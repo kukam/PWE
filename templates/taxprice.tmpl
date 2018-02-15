@@ -1,0 +1,13 @@
+[% PERL %]
+
+### SPRAVNE VOLANI:
+# [% # SET taxprice = 0 %]
+# [% # PROCESS templates/taxprice.tmpl tax=21 price=cartprice round=1 outputname='taxprice' %]
+# [% # taxprice %]
+###
+
+my $tax = (defined($stash->get('tax')) ? $stash->get('tax') : 21); 
+my $price = (defined($stash->get('price')) ? $stash->get('price') : 0);
+my $round = (defined($stash->get('round')) ? $stash->get('round') : 2);
+$stash->set((defined($stash->get('outputname')) ? $stash->get('outputname') : 'taxprice'), sprintf("%.".$round."f", ($price * ($tax/($tax + 100)))));
+[% END %]

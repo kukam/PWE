@@ -1,0 +1,25 @@
+<form [% IF formid %]id="[% formid %]" [% END %] class="form-horizontal" role="form" action="[% script_name %]?page=[% script_page %]&func=default" method="POST">
+   <input type="hidden" name="page" value="[% script_page %]" />
+   <input type="hidden" name="func" value="centity" />
+  <div class="form-group">
+    <label class="col-sm-2 control-label">[% rb.form_name_entity %]</label>
+    <div class="col-sm-10">
+      <input type="text" class="form-control" name="entityname" placeholder="[% rb.form_name_entity_placeholder %]" />
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="col-sm-2 control-label">[% rb.form_def_entity %]</label>
+    <div class="col-sm-10">
+      [% FOREACH dbtable = dbtables_list %]
+         <label class="radio-inline well well-sm"">
+            <input type="radio" name="dbtable" value="[% dbtable %]"> [% dbtable %]
+         </label>
+      [% END %]
+    </div>
+  </div>
+  <div class="form-group">
+    <div class="col-sm-offset-2 col-sm-10">
+      <input type="submit" class="btn btn-default" name="button" value="[% rb.form_button_entity %]" />
+    </div>
+  </div>
+</form>

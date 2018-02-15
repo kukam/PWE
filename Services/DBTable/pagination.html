@@ -1,0 +1,82 @@
+[% UNLESS gopage %]
+    [% SET gopage = table.gopage %]
+[% END %]
+
+[% UNLESS endpage %]
+    [% SET endpage = table.endpage %]
+[% END %]
+
+[% UNLESS pagelist %]
+    [% SET pagelist = table.pagelist %]
+[% END %]
+
+[% UNLESS nlimit %]
+    [% SET nlimit = table.nlimit %]
+[% END %]
+
+[% IF script && table.appendurl %]
+    [% SET script = "$script&tableid=$table.id&$table.appendurl&gopage=" %]
+[% ELSIF table.appendurl %]
+  [% SET script = "$table.script&tableid=$table.id&$table.appendurl&gopage=" %]
+[% ELSIF script %]
+  [% SET script = "$script&tableid=$table.id&gopage=" %]
+[% ELSE %]
+  [% SET script = "$table.script&tableid=$table.id&gopage=" %]
+[% END %]
+
+[% IF enable_ajax %]
+    [% SET ajaxjson = 1 %]
+    [% SET ajaxhtml = 0 %]
+[% ELSIF ajaxjson %]
+    [% SET ajaxjson = 1 %]
+[% ELSIF ajaxhtml %]
+    [% SET ajaxhtml = 1 %]
+[% ELSE %]
+    [% SET ajaxjson = 0 %]
+    [% SET ajaxhtml = 0 %]
+    [% SET enable_ajax = 0 %]
+[% END %]
+
+[% IF endpage != 1 %]
+    <nav>
+    <ul class="pagination">
+
+    [% # Posuneme se o jednu stranu zpet %]
+    [% IF gopage > 1 %]
+        [% SET older = (gopage - 1) %]
+        <li><a [% INCLUDE templates/href.tmpl href="$script$older" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]><span aria-hidden="true">&laquo;</span><span class="sr-only">[% rb.dbtable_older %]</span></a></li>
+    [% ELSE %]
+        <li class="disabled"><a [% INCLUDE templates/href.tmpl href="$script$gopage" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]><span aria-hidden="true">&laquo;</span><span class="sr-only">[% rb.dbtable_older %]</span></a></li>
+    [% END %]
+
+    [% # Moznost prejit na zacatek %]
+    [% IF gopage >= nlimit %]
+        [% SET first = 1 %]
+        <li><a style="margin-right: 10px;" [% INCLUDE templates/href.tmpl href="$script$first" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]>1</a></li>
+    [% END %]    
+    
+    [% SET count = 0 %]
+    [% # Vypsani seznamu stranek %]
+    [% FOREACH p = pagelist %]
+	[% count = p %]
+        <li [% IF p == gopage %]class="active"[% END %]><a [% INCLUDE templates/href.tmpl href="$script$p" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]>[% p %]</a></li>
+    [% END %]
+    
+    [% # Moznost skocit az na konec %]
+    [% IF count != endpage %]
+        <li><a style="margin-left: 10px;" [% INCLUDE templates/href.tmpl href="$script$endpage" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]>[% endpage %]</a></li>
+    [% END %]
+    
+     [% # Posuneme se o jednu stranu dal %]
+    [% IF gopage != endpage && endpage > gopage %]
+        [% SET newer = (gopage + 1) %]
+        <li><a [% INCLUDE templates/href.tmpl href="$script$newer" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]><span aria-hidden="true">&raquo;</span><span class="sr-only">[% rb.dbtable_newer %]</span></a></li>
+    [% ELSE %]
+        <li class="disabled"><a [% INCLUDE templates/href.tmpl href="$script$gopage" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]"><span aria-hidden="true">&raquo;</span><span class="sr-only">[% rb.dbtable_newer %]</span></a></li>
+    [% END %]
+    
+    </ul>
+    </nav>
+[% END %]
+
+

@@ -1,0 +1,12 @@
+<pre id='DATA_DUMPER' style='text-align: left;'>
+    [% PERL %]
+        use Data::Dumper;
+        my $dump = $stash;
+        delete $dump->{'_PARENT'};
+        delete $dump->{'_DEBUG'};
+        my $dmp = Dumper($stash);
+        $dmp =~ s/</&lt;/g;
+        $dmp =~ s/>/&gt;/g;
+        print $dmp;
+    [% END %]
+</pre>

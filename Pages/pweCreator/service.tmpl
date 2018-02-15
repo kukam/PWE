@@ -1,0 +1,51 @@
+package [% services_dir %]::[% servicename %]::[% servicename %];
+
+use strict;
+
+my([% variables %]);
+
+sub new {
+    my ($class,$conf,$log,$validate,$dbi,$entities,$user,$web) = @_;
+
+    $DBI  = $dbi;
+    $LOG  = $log;
+    $WEB  = $web;
+    $CONF = $conf;
+    $USER = $user;
+    $VALIDATE = $validate;
+    $ENTITIES = $entities;
+    
+    my $self = {};
+        
+    bless $self,$class;
+    return $self;
+}
+[% FOREACH s = services %]
+sub Service_[% s %] {
+    my ($self,$input) = @_;
+    [% servicemap.$s %] = $input;
+}
+[% END %]
+# KOMODO-IDE/KOMODO-EDIT
+sub KOMODO {
+    return;
+    require Libs::Config;
+    require Libs::Log;
+    require Libs::Validate;
+    require Libs::DBI;
+    require Libs::Entities;
+    require Libs::User;
+    require Libs::Web;[% FOREACH s = services %]
+    require [% services_dir %]::[% s %]::[% s %];[% END %]
+    
+    $CONF       = new Libs::Config;
+    $LOG        = new Libs::Log;
+    $VALIDATE   = new Libs::Validate;
+    $DBI        = new Libs::DBI;
+    $ENTITIES   = new Libs::Entities;
+    $USER       = new Libs::User;
+    $WEB        = new Libs::Web;[% FOREACH s = services %]
+    [% servicemap.$s %] = new [% services_dir %]::[% s %]::[% s %];[% END %]
+}
+
+1;

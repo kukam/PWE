@@ -1,0 +1,24 @@
+[Unit]
+Description=PWE service
+After=network.target postgresql.service mysql.service nginx.service apache2.service
+Wants=postgresql.service mysql.service
+
+[Service]
+User=kukam
+Group=kukam
+StandardOutput=null
+StandardError=syslog
+Restart=always
+RestartSec=1
+# TCP SOCKET
+#Environment="FCGI_SOCKET_PATH=:9999"
+# UNIX SOCKET
+Environment="FCGI_SOCKET_PATH=/home/kukam/workspace/PWE/examples/static_web/pwe.sock"
+# MAX QUEUE
+Environment="FCGI_LISTEN_QUEUE=10"
+
+WorkingDirectory=/home/kukam/workspace/PWE/examples/static_web
+ExecStart=/home/kukam/workspace/PWE/examples/static_web/pwe.fcgi
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+    <div class="panel panel-default">
+        <div class="panel-heading" role="tab" id="heading_[% formid %]">
+            <h2 class="panel-title">
+                <a class="collapsed" data-toggle="collapse" data-parent="#accordion" href="#collapse_[% formid %]" aria-expanded="false" aria-controls="collapse_[% formid %]">[% formtitle %]</a>
+            </h2>
+        </div>
+        <div id="collapse_[% formid %]" class="panel-collapse collapse" role="tabpanel" aria-labelledby="heading_[% formid %]">
+            <div class="panel-body">
+                <div class="center-block">
+                    [% IF enable_ajax_form %]
+                        <script>$( window ).load(function() { AjaxFormAppender($( "#[% formid %]" )); });</script>
+                    [% END %]
+                    [% INCLUDE "Pages/formExamples/form.html" %]
+                </div>
+            </div>
+        </div>
+    </div>

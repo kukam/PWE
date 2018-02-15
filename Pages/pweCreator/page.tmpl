@@ -1,0 +1,82 @@
+package [% pages_dir %]::[% pagename %]::[% pagename %];
+
+use strict;
+
+my([% variables %]);
+
+sub new {
+    my ($class,$self,$conf,$log,$validate,$dbi,$entities,$user,$web) = @_;
+
+    $DBI  = $dbi;
+    $LOG  = $log;
+    $CONF = $conf;
+    $USER = $user;
+    $WEB  = $web;
+    $VALIDATE = $validate;
+    $ENTITIES = $entities;
+
+    $self->{'func'}->{'default'} = [];
+    
+    $self->{'error'}->{'default'} = "error";
+
+    bless $self,$class;
+    return $self;
+}
+[% IF defsitename %]
+sub Site_[% defsitename %] {
+    my ($self,$input) = @_;
+    $WEB = $input;
+}
+[% END %][% FOREACH s = services %]
+sub Service_[% s %] {
+    my ($self,$input) = @_;
+    [% servicemap.$s %] = $input;
+}
+[% END %]
+# KOMODO-IDE/KOMODO-EDIT
+sub KOMODO {
+    return;
+    require Libs::Config;
+    require Libs::Log;
+    require Libs::Validate;
+    require Libs::DBI;
+    require Libs::Entities;
+    require Libs::User;
+    require [% IF defsitename %][% sites_dir %]::[% defsitename %]::[% defsitename %];[% ELSE %]Libs::Web;[% END %][% FOREACH s = services %]
+    require [% services_dir %]::[% s %]::[% s %];[% END %]
+    
+    $CONF       = new Libs::Config;
+    $LOG        = new Libs::Log;
+    $VALIDATE   = new Libs::Validate;
+    $DBI        = new Libs::DBI;
+    $ENTITIES   = new Libs::Entities;
+    $USER       = new Libs::User;
+    $WEB        = new [% IF defsitename %][% sites_dir %]::[% defsitename %]::[% defsitename %];[% ELSE %]Libs::Web;[% END %][% FOREACH s = services %]
+    [% servicemap.$s %] = new [% services_dir %]::[% s %]::[% s %];[% END %]
+}
+
+sub default {
+    my $self = shift;
+    
+    my $idp = "[% pagename %]_default";
+    
+    # SET ID Page 
+    $WEB->setIDP($idp);
+    $WEB->printHttpHeader();
+    $WEB->printHtmlHeader();
+    $WEB->printHtmlLayout(
+        html_main => "Pages/[% pagename %]/main.html",
+    );
+}
+
+sub error {
+    my ($self,$error) = @_;
+    $WEB->setMessenger("Pages/[% pagename %]/msg.html", msg_error => $error );
+    if ($USER->getParam("ajax_request",0,undef)) {
+        return 400;
+    } else {
+        $self->default();
+    }
+}
+
+1;

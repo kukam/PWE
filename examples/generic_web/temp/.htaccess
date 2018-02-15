@@ -1,0 +1,4 @@
+<Files ~ "\.(pm|pl|log|tmpl|tmplc|bin|html)$">
+    Order Allow,Deny
+    Allow from all
+</Files>

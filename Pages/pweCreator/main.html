@@ -1,0 +1,64 @@
+<h1 class="page-header">[% rb.h1 %]</h1>
+
+<div class="panel-group" id="accordion" role="tablist" aria-multiselectable="false">
+    <div class="panel panel-default">
+        <div class="panel-heading" role="tab" id="headingOne">
+            <h2 class="panel-title">
+                <a class="collapsed" data-toggle="collapse" data-parent="#accordion" href="#collapseOne" aria-expanded="false" aria-controls="collapseOne">[% rb.h2_createpage %]</a>
+            </h2>
+        </div>
+        <div id="collapseOne" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingOne">
+            <div class="panel-body">
+                <div class="center-block">
+                    <script>$( window ).load(function() { AjaxFormAppender($( "#createpage" )); });</script>
+                    [% INCLUDE "Pages/pweCreator/pageForm.html" formid="createpage" %]
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading" role="tab" id="headingTwo">
+            <h2 class="panel-title">
+                <a class="collapsed" data-toggle="collapse" data-parent="#accordion" href="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">[% rb.h2_createservice %]</a>
+            </h2>
+        </div>
+        <div id="collapseTwo" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingTwo">
+            <div class="panel-body">
+                <div class="center-block">
+                    <script>$( window ).load(function() { AjaxFormAppender($( "#createservice" )); });</script>
+                    [% INCLUDE "Pages/pweCreator/serviceForm.html" formid="createservice" %]
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading" role="tab" id="headingThree">
+            <h2 class="panel-title">
+                <a class="collapsed" data-toggle="collapse" data-parent="#accordion" href="#collapseThree" aria-expanded="false" aria-controls="collapseThree">[% rb.h2_createsite %]</a>
+            </h2>
+        </div>
+        <div id="collapseThree" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingThree">
+            <div class="panel-body">
+                <div class="center-block">
+                    <script>$( window ).load(function() { AjaxFormAppender($( "#createsite" )); });</script>
+                    [% INCLUDE "Pages/pweCreator/siteForm.html" formid="createsite" %]
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-heading" role="tab" id="headingFour">
+            <h2 class="panel-title">
+                <a class="collapsed" data-toggle="collapse" data-parent="#accordion" href="#collapseFour" aria-expanded="false" aria-controls="collapseFour">[% rb.h2_createentity %]</a>
+            </h2>
+        </div>
+        <div id="collapseFour" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingFour">
+            <div class="panel-body">
+                <div class="center-block">
+                    <script>$( window ).load(function() { AjaxFormAppender($( "#createentity" )); });</script>
+                    [% INCLUDE "Pages/pweCreator/entityForm.html" formid="createentity" %]
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,68 @@
+package [% sites_dir %]::[% sitename %]::[% sitename %];
+
+use strict;
+
+our ($AUTOLOAD);
+
+my([% variables %]);
+
+sub new {
+    my ($class,$conf,$log,$validate,$dbi,$entities,$user,$web) = @_;
+
+    $DBI  = $dbi;
+    $LOG  = $log;
+    $WEB  = $web;
+    $CONF = $conf;
+    $USER = $user;
+    $VALIDATE = $validate;
+    $ENTITIES = $entities;
+
+    my $self = {};
+
+    bless $self,$class;
+    return $self;
+}
+[% IF defsitename %]
+sub Site_[% defsitename %] {
+    my ($self,$input) = @_;
+    $WEB = $input;
+}
+[% END %][% FOREACH s = services %]
+sub Service_[% s %] {
+    my ($self,$input) = @_;
+    [% servicemap.$s %] = $input;
+}
+[% END %]
+[% FOREACH m = methods %]sub [% m %] { my $self = shift; return $WEB->[% m %](@_); }
+[% END %]
+sub AUTOLOAD {
+    my $self = shift;
+    my $name = $AUTOLOAD;
+    $name =~ s/.*://;
+    return if ($name =~ /^DESTROY$/);
+    return $WEB->$name(@_);
+}
+
+# KOMODO-IDE/KOMODO-EDIT
+sub KOMODO {
+    return;
+    require Libs::Config;
+    require Libs::Log;
+    require Libs::Validate;
+    require Libs::DBI;
+    require Libs::Entities;
+    require Libs::User;
+    require [% IF defsitename %][% sites_dir %]::[% defsitename %]::[% defsitename %];[% ELSE %]Libs::Web;[% END %][% FOREACH s = services %]
+    require [% services_dir %]::[% s %]::[% s %];[% END %]
+    
+    $CONF       = new Libs::Config;
+    $LOG        = new Libs::Log;
+    $VALIDATE   = new Libs::Validate;
+    $DBI        = new Libs::DBI;
+    $ENTITIES   = new Libs::Entities;
+    $USER       = new Libs::User;
+    $WEB        = new [% IF defsitename %][% sites_dir %]::[% defsitename %]::[% defsitename %];[% ELSE %]Libs::Web;[% END %][% FOREACH s = services %]
+    [% servicemap.$s %] = new [% services_dir %]::[% s %]::[% s %];[% END %]
+}
+
+1;

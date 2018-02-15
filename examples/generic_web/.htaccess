@@ -1,0 +1,18 @@
+# HOWTO : http://www.askapache.com/htaccess/speed-up-sites-with-htaccess-caching.html
+
+<FilesMatch "\.(jpg|jpeg|png|gif|swf)$">
+    # 1 WEEK
+    Header set Cache-Control "max-age=604800, public"
+</FilesMatch>
+
+<FilesMatch "\.js$">
+    # 2 DAYS
+    Header set Cache-Control "max-age=172800, proxy-revalidate"
+</FilesMatch>
+
+<Files ~ "\.(pm|pl|log|tmpl|tmplc|bin|html|conf)$">
+    Order Deny,Allow
+    Deny from all
+</Files>
+
+#RewriteEngine on

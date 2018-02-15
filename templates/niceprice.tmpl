@@ -1,0 +1,7 @@
+[% PERL %]
+my $rounded = sprintf("%.".$stash->get('round')."f", $stash->get('price'));
+my $end  = (($stash->get('round') == 0) ? ',-' : '');
+my $point = ($stash->get('point') ? $stash->get('point') : ' ');
+while ($rounded =~ s/^(-?\d+)(\d\d\d)/$1$point$2/){};
+print "$rounded$end <span style=\"text-transform: none !important;\">".$stash->get('currency')."</span>";
+[% END %]

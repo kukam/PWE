@@ -1,0 +1,30 @@
+
+[% SET enable_ajax = 1 %]
+
+<table class="table">
+    <tr>
+        <th>[% INCLUDE Services/DBTable/orderby.html thname="UID" ordercolumn="uid" ajaxjson="$enable_ajax" %]</th>
+        <th>[% INCLUDE Services/DBTable/orderby.html thname="FULLNAME" ordercolumn="fullname" ajaxjson="$enable_ajax" %]</th>
+        <th>[% INCLUDE Services/DBTable/orderby.html thname="CREATED" ordercolumn="created" ajaxjson="$enable_ajax" %]</th>
+        <th>[% INCLUDE Services/DBTable/orderby.html thname="UPDATED" ordercolumn="updated" ajaxjson="$enable_ajax" %]</th>
+        <th>[% INCLUDE Services/DBTable/orderby.html thname="ACTIVE" ordercolumn="active" ajaxjson="$enable_ajax" %]</th>
+    </tr>
+    [% FOREACH h = table.rows %]
+    <tr>
+        <td>[% h.uid %]</td>
+        <td>[% h.fullname %]</td>
+        <td>[% h.created %]</td>
+        <td>[% h.updated %]</td>
+        <td id="columnid-[% h.uid %]">
+          [% SET href = "$script_name?page=$script_page&func=form&uid=$h.uid&active=" %]
+          [% INCLUDE Pages/dbTableExamples/activebtn.html href=href active=h.active ajaxjson="$enable_ajax" %]
+        </td>
+    </tr>
+    [% END %]
+</table>
+[% IF table.endpage > 1 %]
+  <h3>pagination</h3>
+  [% INCLUDE "Services/DBTable/pagination.html" table = table, ajaxjson="$enable_ajax" %]
+  <h3>pager</h3>
+  [% INCLUDE "Services/DBTable/pager.html" table = table, ajaxjson="$enable_ajax" %]
+[% END %]

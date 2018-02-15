@@ -1,0 +1,10 @@
+<h1 class="page-header">[% rb.h1 %]</h1>
+<h2>[% rb.h2_form %]</h2>
+<div class="well well-sm">
+[% INCLUDE "Pages/dbTableExamples/accountForm.html" formid="accountForm" %]
+</div>
+
+<h2>[% rb.h2_table %]</h2>
+<div [% IF table.name %]id="[% table.name %]"[% ELSIF table.id %]id="[% table.id %]"[% END %] class="table-responsive">
+[% INCLUDE "Pages/dbTableExamples/accountTable.html" %]
+</div>

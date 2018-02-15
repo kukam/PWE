@@ -1,0 +1,26 @@
+[% IF script && table.appendurl %]
+    [% SET script = "$script&tableid=$table.id&$table.appendurl&ordercolumn=$ordercolumn&orderby=" %]
+[% ELSIF table.appendurl %]
+  [% SET script = "$table.script&tableid=$table.id&$table.appendurl&ordercolumn=$ordercolumn&orderby=" %]
+[% ELSIF script %]
+  [% SET script = "$script&tableid=$table.id&ordercolumn=$ordercolumn&orderby=" %]
+[% ELSE %]
+  [% SET script = "$table.script&tableid=$table.id&ordercolumn=$ordercolumn&orderby=" %]
+[% END %]
+
+
+[% UNLESS orderby %]
+    [% SET orderby = table.orderby %]
+[% END %]
+
+[% UNLESS enable_ajax %]
+  [% SET enable_ajax = 0 %]
+[% END %]
+
+[% IF orderby == "ASC" %]
+[% SET o = "DESC" %]
+<a [% INCLUDE templates/href.tmpl href="$script$o" ajaxjson="$enable_ajax" %]>[% thname %][% IF table.ordercolumn == ordercolumn %] <i class="glyphicon glyphicon-open"></i>[% END %]</a>
+[% ELSE %]
+[% SET o = "ASC" %]
+<a [% INCLUDE templates/href.tmpl href="$script$o" ajaxjson="$enable_ajax" %]>[% thname %][% IF table.ordercolumn == ordercolumn %] <i class="glyphicon glyphicon-save"></i>[% END %]</a>
+[% END %]
