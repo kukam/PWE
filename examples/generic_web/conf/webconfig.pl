@@ -61,10 +61,10 @@
 
         'db1' => {
             dbdriver 		=> "MySQL",
-            login 		    => "genericweb",
-            password 		=> "genericweb",
-            database 		=> "genericweb",
-            host 		    => "localhost",
+            login 		    => "pwe",
+            password 		=> "pwe",
+            database 		=> "pwe",
+            host 		    => "mysql57",
             logfile		    => "log/mysql",
             loglevel		=> 5,
             dao 		    => 1,
