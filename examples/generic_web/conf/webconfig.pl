@@ -1,7 +1,7 @@
 {
     pwe => {
-        home              => "/PWE/examples/generic_web/",
-        upload_dir        => "ramdisk/upload/",
+        home              => "/PWE/examples/generic_web",
+        upload_dir        => "temp/upload/",
         opts_dir          => "ramdisk/",
         expire_opts_time  => 48,                                                  # hour
         default_tmpl      => "templates/",
