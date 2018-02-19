@@ -1,6 +1,6 @@
 {
     pwe => {
-        home              => "/PWE/examples/generic_web/",
+        home              => "./",
         upload_dir        => "temp/upload/",
         opts_dir          => "ramdisk/",
         expire_opts_time  => 48,                                                  # hour
@@ -64,7 +64,7 @@
             login 		    => "pwe",
             password 		=> "pwe",
             database 		=> "pwe",
-            host 		    => "mysql57",
+            host 		    => "mariadb",
             logfile		    => "log/mysql",
             loglevel		=> 5,
             dao 		    => 1,
@@ -90,7 +90,7 @@
     },
 
     log => {
-        loglevel             => 4,            # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG, 5=PRINT_OUTPUT
+        loglevel             => 5,            # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG, 5=PRINT_OUTPUT
         filter_list          => [],
         error_filter_list    => [],
         warning_filter_list  => [],
