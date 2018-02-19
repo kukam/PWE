@@ -148,7 +148,7 @@ sub write {
     my $pid    = $self->{'pid'};
     my $logdir = $self->{'logdir'};
     my $output = $self->{'output'};
-    my $logout = $logdir . "/webout.log";
+    my $logout = $logdir . "webout.log";
     my $time   = scalar localtime(time);
 
     # PRINT webout.log
