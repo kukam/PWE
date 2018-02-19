@@ -1,6 +1,7 @@
 {
     pwe => {
-        home              => "/PWE/examples/static_web/",
+        #home              => "/PWE/examples/static_web/",
+        home              => "./",
         upload_dir        => "temp/upload/",
         opts_dir          => "ramdisk/",
         expire_opts_time  => 48,                                                 # hour
@@ -63,7 +64,7 @@
     },
 
     log => {
-        loglevel           => 4,              # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG, 5=PRINT_OUTPUT
+        loglevel           => 5,              # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG, 5=PRINT_OUTPUT
         filter_list        => [],
         error_filter_list  => [],
         info_filter_list   => [],

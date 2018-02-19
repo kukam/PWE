@@ -6,8 +6,8 @@
             sid		    VARCHAR(128)			NULL            DEFAULT NULL,
             page		VARCHAR(128)			NULL            DEFAULT NULL,
             func		VARCHAR(128)			NULL            DEFAULT NULL,
-            tmpl		VARCHAR(256)			NULL            DEFAULT NULL,
-            script		VARCHAR(256)			NULL            DEFAULT NULL,
+            tmpl		VARCHAR(255)			NULL            DEFAULT NULL,
+            script		VARCHAR(255)			NULL            DEFAULT NULL,
             query		TEXT				    NOT NULL,
             conditions	TEXT				    NOT NULL,
             ordercolumn	VARCHAR(64)			    NULL            DEFAULT NULL,
@@ -37,8 +37,8 @@
     ",
     3 => "
         CREATE TABLE IF NOT EXISTS `session` (
-            sid          VARCHAR(256)   NOT NULL,
-            useragent	 VARCHAR(256)   NOT NULL,
+            sid          VARCHAR(255)   NOT NULL,
+            useragent	 VARCHAR(255)   NOT NULL,
             ipaddres     VARCHAR(128)   NOT NULL,
             admin		 VARCHAR(1) 	NOT NULL	    DEFAULT 'f',
             messenger	 TEXT			NULL,
