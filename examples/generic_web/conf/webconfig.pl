@@ -90,7 +90,7 @@
     },
 
     log => {
-        loglevel             => 5,            # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG, 5=PRINT_OUTPUT
+        loglevel             => 0,            # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG, 5=PRINT_OUTPUT
         filter_list          => [],
         error_filter_list    => [],
         warning_filter_list  => [],
