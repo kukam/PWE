@@ -21,7 +21,11 @@ use POSIX qw(setsid);
 
 $SIG{TERM} = \&end;
 
-CGI::Fast->file_handles({ fcgi_error_file_handle => IO::Handle->new});
+CGI::Fast->file_handles({
+    fcgi_input_file_handle => IO::Handle->new,
+    fcgi_output_file_handle => \*STDOUT,
+    fcgi_error_file_handle  => IO::Handle->new,
+});
 
 my $CONF = new Libs::Config('conf/webconfig.pl');
 my $LOG  = new Libs::Log($CONF);
@@ -87,7 +91,7 @@ sub daemonize() {
     umask 0;
 }
 
-while (my $CGI = CGI::Fast->new) {
+while (my $CGI = CGI::Fast->new()) {
 
     $DBI->testConnection();
 

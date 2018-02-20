@@ -153,7 +153,7 @@ sub write {
 
     # PRINT webout.log
     if ($self->getLogLevel() > 4 and $self->filterLog('print', $who)) {
-	print STDOUT "PRINT LOG: $text\n";
+	print STDERR "PRINT LOG: $text\n";
     } else {
 	open($output, '>>', $logout) or die "Error Open log:'$logout'";
 	print $output "[$time] $ip $text\n" or die "Error Write log:'$logout'";
