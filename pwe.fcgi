@@ -17,7 +17,7 @@ use Libs::Pages;
 
 use Socket;
 use POSIX qw(setsid);
-require 'syscall.ph';
+#require 'syscall.ph';
 
 $SIG{TERM} = \&end;
 
