@@ -66,7 +66,7 @@
             database 		=> "pwe",
             host 		    => "mariadb",
             logfile		    => "log/mysql",
-            loglevel		=> 5,
+            loglevel		=> 0,
             dao 		    => 1,
             db_pool         => 5,
             daomap_file 	=> "conf/daomap_db1.dump",
