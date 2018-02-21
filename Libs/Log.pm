@@ -12,7 +12,7 @@ sub new {
     $CONF = $conf;
 
     my $self = {
-        'logdir' => ($CONF->getValue("log", "logdir", undef) ? $CONF->getValue("pwe", "home", "") . $CONF->getValue("log", "logdir", undef) : "/dev/null"),
+        'logout' => ($CONF->getValue("log", "logout", undef) ? $CONF->getValue("pwe", "home", "") . $CONF->getValue("log", "logout", undef) : "/dev/null"),
         'loglevel'   => $CONF->getValue("log", "loglevel", 0),
         'delayqueue' => {},
         'ip'         => '127.0.0.1',
@@ -61,12 +61,6 @@ sub debug {
     my ($self, $msg) = @_;
     my $who = sprintf("%s:%d", (caller)[0, 2]);
     $self->write("[D]", "$who :: $msg") if ($self->getLogLevel() > 3 and $self->filterLog('debug', $who));
-}
-
-sub force {
-    my ($self, $msg) = @_;
-    my $who = sprintf("%s:%d", (caller)[0, 2]);
-    $self->write("[F]", "$who :: $msg") if ($self->getLogLevel() > 0);
 }
 
 sub filterLog {
@@ -146,14 +140,14 @@ sub write {
 
     my $ip     = $self->{'ip'};
     my $pid    = $self->{'pid'};
-    my $logdir = $self->{'logdir'};
+    my $logout = $self->{'logout'};
     my $output = $self->{'output'};
-    my $logout = $logdir . "webout.log";
     my $time   = scalar localtime(time);
 
-    # PRINT webout.log
-    if ($self->getLogLevel() > 4 and $self->filterLog('print', $who)) {
-	print STDERR "PRINT LOG: $text\n";
+    if($logout eq $CONF->getValue("pwe", "home", "")."STDOUT"){
+	print STDOUT "[$time] $ip $text\n";
+    } elsif ($logout eq $CONF->getValue("pwe", "home", "")."STDERR") {
+	print STDERR "[$time] $ip $text\n";
     } else {
 	open($output, '>>', $logout) or die "Error Open log:'$logout'";
 	print $output "[$time] $ip $text\n" or die "Error Write log:'$logout'";

@@ -1,6 +1,6 @@
 {
     pwe => {
-        home              => "/PWE/examples/static_web/",
+        home              => "/home/kukam/workspace/PWE.GIT/examples/static_web/",
         upload_dir        => "temp/upload/",
         opts_dir          => "ramdisk/",
         expire_opts_time  => 48,                                                 # hour
@@ -63,7 +63,7 @@
     },
 
     log => {
-        loglevel           => 5,              # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG, 5=PRINT_OUTPUT
+        loglevel           => 4,              # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG
         filter_list        => [],
         error_filter_list  => [],
         info_filter_list   => [],
@@ -76,7 +76,7 @@
         debug_exclude_list => [],
         print_exclude_list => [],
         delay_exclude_list => [],
-        logdir             => "log/",
+        logout             => "log/pwe.log",   # undef = /dev/null, STDOUT, STDERR, log/pwe.log
         log_delay          => 0,                # 1/0 enable/disable
         log_delay_minimum  => "0.001",          # 0.001 = 1ms
     },

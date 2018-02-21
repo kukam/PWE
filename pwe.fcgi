@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use lib './';
 use CGI::Fast socket_perm  => 0770;
+use CGI qw/ :standard /;
 use Libs::Config;
 use Libs::MyDBI;
 use Libs::Log;
@@ -14,18 +15,14 @@ use Libs::User;
 use Libs::Services;
 use Libs::Sites;
 use Libs::Pages;
+use IO::Handle;
 
-use Socket;
 use POSIX qw(setsid);
 #require 'syscall.ph';
 
 $SIG{TERM} = \&end;
 
-CGI::Fast->file_handles({
-    fcgi_input_file_handle => IO::Handle->new,
-    fcgi_output_file_handle => \*STDOUT,
-    fcgi_error_file_handle  => IO::Handle->new,
-});
+CGI::Fast->file_handles({ fcgi_error_file_handle => IO::Handle->new });
 
 my $CONF = new Libs::Config('conf/webconfig.pl');
 my $LOG  = new Libs::Log($CONF);
