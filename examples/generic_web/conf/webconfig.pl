@@ -1,6 +1,6 @@
 {
     pwe => {
-        home              => "/home/kukam/workspace/PWE.GIT/examples/generic_web",
+        home              => "/home/kukam/workspace/PWE.GIT/examples/generic_web/",
         upload_dir        => "temp/upload/",
         opts_dir          => "ramdisk/",
         expire_opts_time  => 48,                                                  # hour
@@ -65,6 +65,7 @@
             password 		=> "pwe",
             database 		=> "pwe",
             host 		    => "mariadb",
+            port		=> 3306,
             logfile		    => "log/mysql",
             loglevel		=> 0,
             dao 		    => 1,

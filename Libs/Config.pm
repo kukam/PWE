@@ -7,6 +7,15 @@ sub new {
 
     my $self = do($file);
 
+    # Moznost prepsat konfiguraci pomoci globalnich promenych (Environment variables)
+     while (my ($key, $value) = each %ENV) {
+	if($key =~ /^PWE_CONF_dbi_(db\d+)_([a-zA-Z0-9-_]+)$/) {
+	    $self->{'dbi'}->{$1}->{$2} = $value if(exists($self->{'dbi'}->{$1}->{$2}));
+	} elsif($key =~ /^PWE_CONF_([a-zA-Z0-9-_]+)_([a-zA-Z0-9-_]+)$/) {
+	    $self->{$1}->{$2} = $value if(exists($self->{$1}->{$2}));
+	}
+    }
+
     bless $self, $class;
     return $self;
 }
