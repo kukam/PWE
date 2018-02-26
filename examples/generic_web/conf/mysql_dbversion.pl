@@ -50,5 +50,8 @@
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_czech_ci;",
     4 => "
         ALTER TABLE dbtable ADD COLUMN  dbid VARCHAR(32)  NOT NULL    DEFAULT 'db1';
-    ",    
+    ",
+    5 => "
+        ALTER TABLE dbtable ADD COLUMN appendurl VARCHAR(255) NULL;
+    "
 }
