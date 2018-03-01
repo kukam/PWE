@@ -27,7 +27,7 @@ sub new {
         'methodlist'      => [],                                    # ziskame seznam zapisovatelnych metod
         'changelist'      => {},
         'errorlist'       => {},
-        'sql_string'      => (($dbdriver eq "MySQL") ? "`" : ""),
+        'sql_string'      => ((($dbdriver eq "mysql") or ($dbdriver eq "maria")) ? "`" : ""),
         'is_share_dbpool' => ($is_share_dbpool ? 1 : 0)             # Informace o sdilenem/nesdilenem connection poolu
     };
 

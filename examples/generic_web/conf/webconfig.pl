@@ -60,7 +60,7 @@
     dbi => {
 
         'db1' => {
-            dbdriver 		=> "MySQL",
+            dbdriver 		=> "mysql",
             login 		    => "pwe",
             password 		=> "pwe",
             database 		=> "pwe",

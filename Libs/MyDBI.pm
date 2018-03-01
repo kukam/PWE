@@ -69,13 +69,13 @@ sub createConnection {
 
     $self->DBC->{$dbid}->{$dbidpool} = {};
 
-    if ($self->getDbDriver($dbid) eq "MySQL") {
+    if (($self->getDbDriver($dbid) eq "mysql") or ($self->getDbDriver($dbid) eq "maria")) {
         require Libs::MyDBI::DRIVER::MySQL;
         $self->DBC->{$dbid}->{$dbidpool} = new Libs::MyDBI::DRIVER::MySQL();
-    } elsif ($self->getDbDriver($dbid) eq "Postgres") {
+    } elsif ($self->getDbDriver($dbid) eq "postgres") {
         require Libs::MyDBI::DRIVER::Postgre;
         $self->DBC->{$dbid}->{$dbidpool} = new Libs::MyDBI::DRIVER::Postgre();
-    } elsif ($self->getDbDriver($dbid) eq "Oracle") {
+    } elsif ($self->getDbDriver($dbid) eq "oracle") {
         require Libs::MyDBI::DRIVER::Oracle;
         $self->DBC->{$dbid}->{$dbidpool} = new Libs::MyDBI::DRIVER::Oracle();
     } else {
@@ -120,9 +120,9 @@ sub checkDbversion {
     my $SQL = undef;
 
     # DAO V TUTO CHVILI JESTE NEJDE POUZIT PRO ZJISTENI EXISTENCE TABULKY, DBI SE ZAKLADA PRED DAO!
-    if ($dbconf->{'dbdriver'} eq "MySQL") {
+    if (($dbconf->{'dbdriver'} eq "mysql") or ($dbconf->{'dbdriver'} eq "maria")) {
         $SQL = $self->select($dbid, "1 FROM information_schema.tables WHERE table_name = ? AND table_schema = ? LIMIT 1", ["dbversion", $dbconf->{'database'}]);
-    } elsif ($dbconf->{'dbdriver'} eq "Postgres") {
+    } elsif ($dbconf->{'dbdriver'} eq "postgres") {
         $SQL = $self->select($dbid, "1 FROM information_schema.tables WHERE table_name = ? AND table_schema = ?", ["dbversion", (defined($dbconf->{'schema'}) ? $dbconf->{'schema'} : "public")]);
     } else {
         die "Unknown dbdriver: $dbconf->{'dbdriver'}\n";

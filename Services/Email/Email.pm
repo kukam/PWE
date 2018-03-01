@@ -41,7 +41,7 @@ sub sendAllEmail {
     my $SQL   = undef;
     my $error = undef;
 
-    if ($DBI->getDbDriver("db1") eq "MySQL") {
+    if (($DBI->getDbDriver("db1") eq "mysql") or ($DBI->getDbDriver("db1") eq "maria")) {
 
         $SQL = $DBI->select("db1", "mid,mailfrom,mailto,replyto,cc,bcc,returnpath,errorto,subject,text,textalt,attachment, TIME_TO_SEC(TIMEDIFF(NOW(),started)) as `timedif` FROM mailqueue WHERE sendstatus = ? AND started < NOW()", ["N"]);
 
