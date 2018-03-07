@@ -1,6 +1,6 @@
 {
     pwe => {
-        home              => "/home/kukam/workspace/PWE.GIT/examples/generic_web/",
+        home              => "./",
         upload_dir        => "temp/upload/",
         opts_dir          => "ramdisk/",
         expire_opts_time  => 48,                                                  # hour
@@ -16,6 +16,8 @@
         cgi_maxfilesize   => (100 * 1048576),                                     # 100MB
         cgi_maxopentries  => 1000,
         cgi_tmpdirectory  => "ramdisk/",
+        assets_dir        => "assets/",                                          # accept read file in this directory (only for unix sock or tcp sock)        
+        assets_browse_dir => "assets/browsable",
         default_page      => "default",
         default_func      => "default",
         development       => 1,

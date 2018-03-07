@@ -129,7 +129,7 @@ while (my $CGI = CGI::Fast->new()) {
         $USER->setParameter('cgi_error', [$error]);
         my $result = $PAGES->callPageFunc('errorPage', 'cgi_error');
 
-    } else {
+    } elsif ((".".$env->{'SCRIPT_NAME'} eq "$0") or ($env->{'SCRIPT_NAME'} eq "/")) {
 
         my $result = $PAGES->callPageFunc($page, $func);
 
@@ -158,6 +158,38 @@ while (my $CGI = CGI::Fast->new()) {
         } else {
             $result_info = "200, OK";
         }
+    } elsif ($env->{'SCRIPT_NAME'} =~ m/../) {
+        $USER->setPage('errorPage');
+        $USER->setFunc('e401');
+        $PAGES->callPageFunc('errorPage', 'e401');        
+    } elsif ((-f ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\Q$CONF->getValue('pwe','assets_dir',notdefinedvalue)\E/)) {
+        my $fname = $env->{'SCRIPT_NAME'};
+        my $dname = $env->{'SCRIPT_NAME'};
+        $fname =~ s{.*/}{};
+        $dname =~ s{\.[^.]+$}{};
+        if($fname =~ /\.js$/) {
+            $WEB->printHttpHeader('type' => 'js');
+        } elsif ($fname =~ /\.css$/) {
+            $WEB->printHttpHeader('type' => 'css');
+        } else {
+            print $CGI->header( -type => "application/octet-stream", -expires => "-1d", -attachment => "$fname" );
+        }
+        if ( open (FILE, "<", ".".$env->{"SCRIPT_NAME"})) {
+            binmode FILE;
+            print <FILE>;
+            close (FILE);
+        } else {
+            print "sorry, cannot open file!"
+        }
+    } elsif ((-d ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\Q$CONF->getValue('pwe','assets_dir',notdefinedvalue)\E/)) {
+        # TODO: make browsable folder
+        $USER->setPage('errorPage');
+        $USER->setFunc('e400');
+        $PAGES->callPageFunc('errorPage', 'e400');
+    } else {
+        $USER->setPage('errorPage');
+        $USER->setFunc('e404');
+        $PAGES->callPageFunc('errorPage', 'e404');
     }
 
     $LOG->info("User call page finis: PID:$$ page:$page func:$func result:$result_info");
