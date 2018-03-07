@@ -119,10 +119,11 @@ while (my $CGI = CGI::Fast->new()) {
     }
 
     my $result_info = "";
-    
-    print STDERR ">>> $env->{'SCRIPT_NAME'} <<<\n";
-    print STDERR ">>> ".$CONF->getValue('pwe','assets_dir','notdefinedvalue')." <<<\n";
-    print STDERR "$0\n";
+
+    my $myscript = $0;
+    my $uri = $env->{'SCRIPT_NAME'};
+    $uri =~ s/^(\.)?\///g;
+    $myscript =~ s/^(\.)?\///g;
     
     if ($CGI->cgi_error()) {
 
@@ -133,7 +134,7 @@ while (my $CGI = CGI::Fast->new()) {
         $USER->setParameter('cgi_error', [$error]);
         my $result = $PAGES->callPageFunc('errorPage', 'cgi_error');
 
-    } elsif ((".".$env->{'SCRIPT_NAME'} eq "$0") or ($env->{'SCRIPT_NAME'} eq "/")) {
+    } elsif (($uri eq $myscript) or (!$uri)) {
 
         my $result = $PAGES->callPageFunc($page, $func);
 
@@ -162,15 +163,15 @@ while (my $CGI = CGI::Fast->new()) {
         } else {
             $result_info = "200, OK";
         }
-    } elsif ($env->{'SCRIPT_NAME'} =~ /\Q..\E/) {
+    } elsif ($uri =~ /\Q..\E/) {
         $USER->setPage('errorPage');
         $USER->setFunc('e401');
         $PAGES->callPageFunc('errorPage', 'e401');        
-    } elsif ((-f ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\/\Q$CONF->getValue('pwe','assets_dir','notdefinedvalue')\E/)) {
-        my $fname = $env->{'SCRIPT_NAME'};
-        my $dname = $env->{'SCRIPT_NAME'};
+        $result_info = "401, No access";
+    } elsif ((-f $uri) and ($uri =~ /^\Q$CONF->getValue('pwe','assets_dir','notdefinedvalue')\E/)) {
+        my $fname = $uri;
         $fname =~ s{.*/}{};
-        $dname =~ s{\.[^.]+$}{};
+        #$dname =~ s{\.[^.]+$}{};
         if($fname =~ /\.js$/) {
             $WEB->printHttpHeader('type' => 'js');
         } elsif ($fname =~ /\.css$/) {
@@ -178,22 +179,24 @@ while (my $CGI = CGI::Fast->new()) {
         } else {
             print $CGI->header( -type => "application/octet-stream", -expires => "-1d", -attachment => "$fname" );
         }
-        if ( open (FILE, "<", ".".$env->{"SCRIPT_NAME"})) {
+        if ( open (FILE, "<", $uri)) {
             binmode FILE;
             print <FILE>;
             close (FILE);
         } else {
             print "sorry, cannot open file!"
         }
-    } elsif ((-d ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\/\Q$CONF->getValue('pwe','assets_browse_dir','notdefinedvalue')\E/)) {
+    } elsif ((-d $uri) and ($uri =~ /^\Q$CONF->getValue('pwe','assets_browse_dir','notdefinedvalue')\E/)) {
         # TODO: make browsable folder
         $USER->setPage('errorPage');
         $USER->setFunc('e400');
         $PAGES->callPageFunc('errorPage', 'e400');
+        $result_info = "400, Bad parameter";
     } else {
         $USER->setPage('errorPage');
         $USER->setFunc('e404');
         $PAGES->callPageFunc('errorPage', 'e404');
+        $result_info = "404, Page not found";
     }
 
     $LOG->info("User call page finis: PID:$$ page:$page func:$func result:$result_info");
