@@ -119,7 +119,10 @@ while (my $CGI = CGI::Fast->new()) {
     }
 
     my $result_info = "";
-
+    
+    print STDERR ">>> $env->{'SCRIPT_NAME'} <<<\n";
+    print STDERR ">>> ".$CONF->getValue('pwe','assets_dir','notdefinedvalue')." <<<\n";
+    
     if ($CGI->cgi_error()) {
 
         my $error = $CGI->cgi_error();
@@ -162,7 +165,7 @@ while (my $CGI = CGI::Fast->new()) {
         $USER->setPage('errorPage');
         $USER->setFunc('e401');
         $PAGES->callPageFunc('errorPage', 'e401');        
-    } elsif ((-f ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\/$CONF->getValue('pwe','assets_dir',notdefinedvalue)/)) {
+    } elsif ((-f ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\/$CONF->getValue('pwe','assets_dir','notdefinedvalue')/)) {
         my $fname = $env->{'SCRIPT_NAME'};
         my $dname = $env->{'SCRIPT_NAME'};
         $fname =~ s{.*/}{};
@@ -181,7 +184,7 @@ while (my $CGI = CGI::Fast->new()) {
         } else {
             print "sorry, cannot open file!"
         }
-    } elsif ((-d ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\/$CONF->getValue('pwe','assets_browse_dir',notdefinedvalue)/)) {
+    } elsif ((-d ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\/$CONF->getValue('pwe','assets_browse_dir','notdefinedvalue')/)) {
         # TODO: make browsable folder
         $USER->setPage('errorPage');
         $USER->setFunc('e400');
