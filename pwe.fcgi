@@ -158,7 +158,7 @@ while (my $CGI = CGI::Fast->new()) {
         } else {
             $result_info = "200, OK";
         }
-    } elsif ($env->{'SCRIPT_NAME'} =~ m/../) {
+    } elsif ($env->{'SCRIPT_NAME'} =~ /\Q..\E/) {
         $USER->setPage('errorPage');
         $USER->setFunc('e401');
         $PAGES->callPageFunc('errorPage', 'e401');        
@@ -181,7 +181,7 @@ while (my $CGI = CGI::Fast->new()) {
         } else {
             print "sorry, cannot open file!"
         }
-    } elsif ((-d ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\Q$CONF->getValue('pwe','assets_dir',notdefinedvalue)\E/)) {
+    } elsif ((-d ".".$env->{'SCRIPT_NAME'}) and ($env->{'SCRIPT_NAME'} =~ /^\Q$CONF->getValue('pwe','assets_browse_dir',notdefinedvalue)\E/)) {
         # TODO: make browsable folder
         $USER->setPage('errorPage');
         $USER->setFunc('e400');
