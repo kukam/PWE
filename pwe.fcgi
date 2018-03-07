@@ -125,6 +125,8 @@ while (my $CGI = CGI::Fast->new()) {
     $uri =~ s/^(\.)?\///g;
     $myscript =~ s/^(\.)?\///g;
     
+    print STDERR ">>>".$CONF->getValue('pwe','assets_dir',undef)." $uri \n";
+    
     if ($CGI->cgi_error()) {
 
         my $error = $CGI->cgi_error();
@@ -168,7 +170,7 @@ while (my $CGI = CGI::Fast->new()) {
         $USER->setFunc('e401');
         $PAGES->callPageFunc('errorPage', 'e401');        
         $result_info = "401, No access";
-    } elsif ((-f $uri) and ($uri =~ /^\Q$CONF->getValue('pwe','assets_dir','notdefinedvalue')\E/)) {
+    } elsif ((-f $uri) and ($CONF->getValue('pwe','assets_dir',undef) =~ /^\Q$uri\E/)) {
         my $fname = $uri;
         $fname =~ s{.*/}{};
         #$dname =~ s{\.[^.]+$}{};
@@ -186,7 +188,7 @@ while (my $CGI = CGI::Fast->new()) {
         } else {
             print "sorry, cannot open file!"
         }
-    } elsif ((-d $uri) and ($uri =~ /^\Q$CONF->getValue('pwe','assets_browse_dir','notdefinedvalue')\E/)) {
+    } elsif ((-d $uri) and ($CONF->getValue('pwe','assets_browse_dir',undef) =~ /^\Q$uri\E/)) {
         # TODO: make browsable folder
         $USER->setPage('errorPage');
         $USER->setFunc('e400');
