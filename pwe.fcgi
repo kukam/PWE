@@ -126,8 +126,8 @@ while (my $CGI = CGI::Fast->new()) {
     #$myscript =~ s/^(\.)?\///g;
     #use Data::Dumper;
     #print STDERR Dumper(\%ENV);
-    print STDERR "$0\n";
-    print STDERR "$env->{'SCRIPT_FILENAME'}\n";
+    #print STDERR "$0\n";
+    #print STDERR "$env->{'SCRIPT_FILENAME'}\n";
     
     if ($CGI->cgi_error()) {
         my $error = $CGI->cgi_error();
@@ -136,7 +136,7 @@ while (my $CGI = CGI::Fast->new()) {
         $USER->setFunc('cgi_error');
         $USER->setParameter('cgi_error', [$error]);
         $result = $PAGES->callPageFunc('errorPage', 'cgi_error');
-    } elsif (($0 =~ /^[\.\/]?\Q$env->{'SCRIPT_FILENAME'}\E/) or ($env->{'SCRIPT_FILENAME'} eq "/") or (!$env->{'SCRIPT_FILENAME'})) {
+    } elsif (($0 =~ /^[\.\/]?\Q$env->{'SCRIPT_FILENAME'}\E/) or ("./".$0 =~ /^[\.\/]?\Q$env->{'SCRIPT_FILENAME'}\E/) or ($env->{'SCRIPT_FILENAME'} eq "/") or (!$env->{'SCRIPT_FILENAME'})) {
         $result = $PAGES->callPageFunc($page, $func);
     } elsif ($env->{'SCRIPT_FILENAME'} =~ /\Q..\E/) {
         $result = 401;
