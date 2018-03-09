@@ -126,7 +126,9 @@ while (my $CGI = CGI::Fast->new()) {
     #$myscript =~ s/^(\.)?\///g;
     #use Data::Dumper;
     #print STDERR Dumper(\%ENV);
-        
+    print STDERR "$0\n";
+    print STDERR "$env->{'SCRIPT_FILENAME'}\n";
+    
     if ($CGI->cgi_error()) {
         my $error = $CGI->cgi_error();
         $result_info = $error;
