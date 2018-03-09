@@ -157,6 +157,8 @@ sub printHttpHeader {
         $output = $self->genTmpl("templates/HttpHeaderRedirect.tmpl", %tmpl);
     } elsif ($tmpl_type eq "image" and $tmpl{'image'}) {
         $output = $self->genTmpl("templates/HttpHeaderImage.tmpl", %tmpl);
+    } elsif ($tmpl_type eq "file" and $tmpl{'filename'}) {
+        $output = $self->genTmpl("templates/HttpHeaderOctetStream.tmpl", %tmpl);
     } elsif ($tmpl_type eq "csvdown") {
         $output = $self->genTmpl("templates/HttpHeaderCsvDownload.tmpl", %tmpl);
     } elsif ($tmpl_type eq "400") {

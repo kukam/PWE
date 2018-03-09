@@ -65,7 +65,7 @@
     },
 
     log => {
-        loglevel           => 4,              # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG
+        loglevel           => 1,              # 0=DISABLE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG
         filter_list        => [],
         error_filter_list  => [],
         info_filter_list   => [],
@@ -78,7 +78,8 @@
         debug_exclude_list => [],
         print_exclude_list => [],
         delay_exclude_list => [],
-        logout             => "log/pwe.log",   # undef = /dev/null, STDOUT, STDERR, log/pwe.log
+        logout             => "STDERR",   # undef = /dev/null, STDOUT, STDERR, log/pwe.log
+        #logout             => "log/pwe.log",   # undef = /dev/null, STDOUT, STDERR, log/pwe.log
         log_delay          => 0,                # 1/0 enable/disable
         log_delay_minimum  => "0.001",          # 0.001 = 1ms
     },

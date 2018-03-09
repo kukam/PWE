@@ -118,87 +118,60 @@ while (my $CGI = CGI::Fast->new()) {
         $USER->setParameter($p, \@params);
     }
 
-    my $result_info = "";
+    my ($result, $result_info);
 
-    my $myscript = $0;
-    my $uri = $env->{'SCRIPT_NAME'};
-    $uri =~ s/^(\.)?\///g;
-    $myscript =~ s/^(\.)?\///g;
+    #my $myscript = $0;
+    #my $uri = $env->{'SCRIPT_NAME'};
+    #$uri =~ s/^(\.)?\///g;
+    #$myscript =~ s/^(\.)?\///g;
+    #use Data::Dumper;
+    #print STDERR Dumper(\%ENV);
         
     if ($CGI->cgi_error()) {
-
         my $error = $CGI->cgi_error();
         $result_info = $error;
         $USER->setPage('errorPage');
         $USER->setFunc('cgi_error');
         $USER->setParameter('cgi_error', [$error]);
-        my $result = $PAGES->callPageFunc('errorPage', 'cgi_error');
-
-    } elsif (($uri eq $myscript) or (!$uri)) {
-
-        my $result = $PAGES->callPageFunc($page, $func);
-
-        if (!$result) {
-            $result_info = "200, OK";
-        } elsif ($result eq 404) {
-            $USER->setPage('errorPage');
-            $USER->setFunc('e404');
-            $PAGES->callPageFunc('errorPage', 'e404');
-            $result_info = "404, Page not found";
-        } elsif ($result eq 500) {
-            $USER->setPage('errorPage');
-            $USER->setFunc('e500');
-            $PAGES->callPageFunc('errorPage', 'e500');
-            $result_info = "500, Error page";
-        } elsif ($result eq 401) {
-            $USER->setPage('errorPage');
-            $USER->setFunc('e401');
-            $PAGES->callPageFunc('errorPage', 'e401');
-            $result_info = "401, No access";
-        } elsif ($result eq 400) {
-            $USER->setPage('errorPage');
-            $USER->setFunc('e400');
-            $PAGES->callPageFunc('errorPage', 'e400');
-            $result_info = "400, Bad parameter";
-        } else {
-            $result_info = "200, OK";
-        }
-    } elsif ($uri =~ /\Q..\E/) {
+        $result = $PAGES->callPageFunc('errorPage', 'cgi_error');
+    } elsif (($0 =~ /^[\.\/]?\Q$env->{'SCRIPT_FILENAME'}\E/) or ($env->{'SCRIPT_FILENAME'} eq "/") or (!$env->{'SCRIPT_FILENAME'})) {
+        $result = $PAGES->callPageFunc($page, $func);
+    } elsif ($env->{'SCRIPT_FILENAME'} =~ /\Q..\E/) {
+        $result = 401;
+    } elsif (-f $CONF->getValue('pwe','home','')."$env->{'SCRIPT_FILENAME'}") {
+        $result = $PAGES->callPageFunc('systemPage', 'file');
+    } elsif (-d $CONF->getValue('pwe','home','')."$env->{'SCRIPT_FILENAME'}") {
+        $result = $PAGES->callPageFunc('systemPage', 'folder');
+    } else {
+        $result = 404;
+    }
+    
+    if (!$result) {
+        $result_info = "200, OK";
+    } elsif ($result eq 404) {
+        $USER->setPage('errorPage');
+        $USER->setFunc('e404');
+        $PAGES->callPageFunc('errorPage', 'e404');
+        $result_info = "404, Page not found";
+    } elsif ($result eq 500) {
+        $USER->setPage('errorPage');
+        $USER->setFunc('e500');
+        $PAGES->callPageFunc('errorPage', 'e500');
+        $result_info = "500, Error page";
+    } elsif ($result eq 401) {
         $USER->setPage('errorPage');
         $USER->setFunc('e401');
-        $PAGES->callPageFunc('errorPage', 'e401');        
+        $PAGES->callPageFunc('errorPage', 'e401');
         $result_info = "401, No access";
-    } elsif ((-f $uri) and ($uri =~ /^assets\//)) {
-        my $fname = $uri;
-        $fname =~ s{.*/}{};
-        #$dname =~ s{\.[^.]+$}{};
-        if($fname =~ /\.js$/) {
-            $WEB->printHttpHeader('type' => 'js');
-        } elsif ($fname =~ /\.css$/) {
-            $WEB->printHttpHeader('type' => 'css');
-        } else {
-            print $CGI->header( -type => "application/octet-stream", -expires => "-1d", -attachment => "$fname" );
-        }
-        if ( open (FILE, "<", $uri)) {
-            binmode FILE;
-            print <FILE>;
-            close (FILE);
-        } else {
-            print "sorry, cannot open file!"
-        }
-    } elsif ((-d $uri) and ($uri =~ /^assets\//)) {
-        # TODO: make browsable folder
+    } elsif ($result eq 400) {
         $USER->setPage('errorPage');
         $USER->setFunc('e400');
         $PAGES->callPageFunc('errorPage', 'e400');
         $result_info = "400, Bad parameter";
     } else {
-        $USER->setPage('errorPage');
-        $USER->setFunc('e404');
-        $PAGES->callPageFunc('errorPage', 'e404');
-        $result_info = "404, Page not found";
+        $result_info = "200, OK";
     }
-
+    
     $LOG->info("User call page finis: PID:$$ page:$page func:$func result:$result_info");
 
     $page = $USER->getPage();
