@@ -136,7 +136,7 @@ while (my $CGI = CGI::Fast->new()) {
         $USER->setFunc('cgi_error');
         $USER->setParameter('cgi_error', [$error]);
         $result = $PAGES->callPageFunc('errorPage', 'cgi_error');
-    } elsif (($0 =~ /^[\.\/]?\Q$env->{'SCRIPT_FILENAME'}\E/) or ("./".$0 =~ /^[\.\/]?\Q$env->{'SCRIPT_FILENAME'}\E/) or ($env->{'SCRIPT_FILENAME'} eq "/") or (!$env->{'SCRIPT_FILENAME'})) {
+    } elsif (($0 eq $env->{'SCRIPT_FILENAME'}) or ("/".$0 eq $env->{'SCRIPT_FILENAME'}) or ($0 eq ".".$env->{'SCRIPT_FILENAME'}) or ($env->{'SCRIPT_FILENAME'} eq "/") or (!$env->{'SCRIPT_FILENAME'})) {
         print STDERR ">>>>>>>>>>>>>>>> if 2\n";
         $result = $PAGES->callPageFunc($page, $func);
     } elsif ($env->{'SCRIPT_FILENAME'} =~ /\Q..\E/) {
