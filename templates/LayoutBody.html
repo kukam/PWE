@@ -1,5 +1,3 @@
 [% # HLAVNI LAYOUT %]
-
-<body>
-</body>
-</html>
+[% PROCESS templates/resource_bundle.tmpl %]
+<body>[% IF html_main %][% INCLUDE $html_main %][% END %]</body></html>

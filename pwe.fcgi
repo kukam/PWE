@@ -119,15 +119,7 @@ while (my $CGI = CGI::Fast->new()) {
     }
 
     my ($result, $result_info);
-
-    #my $myscript = $0;
-    #my $uri = $env->{'SCRIPT_NAME'};
-    #$uri =~ s/^(\.)?\///g;
-    #$myscript =~ s/^(\.)?\///g;
-    #use Data::Dumper;
-    #print STDERR Dumper(\%ENV);
-    #print STDERR ">>>>>>>>>>>>>>>> script:$0 script_filename:$env->{'SCRIPT_FILENAME'}\n";
-    
+   
     if ($CGI->cgi_error()) {
         my $error = $CGI->cgi_error();
         $result_info = $error;
@@ -135,10 +127,10 @@ while (my $CGI = CGI::Fast->new()) {
         $USER->setFunc('cgi_error');
         $USER->setParameter('cgi_error', [$error]);
         $result = $PAGES->callPageFunc('errorPage', 'cgi_error');
+    } elsif ($env->{'SCRIPT_FILENAME'} =~ /\.\./) {
+        $result = 401;
     } elsif (($0 eq $env->{'SCRIPT_FILENAME'}) or ("/".$0 eq $env->{'SCRIPT_FILENAME'}) or ($0 eq ".".$env->{'SCRIPT_FILENAME'}) or ($env->{'SCRIPT_FILENAME'} eq "/") or (!$env->{'SCRIPT_FILENAME'})) {
         $result = $PAGES->callPageFunc($page, $func);
-    } elsif ($env->{'SCRIPT_FILENAME'} =~ /\Q..\E/) {
-        $result = 401;
     } elsif (-f $CONF->getValue('pwe','home','')."$env->{'SCRIPT_FILENAME'}") {
         $result = $PAGES->callPageFunc('systemPage', 'file');
     } elsif (-d $CONF->getValue('pwe','home','')."$env->{'SCRIPT_FILENAME'}") {

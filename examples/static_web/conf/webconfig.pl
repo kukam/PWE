@@ -1,7 +1,7 @@
 {
     pwe => {
         home              => "./",
-        upload_dir        => "temp/upload/",
+        upload_dir        => "assets/browsable/",
         opts_dir          => "ramdisk/",
         expire_opts_time  => 48,                                                 # hour
         default_tmpl      => "templates/",
@@ -17,7 +17,7 @@
         cgi_maxopentries  => 1000,
         cgi_tmpdirectory  => "ramdisk/",
         assets_dir        => "assets/",                                          # accept read file in this directory (only for unix sock or tcp sock)
-        assets_browse_dir => "assets/browsable",
+        assets_browse_dir => "assets/browsable/",
         default_page      => "default",
         default_func      => "default",
         development       => 1,

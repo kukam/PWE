@@ -1,0 +1,13 @@
+<h1>Index of [% dir %]</h1>
+<table style="text-align: left">
+<tr><th style="min-width:20px" valign="top"></td><th style="min-width:100px">Name</th><th style="min-width:100px">Last modified</th><th style="min-width:100px; text-align: right;">Size</th></tr>
+<tr><th colspan="4"><hr></th></tr>
+[% IF dir != basedir %]
+<tr><td valign="top"><a href="../">Parent Directory</a></td><td>&nbsp;</td><td align="right">  - </td></tr>
+[% END %]
+[% FOREACH h IN table.rows %]
+<tr><td style="min-width:20px" valign="top">[[% h.type %]]</td><td style="min-width:100px"><a style="font-size: 16px; font-weight: bold" href="[% h.name %]">[% h.name %]</a></td><td style="min-width:100px" align="right">[% h.date %]</td><td style="min-width:100px" align="right">[% h.size %]</td></tr>
+[% END %]
+<tr><th colspan="4"><hr></th></tr>
+</table>
+<address>PWE file browser</address>

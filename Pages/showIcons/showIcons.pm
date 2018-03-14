@@ -70,7 +70,7 @@ sub default {
     $WEB->setIDP($idp);
     $WEB->printHttpHeader();
     $WEB->printHtmlHeader();
-    $WEB->printHtmlLayout(html_main => "Pages/showIcons/main.html",);
+    $WEB->printHtmlLayout(html_main => "Pages/showIcons/main.html");
 }
 
 sub awesome_674_20150914 {
