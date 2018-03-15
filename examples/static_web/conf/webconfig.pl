@@ -16,9 +16,9 @@
         cgi_maxfilesize   => (100 * 1048576),                                    # 100MB
         cgi_maxopentries  => 1000,
         cgi_tmpdirectory  => "ramdisk/",
-        assets_file       => ["/favicon.ico"],        
-        assets_dir        => ["assets/"],                                          # accept read file in this directory (only for unix sock or tcp sock)
-        assets_browse_dir => ["assets/browsable/"],
+        assets_file       => "/favicon.ico, robots.txt",        
+        assets_dir        => "assets/",                                          # accept read file in this directory (only for unix sock or tcp sock)
+        assets_browse_dir => "assets/browsable/, uploadfiles/",
         default_page      => "default",
         default_func      => "default",
         development       => 1,

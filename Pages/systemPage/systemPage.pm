@@ -131,7 +131,7 @@ sub scaledbytes {
 sub checkassets {
     my ($self,$check,$asset_key) = @_;
     
-    foreach my $asset (@{$CONF->getValue('pwe',$asset_key,[])}) {
+    foreach my $asset (split(/\s*,\s*/, $CONF->getValue('pwe',$asset_key,""))) {
         return $asset if($check =~ /^[\.\/]?\Q$asset\E.*/);
     }
     return undef;
