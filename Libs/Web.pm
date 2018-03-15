@@ -149,6 +149,8 @@ sub printHttpHeader {
         $output = $self->genTmpl("templates/HttpHeaderPlain.tmpl", %tmpl);
     } elsif ($tmpl_type eq "js") {
         $output = $self->genTmpl("templates/HttpHeaderJavascript.tmpl", %tmpl);
+    } elsif ($tmpl_type eq "font") {
+        $output = $self->genTmpl("templates/HttpHeaderFont.tmpl", %tmpl);        
     } elsif ($tmpl_type eq "ajax") {
         $output = $self->genTmpl("templates/HttpHeaderAjax.tmpl", %tmpl);
     } elsif ($tmpl_type eq "ajax_redirect") {

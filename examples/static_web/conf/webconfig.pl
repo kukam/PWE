@@ -16,8 +16,9 @@
         cgi_maxfilesize   => (100 * 1048576),                                    # 100MB
         cgi_maxopentries  => 1000,
         cgi_tmpdirectory  => "ramdisk/",
-        assets_dir        => "assets/",                                          # accept read file in this directory (only for unix sock or tcp sock)
-        assets_browse_dir => "assets/browsable/",
+        assets_file       => ["/favicon.ico"],        
+        assets_dir        => ["assets/"],                                          # accept read file in this directory (only for unix sock or tcp sock)
+        assets_browse_dir => ["assets/browsable/"],
         default_page      => "default",
         default_func      => "default",
         development       => 1,
@@ -78,8 +79,7 @@
         debug_exclude_list => [],
         print_exclude_list => [],
         delay_exclude_list => [],
-        logout             => "STDERR",   # undef = /dev/null, STDOUT, STDERR, log/pwe.log
-        #logout             => "log/pwe.log",   # undef = /dev/null, STDOUT, STDERR, log/pwe.log
+        logout             => "STDERR",         # undef = /dev/null, STDOUT, STDERR, log/pwe.log
         log_delay          => 0,                # 1/0 enable/disable
         log_delay_minimum  => "0.001",          # 0.001 = 1ms
     },

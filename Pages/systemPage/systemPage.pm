@@ -49,15 +49,17 @@ sub KOMODO {
 sub file {
     my $self = shift;
 
-    my $idp = "default";
+    my $idp = "read_file";
 
     # SET ID Page
     $WEB->setIDP($idp);
     
-    my $asset = $CONF->getValue('pwe','assets_dir','assets/');
-    return 401 if($USER->getEnv('SCRIPT_FILENAME',undef) !~ /^[\.\/]?\Q$asset\E.*/);
+    my $home = $CONF->getValue('pwe','home','');
+    my $scriptname = $USER->getEnv('SCRIPT_FILENAME',undef);
     
-    my $file = $CONF->getValue('pwe','home','').$USER->getEnv('SCRIPT_FILENAME',undef);
+    return 401 if(!$self->checkassets($scriptname, 'assets_dir') and !$self->checkassets($scriptname, 'assets_file'));
+    
+    my $file = $home.$scriptname;
     
     my $fshort = $file;
     $fshort =~ s{.*/}{};
@@ -66,6 +68,8 @@ sub file {
         $WEB->printHttpHeader('type' => 'js');
     } elsif ($file =~ /\.css$/) {
         $WEB->printHttpHeader('type' => 'css');
+    } elsif ($file =~ /\.woff2$/) {
+        $WEB->printHttpHeader('type' => 'font', font => "woff2");
     } else {
         $WEB->printHttpHeader('type' => 'file', filename => $fshort);
     }
@@ -82,11 +86,16 @@ sub file {
 
 sub folder {
     my $self = shift;
+
+    # SET ID Page
+    $WEB->setIDP('list_directory');
     
-    my $asset = $CONF->getValue('pwe','assets_browse_dir','assets/browsable/');
     my $home = $CONF->getValue('pwe','home','');
     my $dir = $USER->getEnv('SCRIPT_FILENAME',undef);
-    return 401 if($dir !~ /^[\.\/]?\Q$asset\E.*/);
+    
+    my $basedir = $self->checkassets($dir, 'assets_browse_dir');
+
+    return 401 unless($basedir);
     
     my $table = {};
     opendir(LISTDIR, $home.$dir) || die "Can't open $dir: $!";
@@ -106,11 +115,9 @@ sub folder {
     }
     closedir LISTDIR;
 
-    # SET ID Page
-    $WEB->setIDP('list_directory');
     $WEB->printHttpHeader();
     $WEB->printHtmlHeader(layout_header => "templates/LayoutHeader.html", title => $dir);
-    $WEB->printHtmlLayout(layout_body => "templates/LayoutBody.html", html_main => "Pages/systemPage/list.html", basedir => "/".$asset, dir => $dir, table => $table);
+    $WEB->printHtmlLayout(layout_body => "templates/LayoutBody.html", html_main => "Pages/systemPage/list.html", basedir => "/$basedir", dir => $dir, table => $table);
     #$dname =~ s{\.[^.]+$}{};
     return 200;
 }
@@ -119,6 +126,15 @@ sub scaledbytes {
    (sort { length $a <=> length $b }
    map { sprintf '%.3g%s', $_[0]/1024**$_->[1], $_->[0] }
    [" bytes"=>0],[KB=>1],[MB=>2],[GB=>3],[TB=>4],[PB=>5],[EB=>6])[0]
+}
+
+sub checkassets {
+    my ($self,$check,$asset_key) = @_;
+    
+    foreach my $asset (@{$CONF->getValue('pwe',$asset_key,[])}) {
+        return $asset if($check =~ /^[\.\/]?\Q$asset\E.*/);
+    }
+    return undef;
 }
 
 1;
