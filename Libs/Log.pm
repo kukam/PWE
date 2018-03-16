@@ -109,7 +109,7 @@ sub excludeLog {
 
 =head2 B<[Public] delay()>
 
-    Metoda zapise do logu delay.
+    Metoda zapise do logu delay, a vrati cas spozdeni.
     
 =cut
 
@@ -122,6 +122,7 @@ sub delay {
 
     unless (defined($self->{'delayqueue'}->{$key})) {
         $self->{'delayqueue'}->{$key} = Time::HiRes::time();
+        return 0;
     } else {
         my $start = $self->{'delayqueue'}->{$key};
         my $stop  = Time::HiRes::time();
@@ -129,6 +130,7 @@ sub delay {
         my $who   = sprintf("%s:%d", (caller)[0, 2]);
         $self->write("[d]", "$who :: $key :: $text [ delay : $delay/s ]") if ($delay >= $CONF->getValue("log", "log_delay_minimum", 0) and $self->filterLog('delay', $who));
         delete $self->{'delayqueue'}->{$key};
+        return $delay;
     }
 }
 

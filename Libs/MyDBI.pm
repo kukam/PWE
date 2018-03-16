@@ -20,6 +20,8 @@ sub new {
 
     bless $self, $class;
 
+    my $tray_connet = 1;
+
     # Connect to Databases + Gen MAPS structure
     foreach my $dbid (keys %{$CONF->getValue("dbi", undef, {})}) {
 
@@ -30,10 +32,19 @@ sub new {
 
         # IS CONNECT OK?
         for (my $dbidpool = 0; $dbidpool <= (($dbconf->{'db_pool'} =~ /^\d+$/) ? $dbconf->{'db_pool'} : 1); $dbidpool++) {
+            $LOG->delay("tray_connect_to_db_" . $dbid . "_" . $dbidpool);
             if ($self->createConnection($dbid, $dbidpool, $dbconf)) {
                 $self->DBC->{$dbid}->{$dbidpool}->setPoolLock(1) if ($dbidpool == 0);
-            } else {
+            } elsif ($tray_connet > ((exists($dbconf->{'trayconnect'}) ? $dbconf->{'trayconnect'} : 0) - 1)) {
+                # Unable to connect
                 die "Unable connect to $dbid, poolid $dbidpool bye...\n";
+            } else {
+                # Tray connect
+                $tray_connet++;
+                $dbidpool--;
+                my $delay = $LOG->delay("tray_connect_to_db_" . $dbid . "_" . $dbidpool, "Tray connect to db $dbid dbidpool $dbidpool");
+                sleep(1) if ($delay < 1);
+                next;
             }
         }
 
@@ -102,9 +113,20 @@ sub createConnection {
 
 sub reconnect {
     my ($self, $dbid) = @_;
+    my $dbconf = $CONF->getValue("dbi", $dbid, {});
     foreach my $dbidpool (keys %{$self->DBC->{$dbid}}) {
-        $LOG->error("Reconnecting database $dbid dbidpool:$dbidpool");
-        $self->DBC->{$dbid}->{$dbidpool}->reconnect;
+        my $trayconnect = 0;
+        while (1) {
+            $trayconnect++;
+            $LOG->error("Reconnecting database $dbid dbidpool:$dbidpool");
+            $LOG->delay("tray_reconnect_to_db_" . $dbid . "_" . $dbidpool);
+            $self->DBC->{$dbid}->{$dbidpool}->reconnect;
+            my $delay = $LOG->delay("tray_reconnect_to_db_" . $dbid . "_" . $dbidpool, "Tray reconnect to db $dbid dbidpool $dbidpool");
+            sleep(1) if ($delay < 1);
+            die "Unable reconnect to $dbid, poolid $dbidpool bye...\n" if ($trayconnect > (exists($dbconf->{'trayconnect'}) ? $dbconf->{'trayconnect'} : 0));
+            ($self->ping($dbid, $dbidpool) ? last : next);
+
+        }
     }
 }
 
@@ -139,7 +161,7 @@ sub checkDbversion {
 
     my %dbversion_conf = %{do($dbconf->{'homepath'} . "/" . $dbconf->{'dbversion_file'})};
 
-    WHILE: while (1) {
+  WHILE: while (1) {
 
         my $SQL1 = $self->select($dbid, "dbversion,lockid FROM dbversion", []);
         my ($dbversion, $lockid) = $SQL1->fetchrow_array();
