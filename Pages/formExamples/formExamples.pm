@@ -73,14 +73,14 @@ sub form {
     my $checkbox  = $USER->getParam("checkbox",  0, 'N');
     my $selectbox = $USER->getParam("selectbox", 0, undef);
     my $button    = $USER->getParam("button1",   0, $USER->getParam("button2", 0, undef));
-    
+
     my $all_right = ['correct_form', 'form_dump_email', 'form_dump_fullname', 'form_dump_checkbox', 'form_dump_selectbox', 'form_dump_button'];
 
     if ($USER->isdefinedParam('file_single') or $USER->isdefinedParam('file_multiple')) {
 
         my $home       = $CONF->getValue("pwe", "home",       "/tmp");
         my $upload_dir = $CONF->getValue("pwe", "upload_dir", "upload_dir/");
-        
+
         unless (-d $upload_dir) {
             mkdir($upload_dir);
         }
