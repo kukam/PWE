@@ -53,6 +53,7 @@ sub new {
 sub messenger {
     my $self = shift;
     if (@_) {
+
         # ONLY SET
         my ($value) = @_;
         $value =~ s/\n//g;

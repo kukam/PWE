@@ -40,7 +40,7 @@ use MIME::Base64;
         attachment      MEDIUMBLOB              DEFAULT NULL,
         sendstatus	    ENUM('Y','N','E')		NOT NULL            DEFAULT 'N',
         started	        DATETIME			    NOT NULL       	    DEFAULT NOW(),
-		updated         TIMESTAMP 				NULL		        DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+        updated         TIMESTAMP 				NULL		        DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
         created         TIMESTAMP				NOT NULL            DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY  (`mid`),
         KEY `sendstatus` (`sendstatus`)
@@ -106,6 +106,7 @@ sub sendstatus {
 sub attachment {
     my $self = shift;
     if (@_) {
+
         # ONLY SET
         my ($value) = @_;
         return $self->SUPER::attachment(encode_base64($value));

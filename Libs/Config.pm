@@ -11,21 +11,21 @@ sub new {
     # Moznost prepsat konfiguraci pomoci globalnich promenych (Environment variables)
     # EXAMPLE: PWE_CONF_dbi_dbX_keyname
     # EXAMPLE: PWE_CONF_keyname1_keyname1 (pwe, home)
-     while (my ($key, $value) = each %ENV) {
-        if($key =~ /^PWE_CONF_dbi_(db\d+)_([a-zA-Z0-9_]+)$/) {
-            if($self->getValue('dbi',"$1",undef)) {
-                $self->{'dbi'}->{$1}->{$2} = $value if(exists($self->{'dbi'}->{$1}->{$2}));
+    while (my ($key, $value) = each %ENV) {
+        if ($key =~ /^PWE_CONF_dbi_(db\d+)_([a-zA-Z0-9_]+)$/) {
+            if ($self->getValue('dbi', "$1", undef)) {
+                $self->{'dbi'}->{$1}->{$2} = $value if (exists($self->{'dbi'}->{$1}->{$2}));
             }
-        } elsif($key =~ /^PWE_CONF_([a-zA-Z0-9]+)_([a-zA-Z0-9_]+)$/) {
-            $self->{$1}->{$2} = $value if($self->getValue("$1","$2",undef));
+        } elsif ($key =~ /^PWE_CONF_([a-zA-Z0-9]+)_([a-zA-Z0-9_]+)$/) {
+            $self->{$1}->{$2} = $value if ($self->getValue("$1", "$2", undef));
         }
     }
-     
+
     # Rapair path
-    if($self->getValue('pwe','home',undef) !~ /\/$/) {
+    if ($self->getValue('pwe', 'home', undef) !~ /\/$/) {
         $self->{'pwe'}->{'home'} .= "/";
     }
-    
+
     return $self;
 }
 

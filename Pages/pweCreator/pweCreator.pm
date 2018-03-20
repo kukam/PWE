@@ -96,8 +96,8 @@ sub cpage {
     my $sitesdir    = $CONF->getValue('pwe', 'sites_dir',    "Sites/");
     my $servicesdir = $CONF->getValue('pwe', 'services_dir', "Services/");
 
-    $pagesdir    =~ s/\///;
-    $sitesdir    =~ s/\///;
+    $pagesdir =~ s/\///;
+    $sitesdir =~ s/\///;
     $servicesdir =~ s/\///;
 
     my @variables  = @{$self->{'def_service_variablename'}};
@@ -191,7 +191,7 @@ sub csite {
     my $sitesdir    = $CONF->getValue('pwe', 'sites_dir',    "Sites/");
     my $servicesdir = $CONF->getValue('pwe', 'services_dir', "Services/");
 
-    $sitesdir    =~ s/\///;
+    $sitesdir =~ s/\///;
     $servicesdir =~ s/\///;
 
     my @variables  = @{$self->{'def_service_variablename'}};

@@ -36,9 +36,11 @@ sub new {
             if ($self->createConnection($dbid, $dbidpool, $dbconf)) {
                 $self->DBC->{$dbid}->{$dbidpool}->setPoolLock(1) if ($dbidpool == 0);
             } elsif ($tray_connet > ((exists($dbconf->{'trayconnect'}) ? $dbconf->{'trayconnect'} : 0) - 1)) {
+
                 # Unable to connect
                 die "Unable connect to $dbid, poolid $dbidpool bye...\n";
             } else {
+
                 # Tray connect
                 $tray_connet++;
                 $dbidpool--;

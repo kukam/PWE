@@ -46,7 +46,7 @@ sub autoUpdateTimestamp {
 
     return if (@{$self->DAORef->getChangeList()} == 0);
 
-    NEXT: foreach my $method1 (@{$self->DAORef->getMethodList()}) {
+  NEXT: foreach my $method1 (@{$self->DAORef->getMethodList()}) {
 
         # Pokud metoda je zmenena, nebude do ni nijak zasahovat
         foreach my $method2 (@{$self->DAORef->getChangeList()}) {

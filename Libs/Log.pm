@@ -146,14 +146,14 @@ sub write {
     my $output = $self->{'output'};
     my $time   = scalar localtime(time);
 
-    if($logout eq $CONF->getValue("pwe", "home", "")."STDOUT"){
-	print STDOUT "[$time] $ip $text\n";
-    } elsif ($logout eq $CONF->getValue("pwe", "home", "")."STDERR") {
-	print STDERR "[$time] $ip $text\n";
+    if ($logout eq $CONF->getValue("pwe", "home", "") . "STDOUT") {
+        print STDOUT "[$time] $ip $text\n";
+    } elsif ($logout eq $CONF->getValue("pwe", "home", "") . "STDERR") {
+        print STDERR "[$time] $ip $text\n";
     } else {
-	open($output, '>>', $logout) or die "Error Open log:'$logout'";
-	print $output "[$time] $ip $text\n" or die "Error Write log:'$logout'";
-	close($output) or die "Error Close log:'$logout'";
+        open($output, '>>', $logout) or die "Error Open log:'$logout'";
+        print $output "[$time] $ip $text\n" or die "Error Write log:'$logout'";
+        close($output) or die "Error Close log:'$logout'";
     }
 
     # ZAMCENI
@@ -223,7 +223,7 @@ sub sendErrorReport {
         my $result = $send->send();
 
         if ($result) {
-            $self-->info("Traing send email to:$to FAIL, msg:$result");
+            $self-- > info("Traing send email to:$to FAIL, msg:$result");
         } else {
             $self->info("Send error report mail to:$to is completed.");
             last;

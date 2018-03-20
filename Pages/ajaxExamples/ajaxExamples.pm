@@ -76,7 +76,7 @@ sub replaceHTML {
 
     $WEB->printHttpHeader('type' => 'ajax');
     $WEB->printAjaxLayout(
-        ajax_id   => ['replaceHTML_I', 'replaceHTML_II'],
+        ajax_id => ['replaceHTML_I', 'replaceHTML_II'],
         ajax_html => [$self->getRandomSpan(), $self->getRandomSpan(), $self->getRandomSpan(), $self->getRandomSpan()]
     );
 }

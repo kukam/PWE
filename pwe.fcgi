@@ -24,8 +24,8 @@ $SIG{TERM} = \&end;
 
 CGI::Fast->file_handles({ fcgi_error_file_handle => IO::Handle->new });
 
-my $CONF = new Libs::Config('conf/webconfig.pl');
-my $LOG  = new Libs::Log($CONF);
+my $CONF =      new Libs::Config('conf/webconfig.pl');
+my $LOG  =      new Libs::Log($CONF);
 
 $LOG->info("Starting PWE server...");
 

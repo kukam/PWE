@@ -110,93 +110,87 @@ sub new {
 
 sub setSubject {
     my ($self, $subject) = @_;
-    $self->{'subject'} = $subject if(defined($subject));
+    $self->{'subject'} = $subject if (defined($subject));
 }
 
 sub setSubjectUTF8 {
     my ($self, $subject) = @_;
-    $self->{'subject'} = $self->_mimeencode($subject, 'UTF-8') if(defined($subject));
+    $self->{'subject'} = $self->_mimeencode($subject, 'UTF-8') if (defined($subject));
 }
 
 sub setSubjectUTF8toASCI {
     my ($self, $subject) = @_;
-    $self->{'subject'} = utf8_ascii($subject) if(defined($subject));
+    $self->{'subject'} = utf8_ascii($subject) if (defined($subject));
 }
 
 sub setFrom {
     my ($self, $from) = @_;
-    push(@{$self->{'from'}}, $from) if(defined($from));
+    push(@{$self->{'from'}}, $from) if (defined($from));
 }
 
 sub setReturnPath {
     my ($self, $rpath) = @_;
-    push(@{$self->{'rpath'}}, $rpath) if(defined($rpath));
+    push(@{$self->{'rpath'}}, $rpath) if (defined($rpath));
 }
 
 sub setErrorTo {
     my ($self, $errto) = @_;
-    push(@{$self->{'errto'}}, $errto) if(defined($errto));
+    push(@{$self->{'errto'}}, $errto) if (defined($errto));
 }
 
 sub setTo {
     my ($self, $to) = @_;
-    push(@{$self->{'to'}}, $to) if(defined($to));
+    push(@{$self->{'to'}}, $to) if (defined($to));
 }
 
 sub setReplyTo {
     my ($self, $replyto) = @_;
-    push(@{$self->{'replyto'}}, $replyto) if(defined($replyto));
+    push(@{$self->{'replyto'}}, $replyto) if (defined($replyto));
 }
 
 sub setCc {
     my ($self, $cc) = @_;
-    push(@{$self->{'cc'}}, $cc) if(defined($cc));
+    push(@{$self->{'cc'}}, $cc) if (defined($cc));
 }
 
 sub setBcc {
     my ($self, $bcc) = @_;
-    push(@{$self->{'bcc'}}, $bcc) if(defined($bcc));
+    push(@{$self->{'bcc'}}, $bcc) if (defined($bcc));
 }
 
 sub setBody {
     my ($self, $body) = @_;
-    push(@{$self->{'body'}}, $body) if(defined($body));
+    push(@{$self->{'body'}}, $body) if (defined($body));
 }
 
 sub setBodyPlainUTF8 {
     my ($self, $body) = @_;
-    if(defined($body)) {
-        $body = "Content-Type: text/plain; charset=UTF-8\n"
-        . "Content-Transfer-Encoding: quoted-printable\n"
-        . "Content-Transfer-Encoding: 8bit\n\n"
-        . $body;
+    if (defined($body)) {
+        $body = "Content-Type: text/plain; charset=UTF-8\n" . "Content-Transfer-Encoding: quoted-printable\n" . "Content-Transfer-Encoding: 8bit\n\n" . $body;
         push(@{$self->{'body'}}, $body);
     }
 }
 
 sub setBodyHtmlUTF8 {
     my ($self, $body) = @_;
-    if(defined($body)) {
-        $body = "Content-Type: text/html; charset=UTF-8\n"
-        . "Content-Transfer-Encoding: quoted-printable\n"
-        . "Content-Transfer-Encoding: 8bit\n\n" 
-        . $body;
+    if (defined($body)) {
+        $body = "Content-Type: text/html; charset=UTF-8\n" . "Content-Transfer-Encoding: quoted-printable\n" . "Content-Transfer-Encoding: 8bit\n\n" . $body;
         push(@{$self->{'body'}}, $body);
     }
 }
 
 sub setAttachment {
     my ($self, $attachment) = @_;
-    push(@{$self->{'attachments'}}, $attachment) if(defined($attachment));
+    push(@{$self->{'attachments'}}, $attachment) if (defined($attachment));
 }
 
 sub send {
     my $self = shift;
-    
-    return "Invalid email address ".$self->_findInvalidEmail() if(defined($self->_findInvalidEmail()));
-    return "SMTP From address is required to send a message!" unless(defined($self->{'from'}[0]));
-    return "SMTP To address is required to send a message!" unless(defined($self->{'to'}[0]));
-    
+
+    return "Invalid email address " . $self->_findInvalidEmail() if (defined($self->_findInvalidEmail()));
+    return "SMTP From address is required to send a message!" unless (defined($self->{'from'}[0]));
+    return "SMTP To address is required to send a message!"   unless (defined($self->{'to'}[0]));
+
     my $smtp = Net::SMTP->new(
         $self->{'host'},
         SSL     => $self->{'ssl'},
@@ -207,7 +201,7 @@ sub send {
     ) or return "Could not connect to SMTP host: $self->{'host'}, port: $self->{'port'}";
 
     # Authenticate
-    if($self->{'authid'}) {
+    if ($self->{'authid'}) {
         $smtp->auth($self->{'authid'}, $self->{'authpw'}) or return $smtp->message();
     }
 
@@ -237,16 +231,16 @@ sub send {
     }
 
     # SEND THE BODY
-    $smtp->data() or return $smtp->message();
-    $smtp->datasend("Date: " . $self->_dateAndTime() . "\n") or return $smtp->message();
+    $smtp->data()                                                                  or return $smtp->message();
+    $smtp->datasend("Date: " . $self->_dateAndTime() . "\n")                       or return $smtp->message();
     $smtp->datasend("Message-ID: " . $self->_messageID($self->{'from'}[0]) . "\n") or return $smtp->message();
-    $smtp->datasend("From: " . $self->{'from'}[0] . "\n") or return $smtp->message();
+    $smtp->datasend("From: " . $self->{'from'}[0] . "\n")                          or return $smtp->message();
     $smtp->datasend("To: " . join(',', @{$self->{'to'}}) . "\n") or return $smtp->message();
-    
+
     if (defined($self->{'cc'}[0])) {
-        $smtp->datasend("Cc: ".join(',', @{$self->{'cc'}})."\n") or return $smtp->message();
+        $smtp->datasend("Cc: " . join(',', @{$self->{'cc'}}) . "\n") or return $smtp->message();
     }
-    
+
     if (defined($self->{'replyto'}[0])) {
         $smtp->datasend("Reply-To: $self->{'replyto'}[0]\n") or return $smtp->message();
     }
@@ -258,14 +252,14 @@ sub send {
     if (defined($self->{'errto'}[0])) {
         $smtp->datasend("Errors-To: $self->{'errto'}[0]\n") or return $smtp->message();
     }
-    
+
     $smtp->datasend("Subject: " . $self->{'subject'} . "\n") or return $smtp->message();
 
     # SEND BOUNDARY FIRST HEADER
     if ($boundry1) {
-        $smtp->datasend("MIME-Version: 1.0\n") or return $smtp->message();
+        $smtp->datasend("MIME-Version: 1.0\n")                                     or return $smtp->message();
         $smtp->datasend("Content-Type: multipart/mixed; BOUNDARY=\"$boundry1\"\n") or return $smtp->message();
-        $smtp->datasend("\n--$boundry1\n") or return $smtp->message();
+        $smtp->datasend("\n--$boundry1\n")                                         or return $smtp->message();
     }
 
     # Send Multi BODY
@@ -273,13 +267,13 @@ sub send {
         $smtp->datasend("Content-Type: multipart/alternative; BOUNDARY=\"$boundry2\"\n") or return $smtp->message();
         foreach my $body (@{$self->{'body'}}) {
             $smtp->datasend("\n--$boundry2\n") or return $smtp->message();
-            $smtp->datasend($body) or return $smtp->message();
-            $smtp->datasend("\n\n") or return $smtp->message();
+            $smtp->datasend($body)             or return $smtp->message();
+            $smtp->datasend("\n\n")            or return $smtp->message();
         }
         $smtp->datasend("\n--$boundry2--\n") or return $smtp->message();
     } else {
         foreach my $body (@{$self->{'body'}}) {
-            $smtp->datasend($body) or return $smtp->message();
+            $smtp->datasend($body)  or return $smtp->message();
             $smtp->datasend("\n\n") or return $smtp->message();
         }
     }
@@ -296,10 +290,10 @@ sub send {
         # that the email client doesn't have to
         my $contentType = guess_media_type($file);
 
-        $smtp->datasend("--$boundry1\n") or return $smtp->message();
+        $smtp->datasend("--$boundry1\n")                                                   or return $smtp->message();
         $smtp->datasend("Content-Type: $contentType; charset=UTF-8; name=\"$fileName\"\n") or return $smtp->message();
-        $smtp->datasend("Content-Transfer-Encoding: base64\n") or return $smtp->message();
-        $smtp->datasend("Content-Disposition: attachment; filename=\"$fileName\"\n\n") or return $smtp->message();
+        $smtp->datasend("Content-Transfer-Encoding: base64\n")                             or return $smtp->message();
+        $smtp->datasend("Content-Disposition: attachment; filename=\"$fileName\"\n\n")     or return $smtp->message();
 
         my $bufer;
         open(FILE, $file) or return "$!";
@@ -315,8 +309,8 @@ sub send {
         $smtp->datasend("\n--$boundry1--\n") or return $smtp->message();    # send boundary end message
     }
     $smtp->datasend("\n\n") or return $smtp->message();
-    $smtp->dataend() or return $smtp->message();
-    $smtp->quit() or return $smtp->message();
+    $smtp->dataend()        or return $smtp->message();
+    $smtp->quit()           or return $smtp->message();
 
     return undef;
 }
@@ -367,17 +361,17 @@ sub _mimeencode {
 
 sub _findInvalidEmail {
     my $self = shift;
-    
+
     # Validate email
     foreach my $src (qw(from to replyto cc bcc errto rpath)) {
-        foreach my $email (@{$self->{$src}}) { return $email unless($self->_validEmail($email)); }
+        foreach my $email (@{$self->{$src}}) { return $email unless ($self->_validEmail($email)); }
     }
-    
+
     return undef;
 }
 
 sub _validEmail {
-    my ($self,$email) = @_;
+    my ($self, $email) = @_;
     $email =~ s/.*<//;
     $email =~ s/>.*//;
     return undef if (!Mail::RFC822::Address::valid($email));

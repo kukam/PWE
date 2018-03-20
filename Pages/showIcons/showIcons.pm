@@ -30,8 +30,8 @@ sub new {
 
     $self->{'access'} = ['admin'];
 
-    $self->{'func'}->{'default'}               = [];
-    $self->{'func'}->{'awesome_674_20150914'}  = [];
+    $self->{'func'}->{'default'}              = [];
+    $self->{'func'}->{'awesome_674_20150914'} = [];
 
     bless $self, $class;
     return $self;
@@ -80,7 +80,7 @@ sub awesome_674_20150914 {
 
     my $home = $CONF->getValue("pwe", "home", "/tmp");
     my $map = $self->getJSONHash($home . "/assets/less/awesome_674_20150914/map.json");
-    
+
     $WEB->printHttpHeader('type' => 'ajax');
     $WEB->printAjaxLayout(
         ajax_id   => ['awesome_674_20150914'],
@@ -94,12 +94,12 @@ sub awesome_674_20150914 {
 
 sub getJSONHash {
     my ($self, $file) = @_;
-    
-    unless(-f $file) {
+
+    unless (-f $file) {
         $LOG->error("Json file not exist!");
         return {};
     } else {
-        $LOG->info("Read json file: ".$file);
+        $LOG->info("Read json file: " . $file);
         local $/;    #Enable 'slurp' mode
         open my $fh, "<", $file;
         my $json = <$fh>;
