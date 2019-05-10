@@ -166,7 +166,8 @@ sub setBody {
 sub setBodyPlainUTF8 {
     my ($self, $body) = @_;
     if (defined($body)) {
-        $body = "Content-Type: text/plain; charset=UTF-8\n" . "Content-Transfer-Encoding: quoted-printable\n" . "Content-Transfer-Encoding: 8bit\n\n" . $body;
+        $body = "Content-Type: text/plain; charset=UTF-8\n" . "Content-Transfer-Encoding: quoted-printable\n\n" . MIME::QuotedPrint::encode($body);
+        #$body = "Content-Type: text/plain; charset=UTF-8\n" . "Content-Transfer-Encoding: quoted-printable\n" . "Content-Transfer-Encoding: 8bit\n\n" . $body;
         push(@{$self->{'body'}}, $body);
     }
 }
@@ -174,7 +175,8 @@ sub setBodyPlainUTF8 {
 sub setBodyHtmlUTF8 {
     my ($self, $body) = @_;
     if (defined($body)) {
-        $body = "Content-Type: text/html; charset=UTF-8\n" . "Content-Transfer-Encoding: quoted-printable\n" . "Content-Transfer-Encoding: 8bit\n\n" . $body;
+        $body = "Content-Type: text/html; charset=UTF-8\n" . "Content-Transfer-Encoding: quoted-printable\n\n" . MIME::QuotedPrint::encode($body);
+        #$body = "Content-Type: text/html; charset=UTF-8\n" . "Content-Transfer-Encoding: quoted-printable\n" . "Content-Transfer-Encoding: 8bit\n\n" . $body;
         push(@{$self->{'body'}}, $body);
     }
 }
