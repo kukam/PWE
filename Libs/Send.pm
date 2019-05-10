@@ -115,7 +115,7 @@ sub setSubject {
 
 sub setSubjectUTF8 {
     my ($self, $subject) = @_;
-    $self->{'subject'} = $self->_mimeencode($subject, 'UTF-8') if (defined($subject));
+    $self->{'subject'} = $self->_encodeSubject($subject, 'UTF-8') if (defined($subject));
 }
 
 sub setSubjectUTF8toASCI {
@@ -350,13 +350,15 @@ sub _messageID {
     return sprintf "<%04d%02d%02d_%02d%02d%02d_%06d.%s>", $year, $mon, $mday, $hour, $min, $sec, rand(100000), $from;
 }
 
-sub _mimeencode {
+sub _encodeSubject {
     my ($self, $str, $enc) = @_;
     return $str unless $str =~ /[[:^ascii:]]/;
     my @parts;
     while ($str =~ /(.{1,40}.*?(?:\s|$))/g) {
         my $part = $1;
-        push @parts, MIME::QuotedPrint::encode($part, '');
+        my $encode = MIME::QuotedPrint::encode($part, '');
+        $encode =~ s/\s/_/g;
+        push (@parts, $encode);
     }
     return join "\r\n\t", map { "=?$enc?Q?$_?=" } @parts;
 }
