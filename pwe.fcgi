@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 use strict;
 use warnings;
@@ -42,6 +42,7 @@ my $USER = new Libs::User($CONF, $LOG, $VALIDATE, $DBI);
 $LOG->delay("create_object_user", "Created object USER");
 
 $LOG->delay("create_object_web");
+
 my $WEB = new Libs::Web($CONF, $LOG, $VALIDATE, $DBI, $USER);
 $LOG->delay("create_object_web", "Created object WEB");
 
@@ -127,6 +128,8 @@ while (my $CGI = CGI::Fast->new()) {
         $USER->setFunc('cgi_error');
         $USER->setParameter('cgi_error', [$error]);
         $result = $PAGES->callPageFunc('errorPage', 'cgi_error');
+    } elsif (not defined($env->{'SCRIPT_FILENAME'})) {
+        $result = $PAGES->callPageFunc('default', 'default');
     } elsif ($env->{'SCRIPT_FILENAME'} =~ /\.\./) {
         $result = 401;
     } elsif (($0 eq $env->{'SCRIPT_FILENAME'}) or ("/".$0 eq $env->{'SCRIPT_FILENAME'}) or ($0 eq ".".$env->{'SCRIPT_FILENAME'}) or ($env->{'SCRIPT_FILENAME'} eq "/") or (!$env->{'SCRIPT_FILENAME'})) {
