@@ -17,7 +17,7 @@
     7 => "ALTER TABLE users ALTER COLUMN email DROP NOT NULL;",
     8 => "ALTER TABLE users ALTER COLUMN email SET DEFAULT NULL;",
     9 => "CREATE TABLE dbtable (
-    
+
     id             	SERIAL          		NOT NULL        PRIMARY KEY,
     name		VARCHAR(128)			NULL,
     sid		VARCHAR(128)			NOT NULL,
@@ -57,5 +57,5 @@
     14 => "ALTER TABLE session ADD COLUMN lang VARCHAR(32) DEFAULT 'CZE';",
     15 => "
         ALTER TABLE dbtable ADD COLUMN  dbid VARCHAR(32)  NOT NULL    DEFAULT 'db1';
-    ",    
+    ",
 };

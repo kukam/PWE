@@ -162,7 +162,7 @@ sub escape_jsinjection {
 
 sub is_sql_int {
     my ($self, $dbdriver, $value, $unsig) = @_;
-    if (($dbdriver eq "mysql") or ($dbdriver eq "maria")) {
+    if (($dbdriver eq "mysql") or ($dbdriver eq "mariadb")) {
         my $result = (defined(Libs::Validate::MySQL::is_int($value, $unsig)) ? 1 : undef);
         return $result;
     } elsif ($dbdriver eq "postgres") {
@@ -172,7 +172,7 @@ sub is_sql_int {
 
 sub is_sql_varchar {
     my ($self, $dbdriver, $value, $size) = @_;
-    if (($dbdriver eq "mysql") or ($dbdriver eq "maria")) {
+    if (($dbdriver eq "mysql") or ($dbdriver eq "mariadb")) {
         return (defined(Libs::Validate::MySQL::is_varchar($value, $size)) ? 1 : undef);
     } elsif ($dbdriver eq "postgres") {
         return (defined(Libs::Validate::Postgres::is_varchar($value, $size)) ? 1 : undef);
@@ -181,7 +181,7 @@ sub is_sql_varchar {
 
 sub is_sql_enum {
     my ($self, $dbdriver, $value, $enumv) = @_;
-    if (($dbdriver eq "mysql") or ($dbdriver eq "maria")) {
+    if (($dbdriver eq "mysql") or ($dbdriver eq "mariadb")) {
         return (defined(Libs::Validate::MySQL::is_enum($value, @{$enumv})) ? 1 : undef);
     } elsif ($dbdriver eq "postgres") {
         $LOG->error("TODO : DODELAT VALIDACI PRO POSTGRES ENUM");
@@ -191,7 +191,7 @@ sub is_sql_enum {
 
 sub is_sql_decimal {
     my ($self, $dbdriver, $value0, $value1, $value2, $unsig) = @_;
-    if (($dbdriver eq "mysql") or ($dbdriver eq "maria")) {
+    if (($dbdriver eq "mysql") or ($dbdriver eq "mariadb")) {
         return (defined(Libs::Validate::MySQL::is_decimal($value0, $value1, $value2, $unsig)) ? 1 : undef);
     } elsif ($dbdriver eq "postgres") {
         return (defined(Libs::Validate::MySQL::is_decimal($value0, $value1, $value2)) ? 1 : undef);
@@ -201,7 +201,7 @@ sub is_sql_decimal {
 
 sub is_sql_boolen {
     my ($self, $dbdriver, $value) = @_;
-    if (($dbdriver eq "mysql") or ($dbdriver eq "maria")) {
+    if (($dbdriver eq "mysql") or ($dbdriver eq "mariadb")) {
         $LOG->error("TODO: DODELAT BOOLEAN V MYSQL");
         return undef;
     } elsif ($dbdriver eq "postgres") {
