@@ -111,15 +111,18 @@ while ( my $CGI = CGI::Fast->new() ) {
     my $page = (
         defined( $CGI->param('page') )
         ? $CGI->param('page')
-        : $CONF->getValue( "pwe", "default_page", 'default' ) );
+        : $CONF->getValue( "pwe", "default_page", 'default' )
+    );
     my $func = (
         defined( $CGI->param('func') )
         ? $CGI->param('func')
-        : $CONF->getValue( "pwe", "default_func", 'default' ) );
+        : $CONF->getValue( "pwe", "default_func", 'default' )
+    );
     my $opt = (
         defined( $CGI->param('opt') )
         ? $CGI->param('opt')
-        : $CONF->getValue( "pwe", "enable_opt", 0 ) );
+        : $CONF->getValue( "pwe", "enable_opt", 0 )
+    );
 
     $USER->newRequest( $page, $func, $sid, $opt, $env, $CGI );
     $SITES->newRequest();
