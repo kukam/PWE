@@ -41,11 +41,11 @@ sub sendAllEmail {
     my $SQL   = undef;
     my $error = undef;
 
-    if (($DBI->getDbDriver("db1") eq "mysql") or ($DBI->getDbDriver("db1") eq "maria")) {
+    if (($DBI->getDbDriver("db1") eq "mysql") or ($DBI->getDbDriver("db1") eq "mariadb")) {
 
         $SQL = $DBI->select("db1", "mid,mailfrom,mailto,replyto,cc,bcc,returnpath,errorto,subject,text,textalt,attachment, TIME_TO_SEC(TIMEDIFF(NOW(),started)) as `timedif` FROM mailqueue WHERE sendstatus = ? AND started < NOW()", ["N"]);
 
-    } elsif ($DBI->getDbDriver("db1") eq "Postgres") {
+    } elsif ($DBI->getDbDriver("db1") eq "postgres") {
 
         # TODO : Slo by pouzit tuto funkci age(NOW(), started), ale nevim jak prevest tento format na secundy
         $SQL = $DBI->select("db1","mid,mailfrom,mailto,replyto,cc,bcc,returnpath,errorto,subject,text,textalt,attachment, (extract(epoch from NOW() at time zone 'utc' at time zone 'utc') - extract(epoch from started at time zone 'utc' at time zone 'utc')) as timedif FROM mailqueue WHERE sendstatus = ? AND started < NOW()",["N"]);

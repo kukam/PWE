@@ -2,7 +2,7 @@
     [% SET enable_ajax = 0 %]
 [% END %]
 
-[% IF active == 1 %]
+[% IF active == 't' || active == 1 %]
     [% SET active = 'f' %]
     <a class="btn btn-success" [% INCLUDE templates/href.tmpl href="$href$active" ajaxjson="$enable_ajax" %]>
         <i class="glyphicon glyphicon-ok"></i>

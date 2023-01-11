@@ -3,10 +3,11 @@ name: pwe
 
 services:
    database:
-     image: ${DB_DRIVER:-postgres}:latest
+     image: ${DB_DRIVER:-mariadb}:latest
      restart: unless-stopped
      volumes:
-       - ${DB_DRIVER:-postgres}:/var/lib/mysql
+       - ${DB_DRIVER:-mariadb}:/var/lib/mysql
+      #  - ${DB_DRIVER:-mariadb}:/var/lib/postgresql/data
        - /etc/localtime:/etc/localtime:ro
      environment:
        MYSQL_ROOT_PASSWORD: ${DB_ADMIN_PASSWORD:-root123}
@@ -19,9 +20,6 @@ services:
    fcgi:
      image: kukam/pwe:latest
      restart: unless-stopped
-     volumes:
-       - uploadfile:/PWE/webapps/generic_web/uploadfile
-       - /etc/localtime:/etc/localtime:ro    
      stdin_open: true
      tty: true
      environment:
@@ -32,19 +30,23 @@ services:
        PWE_CONF_pwe_upload_dir: uploadfile/
        PWE_CONF_pwe_assets_browse_dir: uploadfile/
        PWE_CONF_pwe_opts_dir: sessions/
-       PWE_CONF_dbi_db1_dbdriver: ${DB_DRIVER:-postgres}
+       PWE_CONF_dbi_db1_dbdriver: ${DB_DRIVER:-mariadb}
        PWE_CONF_dbi_db1_host: database
-       PWE_CONF_dbi_db1_port: ${DB_PORT:-5432}
+       PWE_CONF_dbi_db1_port: ${DB_PORT:-3306}
+      #  PWE_CONF_dbi_db1_port: ${DB_PORT:-5432}
        PWE_CONF_dbi_db1_schema: public
        PWE_CONF_dbi_db1_database: ${DB_NAME:-pwe}
        PWE_CONF_dbi_db1_login: ${DB_USER:-pwe}
        PWE_CONF_dbi_db1_password: ${DB_USER_PASSWORD:-pwe}
-       PWE_CONF_dbi_db1_dbversion_file: conf/${DB_DRIVER:-postgres}_dbversion.pl
+       PWE_CONF_dbi_db1_dbversion_file: conf/${DB_DRIVER:-mariadb}_dbversion.pl
        PWE_CONF_dbi_db1_trayconnect: 10
        PWE_CONF_log_logout: STDERR
        PWE_CONF_log_loglevel: 3
        PWE_CONF_log_log_delay: 1
        PWE_CONF_log_log_delay_minimum: 0.1
+     volumes:
+       - uploadfile:/PWE2/webapps/generic_web/uploadfile
+       - /etc/localtime:/etc/localtime:ro    
    webproxy:
      image: nginx:latest
      restart: unless-stopped

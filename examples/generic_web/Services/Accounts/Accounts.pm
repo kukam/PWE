@@ -26,7 +26,7 @@ sub setAccount {
 
     my $USER = $ENTITIES->createEntityObject('User', $acc{uid});
     $USER->fullname($acc{'fullname'}) if ($acc{'fullname'});
-    $USER->active($acc{'active'})     if ($acc{'active'});
+    $USER->active($acc{'active'})     if (defined($acc{'active'}));
     $USER->flush;
     $USER->logit;
     if ($USER->error) {

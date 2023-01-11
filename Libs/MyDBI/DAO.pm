@@ -311,7 +311,7 @@ sub delete {
 sub commit {
     my $self = shift;
     $self->DB->commit();
-    $LOG->debug("DB Commit " . $self->getTableName() . " " . ($self->getPrimaryValue ? $self->getPrimaryColumnName() . ":" . $self->getPrimaryValue() : ""));
+    $LOG->debug("DB Commit " . $self->getTableName() . " " . ($self->getPrimaryValue ? $self->getPrimaryColumnName() . ":" . $self->getPrimaryValue() : "")) if(@{$self->getChangeList()} > 0);
 }
 
 sub rollback {
@@ -559,6 +559,9 @@ sub createInsertQuery {
             } elsif ($value eq "CURRENT_TIMESTAMP") {
                 push(@set1, "$sqlst$method$sqlst");
                 push(@set2, "CURRENT_TIMESTAMP");
+            } elsif ($value eq "current_timestamp()") {
+                push(@set1, "$sqlst$method$sqlst");
+                push(@set2, "current_timestamp");
             } else {
                 push(@set1,      "$sqlst$method$sqlst");
                 push(@set2,      "?");
@@ -674,6 +677,19 @@ sub CheckValue {
             return 1;
         } elsif (!defined($VALIDATE->is_sql_int($dbdriver, $value, $unsig))) {
             $self->setErrorList("Invalid write data : INT(size:$size, unsig:$unsig, null:$null, unique:$unique), table:$table, column_name:$name, value:$value, who:$who");
+            return 0;
+        }
+    } elsif (lc($type) eq "tinyint") {
+        if (!defined($value) and $null == 1) {
+            return 1;
+        } elsif (($value eq '') and (defined($def))) {
+            return 1;
+        } elsif ($value eq '' and $null == 1) {
+            return 1;
+        } elsif ($value eq "NULL" and $null == 1) {
+            return 1;
+        } elsif (!defined($VALIDATE->is_tinyint($dbdriver, $value, $unsig))) {
+            $self->setErrorList("Invalid write data : TINYINT(size:$size, unsig:$unsig, null:$null, unique:$unique), table:$table, column_name:$name, value:$value, who:$who");
             return 0;
         }
     } elsif ((lc($type) eq "varchar") or (lc($type) eq "character varying")) {

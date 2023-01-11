@@ -208,7 +208,7 @@ sub genTableData {
 
     # SELECT
     my $select = "";
-    if (($DBI->getDbDriver($TO->dbid()) eq "mysql") or ($DBI->getDbDriver($TO->dbid()) eq "maria")) {
+    if (($DBI->getDbDriver($TO->dbid()) eq "mysql") or ($DBI->getDbDriver($TO->dbid()) eq "mariadb")) {
         $select = $mirrorTO->{'query'} . " " . $mirrorTO->{'groupby'} . " " . ($mirrorTO->{'ordercolumn'} ? "ORDER BY " . $mirrorTO->{'ordercolumn'} . " " . $mirrorTO->{'orderby'} : "") . " LIMIT " . ($mirrorTO->{'maxrow'} * ($mirrorTO->{'gopage'} - 1)) . "," . $mirrorTO->{'maxrow'};
     } elsif ($DBI->getDbDriver($TO->dbid()) eq "postgres") {
         $select = $mirrorTO->{'query'} . " " . $mirrorTO->{'groupby'} . " " . ($mirrorTO->{'ordercolumn'} ? "ORDER BY " . $mirrorTO->{'ordercolumn'} . " " . $mirrorTO->{'orderby'} : "") . " LIMIT " . $mirrorTO->{'maxrow'} . " OFFSET " . ($mirrorTO->{'maxrow'} * ($mirrorTO->{'gopage'} - 1));

@@ -113,9 +113,9 @@ sub form {
     );
 
     if ($uid) {
-        if ($result and $act eq 't') {
+        if ($result and $act eq 't' ) {
             $WEB->setMessenger("Pages/formExamples/msg.html", msg_allright => ['enable_active_status'], disable_scrolltomessenger => 1 );
-        } elsif ($result and $act eq 'f') {
+        } elsif ($result and $act eq 'f' ) {
             $WEB->setMessenger("Pages/formExamples/msg.html", msg_allright => ['disable_active_status'], disable_scrolltomessenger => 1 );
         } else {
             $WEB->setMessenger("Pages/ajaxExamples/msg.html", msg_error => ['error_active_status']);
@@ -127,7 +127,7 @@ sub form {
             ajax_id   => ["columnid-$uid"],
             ajax_tmpl => ["Pages/dbTableExamples/activebtn.html"],
             ajax_data => {
-                active => (($act eq 't') ? 1 : 0),
+                active => $act,
                 enable_ajax => 1,
                 href   => $WEB->getScriptName() . '?page=dbTableExamples&func=form&uid=' . $uid . '&active='
             },

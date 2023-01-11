@@ -1,57 +1,54 @@
 {
     1 => "
-        CREATE TABLE IF NOT EXISTS `dbtable` (
-            id 		    INT(8) 		            UNSIGNED NOT NULL AUTO_INCREMENT,
-            name		VARCHAR(128)			NULL            DEFAULT NULL,
-            sid		    VARCHAR(128)			NULL            DEFAULT NULL,
-            page		VARCHAR(128)			NULL            DEFAULT NULL,
-            func		VARCHAR(128)			NULL            DEFAULT NULL,
-            tmpl		VARCHAR(256)			NULL            DEFAULT NULL,
-            script		VARCHAR(256)			NULL            DEFAULT NULL,
-            query		TEXT				    NOT NULL,
-            conditions	TEXT				    NOT NULL,
-            ordercolumn	VARCHAR(64)			    NULL            DEFAULT NULL,
-            orderby		VARCHAR(64)			    NULL            DEFAULT 'ASC',
-            groupby		VARCHAR(128)			NULL            DEFAULT NULL,   
-            maxrow		INTEGER				    NULL            DEFAULT 40,
-            gopage		INTEGER				    NULL            DEFAULT 1,
-            rowcount	INTEGER				    NULL            DEFAULT 0,
-            endpage		SMALLINT			    NULL            DEFAULT 0,
-            nlimit		SMALLINT			    NULL            DEFAULT NULL,
-            updated     TIMESTAMP 			    NULL		    DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            created     TIMESTAMP			    NOT NULL        DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            KEY `name`  (`name`),
-            KEY `sid`   (`sid`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_czech_ci AUTO_INCREMENT=0;
+        CREATE TABLE `dbtable` (
+          `id` int(8) unsigned NOT NULL AUTO_INCREMENT,
+          `name` varchar(128) DEFAULT NULL,
+          `dbid` varchar(32) NOT NULL DEFAULT 'db1',
+          `sid` varchar(128) DEFAULT NULL,
+          `page` varchar(128) DEFAULT NULL,
+          `func` varchar(128) DEFAULT NULL,
+          `tmpl` varchar(255) DEFAULT NULL,
+          `script` varchar(255) DEFAULT NULL,
+          `query` text NOT NULL,
+          `conditions` text NOT NULL,
+          `ordercolumn` varchar(64) DEFAULT NULL,
+          `orderby` varchar(64) DEFAULT 'ASC',
+          `groupby` varchar(128) DEFAULT NULL,
+          `maxrow` int(11) DEFAULT 40,
+          `gopage` int(11) DEFAULT 1,
+          `rowcount` int(11) DEFAULT 0,
+          `endpage` smallint(6) DEFAULT 0,
+          `appendurl` varchar(255) DEFAULT NULL,
+          `nlimit` smallint(6) DEFAULT NULL,
+          `updated` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+          `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (`id`),
+          KEY `name` (`name`),
+          KEY `sid` (`sid`)
+        ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_czech_ci;
     ",
     2 => "
-        CREATE TABLE IF NOT EXISTS `users` (
-            uid 		 INT(8) 		UNSIGNED NOT NULL AUTO_INCREMENT,
-            fullname     VARCHAR(128)   NOT NULL,
-            active       VARCHAR(1)     NOT NULL        DEFAULT 'f',
-            updated      TIMESTAMP 		NULL		    DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            created      TIMESTAMP		NOT NULL        DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY  (`uid`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_czech_ci AUTO_INCREMENT=0;
+        CREATE TABLE `session` (
+          `sid` varchar(255) NOT NULL,
+          `useragent` varchar(255) NOT NULL,
+          `ipaddres` varchar(128) NOT NULL,
+          `admin` enum ('t', 'f') NOT NULL DEFAULT 'f',
+          `messenger` text DEFAULT NULL,
+          `lang` varchar(32) NOT NULL DEFAULT 'CZE',
+          `expire` int(12) NOT NULL,
+          `updated` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+          `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (`sid`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_czech_ci;
     ",
     3 => "
-        CREATE TABLE IF NOT EXISTS `session` (
-            sid          VARCHAR(256)   NOT NULL,
-            useragent	 VARCHAR(256)   NOT NULL,
-            ipaddres     VARCHAR(128)   NOT NULL,
-            admin		 VARCHAR(1) 	NOT NULL	    DEFAULT 'f',
-            messenger	 TEXT			NULL,
-            lang		 VARCHAR(32) 	NOT NULL	    DEFAULT 'CZE',
-            expire		 INT(12)		NOT NULL,
-            updated      TIMESTAMP	    NULL            DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-            created      TIMESTAMP	    NOT NULL 	    DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY  (`sid`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_czech_ci;",
-    4 => "
-        ALTER TABLE dbtable ADD COLUMN  dbid VARCHAR(32)  NOT NULL    DEFAULT 'db1';
-    ",
-    5 => "
-        ALTER TABLE dbtable ADD COLUMN appendurl VARCHAR(255) NULL;
+        CREATE TABLE `users` (
+          `uid` int(8) unsigned NOT NULL AUTO_INCREMENT,
+          `fullname` varchar(128) NOT NULL,
+          `active` enum ('t', 'f') NOT NULL DEFAULT 'f',
+          `updated` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+          `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (`uid`)
+        ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_czech_ci;
     "
 }
