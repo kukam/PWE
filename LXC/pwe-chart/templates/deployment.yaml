@@ -62,8 +62,6 @@ spec:
           volumeMounts:
             - name: uploadfile
               mountPath: /PWE/webapps/generic_web/uploadfile
-            - name: mydata
-              mountPath: /PWE/webapps/generic_web/uploadfile2
           env:
             - name: FCGI_SOCKET_PATH
               value: ":7779"
@@ -119,6 +117,3 @@ spec:
         - name: config
           configMap:
             name: nginx-config-map
-        - name: mydata
-          persistentVolumeClaim:
-            claimName: mydata
