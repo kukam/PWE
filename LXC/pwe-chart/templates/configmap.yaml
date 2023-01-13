@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config-map
+data:
+  default.conf: |
+    server {
+      listen   80;
+      location / {
+          gzip off;
+          #fastcgi_keep_conn on;
+          fastcgi_pass  pwe_balancer;
+          fastcgi_param  SCRIPT_FILENAME $fastcgi_script_name;
+          include fastcgi_params;
+      }
+      error_log /dev/stdout info;
+      access_log /dev/stdout;
+    }
+    upstream pwe_balancer {
+        server localhost:7779;
+    }

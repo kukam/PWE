@@ -1,0 +1,124 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  labels:
+    app: db
+spec:
+  replicas: {{ .Values.db.replicaCount }}
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: db
+          image:  "{{ .Values.db.image.repository }}:{{ .Values.db.image.tag }}"
+          imagePullPolicy: {{ .Values.pwe.fcgi.image.pullPolicy }}
+          volumeMounts:
+            - name: mariadb
+              mountPath: /var/lib/mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "root123"
+            - name: MYSQL_DATABASE
+              value: "pwe"
+            - name: MYSQL_USER
+              value: "pwe"
+            - name: MYSQL_PASSWORD
+              value: "pwe"
+          ports:
+            - containerPort: 3306
+      volumes:
+        - name: mariadb
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pwe
+  labels:
+    app: pwe
+spec:
+  replicas: {{ .Values.pwe.replicaCount }}
+  selector:
+    matchLabels:
+      app: pwe
+  template:
+    metadata:
+      labels:
+        app: pwe
+    spec:
+      containers:
+        - name: fcgi
+          image: "{{ .Values.pwe.fcgi.image.repository }}:{{ .Values.pwe.fcgi.image.tag }}"
+          imagePullPolicy: {{ .Values.pwe.fcgi.image.pullPolicy }}
+          ports:
+            - containerPort: 7779
+          volumeMounts:
+            - name: uploadfile
+              mountPath: /PWE/webapps/generic_web/uploadfile
+            - name: mydata
+              mountPath: /PWE/webapps/generic_web/uploadfile2
+          env:
+            - name: FCGI_SOCKET_PATH
+              value: ":7779"
+            - name: PWE_CONF_pwe_home
+              value: "/PWE/webapps/generic_web"
+            - name: PWE_CONF_pwe_save_opt_to
+              value: "db"
+            - name: PWE_CONF_pwe_assets_dir
+              value: "assets, uploadfile/"
+            - name: PWE_CONF_pwe_upload_dir
+              value: "uploadfile/"
+            - name: PWE_CONF_pwe_assets_browse_dir
+              value: "uploadfile/"
+            - name: PWE_CONF_pwe_opts_dir
+              value: "sessions/"
+            - name: PWE_CONF_dbi_db1_dbdriver
+              value: "mariadb"
+            - name: PWE_CONF_dbi_db1_host
+              value: "db"
+            - name: PWE_CONF_dbi_db1_port
+              value: "3306"
+            - name: PWE_CONF_dbi_db1_schema
+              value: "public"
+            - name: PWE_CONF_dbi_db1_database
+              value: "pwe"
+            - name: PWE_CONF_dbi_db1_login
+              value: "pwe"
+            - name: PWE_CONF_dbi_db1_password
+              value: "pwe"
+            - name: PWE_CONF_dbi_db1_dbversion_file
+              value: "conf/mariadb_dbversion.pl"
+            - name: PWE_CONF_dbi_db1_trayconnect
+              value: "10"
+            - name: PWE_CONF_log_logout
+              value: "STDERR"
+            - name: PWE_CONF_log_loglevel
+              value: "3"
+            - name: PWE_CONF_log_log_delay
+              value: "1"
+            - name: PWE_CONF_log_log_delay_minimum
+              value: "0.1"
+        - name: http
+          image: "{{ .Values.pwe.http.image.repository }}:{{ .Values.pwe.http.image.tag }}"
+          imagePullPolicy: {{ .Values.pwe.http.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: config
+              mountPath: "/etc/nginx/conf.d"
+      volumes:
+        - name: uploadfile
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: nginx-config-map
+        - name: mydata
+          persistentVolumeClaim:
+            claimName: mydata
