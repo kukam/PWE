@@ -5,6 +5,7 @@ use JSON;
 use Template;
 
 #use XML::Simple;
+use Sys::Hostname;
 use File::Basename;
 use Cz::Cstocs 'utf8_ascii';
 
@@ -320,6 +321,7 @@ sub genTmpl {
     $tmpl{'conf_description'} = $CONF->getValue("http", "description", "");
     $tmpl{'conf_development'} = $CONF->getValue("pwe", "development", 0);
     $tmpl{'full_url'}         = $tmpl{'http_https'} . $tmpl{'server_name'} . "/";
+    $tmpl{'hostname'}         = hostname;
     $tmpl{'random_number'}    = int(rand(999999999));
 
     # odstraneni portu za hostem (kukam.freebox.cz:8080)
