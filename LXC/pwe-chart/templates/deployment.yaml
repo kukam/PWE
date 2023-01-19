@@ -112,8 +112,11 @@ spec:
             - name: config
               mountPath: "/etc/nginx/conf.d"
       volumes:
-        - name: uploadfile
-          emptyDir: {}
         - name: config
           configMap:
             name: nginx-config-map
+        # - name: uploadfile
+        #   emptyDir: {}
+        - name: uploadfile
+          persistentVolumeClaim:
+            claimName: cephfs-pv-claim

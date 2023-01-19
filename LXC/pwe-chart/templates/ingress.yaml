@@ -9,7 +9,7 @@ spec:
   tls:
     - hosts:
         - pwe.kube.freebox.cz
-      secretName: secret
+      secretName: tls
   rules:
     - host: pwe.kube.freebox.cz
       http:

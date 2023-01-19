@@ -19,7 +19,7 @@ pwe:
     image:
       repository: kukam/pwe
       tag: latest
-      pullPolicy: IfNotPresent
+      pullPolicy: Always
   http:
     image:
       repository: nginx

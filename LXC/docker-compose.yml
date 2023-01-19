@@ -6,8 +6,9 @@ services:
      image: ${DB_DRIVER:-mariadb}:latest
      restart: unless-stopped
      volumes:
-       - ${DB_DRIVER:-mariadb}:/var/lib/mysql
-      #  - ${DB_DRIVER:-mariadb}:/var/lib/postgresql/data
+       - mariadb:/var/lib/mysql
+      #  - mysql:/var/lib/mysql
+      #  - postgres:/var/lib/postgresql/data
        - /etc/localtime:/etc/localtime:ro
      environment:
        MYSQL_ROOT_PASSWORD: ${DB_ADMIN_PASSWORD:-root123}
@@ -17,6 +18,8 @@ services:
        POSTGRES_DB: ${DB_NAME:-pwe}
        POSTGRES_PASSWORD: ${DB_USER_PASSWORD:-pwe}
        POSTGRES_USER: ${DB_USER:-pwe}
+     ports:
+       - "${DATABASE_PUB_PORT:-7775}:${DB_PORT:-3306}"
    fcgi:
      image: kukam/pwe:latest
      restart: unless-stopped
@@ -45,8 +48,11 @@ services:
        PWE_CONF_log_log_delay: 1
        PWE_CONF_log_log_delay_minimum: 0.1
      volumes:
-       - uploadfile:/PWE2/webapps/generic_web/uploadfile
-       - /etc/localtime:/etc/localtime:ro    
+      #  - /Users/kukam/Workspace/PWE/pwe:/PWE # Devel PWE
+       - uploadfile:/PWE/webapps/generic_web/uploadfile
+       - /etc/localtime:/etc/localtime:ro
+     ports:
+       - "${FCGI_PUB_PORT:-7779}:7779"
    webproxy:
      image: nginx:latest
      restart: unless-stopped

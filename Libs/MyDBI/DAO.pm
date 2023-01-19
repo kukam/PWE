@@ -541,6 +541,7 @@ sub createInsertQuery {
         my $default = $self->getValue($method, "def");
 
         if (!ref($value)) {
+            $LOG->error(">>>>$value<<<<<");
             if ($value eq "NULL") {
                 push(@set1, "$sqlst$method$sqlst");
                 push(@set2, "NULL");
