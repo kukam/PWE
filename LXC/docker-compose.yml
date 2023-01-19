@@ -19,6 +19,7 @@ services:
        POSTGRES_PASSWORD: ${DB_USER_PASSWORD:-pwe}
        POSTGRES_USER: ${DB_USER:-pwe}
      ports:
+       # mysql -upwe -ppwe -P 7775 -h 127.0.0.1 pwe
        - "${DATABASE_PUB_PORT:-7775}:${DB_PORT:-3306}"
    fcgi:
      image: kukam/pwe:latest
@@ -44,11 +45,11 @@ services:
        PWE_CONF_dbi_db1_dbversion_file: conf/${DB_DRIVER:-mariadb}_dbversion.pl
        PWE_CONF_dbi_db1_trayconnect: 10
        PWE_CONF_log_logout: STDERR
-       PWE_CONF_log_loglevel: 3
+       PWE_CONF_log_loglevel: 1
        PWE_CONF_log_log_delay: 1
        PWE_CONF_log_log_delay_minimum: 0.1
      volumes:
-      #  - /Users/kukam/Workspace/PWE/pwe:/PWE # Devel PWE
+       - /Users/kukam/Workspace/PWE/pwe:/PWE # Devel PWE
        - uploadfile:/PWE/webapps/generic_web/uploadfile
        - /etc/localtime:/etc/localtime:ro
      ports:

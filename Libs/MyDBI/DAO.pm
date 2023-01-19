@@ -562,7 +562,7 @@ sub createInsertQuery {
                 push(@set2, "CURRENT_TIMESTAMP");
             } elsif ($value eq "current_timestamp()") {
                 push(@set1, "$sqlst$method$sqlst");
-                push(@set2, "current_timestamp");
+                push(@set2, "current_timestamp()");
             } else {
                 push(@set1,      "$sqlst$method$sqlst");
                 push(@set2,      "?");
@@ -611,6 +611,8 @@ sub createUpdateQuery {
                 push(@set, "$sqlst$method$sqlst = NOW()");
             } elsif ($value eq "CURRENT_TIMESTAMP") {
                 push(@set, "$sqlst$method$sqlst = CURRENT_TIMESTAMP");
+            } elsif ($value eq "current_timestamp()") {
+                push(@set, "$sqlst$method$sqlst = current_timestamp()");
             } else {
                 push(@set,       "$sqlst$method$sqlst = ?");
                 push(@{$values}, $value);
