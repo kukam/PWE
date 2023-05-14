@@ -517,7 +517,7 @@ sub setRunDBMethod {
     $self->{'db_run_method'} = $value;
 }
 
-# NOTE: V pripade ze je potreba zapis ktery je obaleny SQL funkci, pak je treba takovou hodnotu projet select a vysled pak setnout do DAO objektu.
+# NOTE: V pripade ze je potreba zapis ktery je obaleny SQL funkci, pak je treba takovou hodnotu projet selectem a vysled pak setnout do DAO objektu.
 #	my $SQL = $DBI->select("db1","STR_TO_DATE(NOW(),'%Y-%m-%d')",[]);
 #	my $date = $SQL->fetchrow_array();
 #	$SQL->finish;
@@ -541,7 +541,6 @@ sub createInsertQuery {
         my $default = $self->getValue($method, "def");
 
         if (!ref($value)) {
-            $LOG->error(">>>>$value<<<<<");
             if ($value eq "NULL") {
                 push(@set1, "$sqlst$method$sqlst");
                 push(@set2, "NULL");
@@ -569,7 +568,6 @@ sub createInsertQuery {
                 push(@{$values}, $value);
             }
         } else {
-
             # TODO : DOPSAT PODPORU PRO ZAPIS BINARNICH DAT
             my $ref = ref($value);
             $LOG->error("TENTO TYP ref:'$ref' NENI DOPROGRAMOVAN PRO ZAPIS DO DOATABAZE. Metoda: createInsertQuery");

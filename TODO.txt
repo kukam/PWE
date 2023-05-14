@@ -1,0 +1,30 @@
+1) = HOTOVO, OPRAVENO. Prepsat vsechny rb.tmpl, tak aby vzdy kazdy klic zacinal rb.<nazev>.atd.
+   
+2) v DAO.pm v metode refreshTABLE jsem udelal zmemu ve zpracovani dat, uz neni v selectu LIMIT 1, ale je prlolistovan cely vystup a zaroven
+   vypisovana warnig hlaska, ze existuji duplictni zaznamy, to je OK, ale kod pocita s tim, ze v tabulka ma primarni sloupec,
+   co se stane, ale kdyz ho mit nebude? Chtel by to prozkoumat a poradne otestovat!
+   
+3) V JS je chyba, kdyz mi apach vrati 404 a ne pwe, pak si javascript stim spravne neporadi, a nevrati do messengru interni hlasku '404'.
+   Nasimulujes to tak, ze si js zavolas nejaky nexxisutujici soubor a apach (ne pwe) ti vrati 404
+
+4) Prozkoumat chybu, kdyz smazu link na nejakou json mapu pro generovani ikonek a vypnu kontrolu 'existence souboru' v showicons.pm, pak
+   mi spadne page na hubu, to je dejme tomu OK, ale jakto ze stranka nevrati chybu 500 a neukaze to v message ? A jakto ze pak pri znovunacteni
+   stranky, je prazdna stranka, misto toho, aby web vratil 404? Nesouvisi ta chyba s bodem 3?
+
+5) DB Pool
+   Prepsat DBI driver tak, aby pouzival dbpool pro DAO objekty.
+      Takze pokud si vytvorim DAO objekt dostanu pridelenou koneksnu do db a ta se mi preda z poolu ktery drzi MyDBI.
+      Jakmile dojde k destory v DAO objektu tak do te dane koneksny zapisu informaci, ze opoustim dane spojeni.
+      Od te chvile, muze pouzivat koneksnu dalsi DAO objekt.
+      DBI pri pridavani poolu budu vzdy koukat zdali je dana koneksne volna nebo ne
+      (tuto informaci zjisti v metadatech daneho dbi objektu, do ktere bude zapisovat zminovany DAO objekt use => 1/0)
+      
+      Zakladem bude: MyDBI bude mit vyhrazeny prvni pool, ktery si bude drzet po celou dobu zivota,
+                     DAO objektu se budou pridavat objekty s id '2' a vissi, pokud dojde na vycerpani poolu,
+                     bude DAO objektu preda privni objekt ktery si budou s MyDBI sdilet (tudis budou na stejne transakci)
+      Vyhody: budou se moct vytvorit dva DAO objekty, ktere budou mit samostatnou transakci.
+      Nevyhody: PWE si bude drzet vice otevrenych spojeni do db. Toto by se ovlivnuje konfiguraci (db_pool)
+      Zmeny: V MyDBI bude zmenena struktura objektu v DBC $self->{'DBC'}->{dbid}->{dbpoolID}->{driver}.
+      Nezapomenout: MySQL driver drzi dve spojeni (w,r) tudis celkovy pocet spojeni bude (db_pool * 2) v podani myslq.
+
+6) Proverit expiraci session + mazani session + mazani cookie id atd....      

@@ -17,7 +17,7 @@ sub new {
                 $self->{'dbi'}->{$1}->{$2} = $value if (exists($self->{'dbi'}->{$1}->{$2}));
             }
         } elsif ($key =~ /^PWE_CONF_([a-zA-Z0-9]+)_([a-zA-Z0-9_]+)$/) {
-            $self->{$1}->{$2} = $value if ($self->getValue("$1", "$2", undef));
+            $self->{$1}->{$2} = $value if ($self->isExistValue("$1", "$2"));
         }
     }
 
@@ -31,7 +31,7 @@ sub new {
 
 =head2 B<[Public] getValue($key,$subkey,$def)>
 
-    Metoda vraci obsah atributu ($key) a jeho podklic ($subkey),
+    Metoda vraci obsah atributu ($key) a jeho podklice ($subkey),
     pokud jedna z promenych neexistuje vraci metoda hodnotu $def.
     
 =cut
@@ -50,6 +50,13 @@ sub getValue {
         return $def unless ($self->{$key});
         return $self->{$key};
     }
+}
+
+sub isExistValue {
+    my ($self, $key, $subkey,) = @_;
+    return 0 if (ref($self->{$key}) ne "HASH");
+    return 0 unless (exists($self->{$key}->{$subkey}));
+    return 1;
 }
 
 1;

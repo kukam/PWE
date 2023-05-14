@@ -5,7 +5,6 @@
 #
 # ./debug.cgi 'page=....'
 
-export PERL5LIB="$HOME/Tools/KOMODO-IDE10-DEBUG"
-export PERLDB_OPTS="RemotePort=127.0.0.1:9000 async=1"
-export DBGP_IDEKEY="jdoe"
+export PERL5LIB="$(pwd)"
+export PERLDB_OPTS="RemotePort=127.0.0.1:13603"
 

@@ -12,6 +12,7 @@
         smtp_servers      => [],
         enable_opt        => 1,
         save_opt_to       => "db",                                                # db / file
+        cgi_script_name   => undef,
         cgi_disableupload => 0,
         cgi_maxfilesize   => (100 * 1048576),                                     # 100MB
         cgi_maxopentries  => 1000,

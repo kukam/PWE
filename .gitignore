@@ -1,5 +1,8 @@
 !Build/
 .last_cover_stats
+.vscode
+.DS_Store
+/ramdisk
 /META.yml
 /META.json
 /MYMETA.*

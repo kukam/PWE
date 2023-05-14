@@ -2,7 +2,12 @@
 
 use strict;
 use warnings;
-use lib './';
+
+# use Cwd qw( abs_path );
+use File::Basename qw( dirname basename );
+
+# use lib dirname( abs_path( $0 ) );
+use lib dirname($0);
 use CGI::Fast socket_perm => 0770;
 use CGI qw/ :standard /;
 use Libs::Config;
@@ -155,9 +160,9 @@ while ( my $CGI = CGI::Fast->new() ) {
     elsif ( $env->{'SCRIPT_FILENAME'} =~ /\.\./ ) {
         $result = 401;
     }
-    elsif (( $0 eq $env->{'SCRIPT_FILENAME'} )
-        or ( "/" . $0 eq $env->{'SCRIPT_FILENAME'} )
-        or ( $0 eq "." . $env->{'SCRIPT_FILENAME'} )
+    elsif (( basename($0) eq $env->{'SCRIPT_FILENAME'} )
+        or ( "/" . basename($0) eq $env->{'SCRIPT_FILENAME'} )
+        or ( basename($0) eq "." . $env->{'SCRIPT_FILENAME'} )
         or ( $env->{'SCRIPT_FILENAME'} eq "/" )
         or ( !$env->{'SCRIPT_FILENAME'} ) )
     {
