@@ -2,11 +2,9 @@ version: "3.7"
 
 name: pwe
 
-# How to start
-# COMPOSE_PROFILES="static" docker compose up --build --remove-orphans
-# COMPOSE_PROFILES="generic" docker compose up --build --remove-orphans
-# docker compose --profile static up --build --remove-orphans
-# docker compose --profile generic up --build --remove-orphans
+# How to start on MAC OS
+# MY_IP="$(for i in {0..10}; do ipconfig getifaddr en${i}; done | head -1)" COMPOSE_PROFILES="static" docker compose up --build --remove-orphans
+# MY_IP="$(for i in {0..10}; do ipconfig getifaddr en${i}; done | head -1)" COMPOSE_PROFILES="generic" docker compose up --build --remove-orphans
 
 services:
   database:
@@ -58,18 +56,14 @@ services:
     tty: true
     configs:
       - source: nginx_config
-        target: /etc/nginx/conf.d/default.conf
+        target: /etc/nginx/default.conf.template
         uid: "root"
         gid: "root"
         mode: 640
-    #   - source: nginx_config
-    #     target: /etc/nginx/default.conf.template
-    #     uid: "root"
-    #     gid: "root"
-    #     mode: 640
-    # environment:
-    #   COMPOSE_PROFILES: ${COMPOSE_PROFILES:-unknown}
-    # command: /bin/bash -c 'eval "cat <<< \"$(</etc/nginx/default.conf.template)\"" > /etc/nginx/conf.d/default.conf && nginx -g "daemon off;"'
+    environment:
+      MY_IP: ${MY_IP:-unknown}
+      COMPOSE_PROFILES: ${COMPOSE_PROFILES:-unknown}
+    command: /bin/bash -c 'eval "cat <<< \"$(</etc/nginx/default.conf.template)\"" > /etc/nginx/conf.d/default.conf && sleep 2 && nginx -g "daemon off;"'
     ports:
       - "${WEBSERVER_PUB_PORT:-7778}:80"
     volumes:
