@@ -43,7 +43,8 @@ services:
       - env_${COMPOSE_PROFILES:-unknown}.env
     volumes:
       - /Users/kukam/Workspace/pwe/pwe:/PWE # Devel PWE
-      - uploadfile:/PWE/webapps/generic_web/uploadfile
+      - uploadfile:/PWE/webapps/${COMPOSE_PROFILES:-unknown}_web/uploadfile
+      - sessions:/PWE/webapps/${COMPOSE_PROFILES:-unknown}_web/sessions
       - /etc/localtime:/etc/localtime:ro
 
   webproxy:
@@ -88,6 +89,7 @@ services:
 
 volumes:
   uploadfile: # folder for uploadfile
+  sessions:   # folder for sessions
   mysql:      # MySQL volume
   mariadb:    # MariaDB volume
   postgres:   # Postgres volume
