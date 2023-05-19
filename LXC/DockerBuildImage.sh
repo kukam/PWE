@@ -1,10 +1,11 @@
 
 # HOW TO BUILD PWE IMAGE
-# cd root path the project
 # ./LXC/DockerBuildImage.sh
 
 PERL_VERSION="5.36.1"
 
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+docker buildx create --use
 docker buildx build --push \
     -t kukam/pwe:latest \
     --cache-from kukam/pwe:latest \
