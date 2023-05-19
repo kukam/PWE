@@ -3,7 +3,9 @@ version: "3.7"
 name: pwe
 
 # How to start on MAC OS
+# static
 # MY_IP="$(for i in {0..10}; do ipconfig getifaddr en${i}; done | head -1)" COMPOSE_PROFILES="static" docker compose up --build --remove-orphans
+# generic
 # MY_IP="$(for i in {0..10}; do ipconfig getifaddr en${i}; done | head -1)" COMPOSE_PROFILES="generic" docker compose up --build --remove-orphans
 
 services:

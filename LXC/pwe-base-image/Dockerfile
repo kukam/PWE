@@ -17,9 +17,8 @@ RUN bash -c "set -x \
     && perlbrew use perl-${PERL_VERSION} \
     && perlbrew switch perl-${PERL_VERSION} \
     && perlbrew install-cpanm \
-    && apt clean autoclean \
     && apt-get autoremove --yes \
-    && rm -rf /var/lib/{apt,dpkg,cache,log}/"
+    && apt clean autoclean"
 
 RUN bash -c "set -x \
     && source /opt/perl5/etc/bashrc \
