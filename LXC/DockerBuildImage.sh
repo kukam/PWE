@@ -6,7 +6,7 @@ PERL_VERSION="5.36.1"
 
 docker buildx build --push \
     -t kukam/pwe:latest \
-    --cache-from /pwe:latest \
+    --cache-from kukam/pwe:latest \
     --build-arg CPU_ARCH=${CPU_ARCH} \
     --build-arg PERL_VERSION=${PERL_VERSION} \
     --build-arg BUILDKIT_INLINE_CACHE=1 \
