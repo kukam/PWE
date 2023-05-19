@@ -1,7 +1,6 @@
-ARG CPU_ARCH=
 ARG PERL_VERSION=
 
-FROM kukam/pwe-base:${PERL_VERSION}-${CPU_ARCH}
+FROM kukam/pwe-base:${PERL_VERSION}
 
 ADD LXC/entrypoint.sh /entrypoint.sh
 
