@@ -1,5 +1,7 @@
 
-cd ../
+# HOW TO BUILD PWE IMAGE
+# cd root path the project
+# ./LXC/DockerBuildImage.sh
 
 PERL_VERSION="5.36.1"
 
@@ -10,5 +12,3 @@ docker buildx build --push \
     --build-arg BUILDKIT_INLINE_CACHE=1 \
     --platform "linux/amd64,linux/arm64/v8" \
     --no-cache .
-
-cd LXC/
