@@ -2,7 +2,7 @@ ARG PERL_VERSION=
 
 FROM kukam/pwe-base:${PERL_VERSION}
 
-ADD LXC/entrypoint.sh /entrypoint.sh
+ADD LXC/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 WORKDIR /PWE
 ADD assets assets
@@ -17,11 +17,9 @@ ADD LICENSE LICENSE
 ADD favicon.ico favicon.ico
 ADD pwe.fcgi pwe.fcgi
 
-VOLUME /PWE/webapps
-WORKDIR /PWE/webapps
-
 ENV PWE_CONF_pwe_home '/PWE/webapps/static_web'
 
-ENTRYPOINT ["/entrypoint.sh"]
+VOLUME /PWE/webapps
+WORKDIR /PWE/webapps
 
 CMD ["perl", "pwe.fcgi"]
