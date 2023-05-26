@@ -8,7 +8,7 @@ use File::Basename qw( dirname basename );
 
 # use lib dirname( abs_path( $0 ) );
 use lib dirname($0);
-use CGI::Fast socket_perm => 0770;
+use CGI::Fast socket_perm => '0770';
 use CGI qw/ :standard /;
 use Libs::Config;
 use Libs::MyDBI;
@@ -30,46 +30,41 @@ $SIG{TERM} = \&end;
 
 CGI::Fast->file_handles( { fcgi_error_file_handle => IO::Handle->new } );
 
-my $CONF = new Libs::Config('conf/webconfig.pl');
-my $LOG  = new Libs::Log($CONF);
+my $CONF = Libs::Config->new('conf/webconfig.pl');
+my $LOG  = Libs::Log->new($CONF);
 $LOG->info("Starting PWE server...");
 
 $LOG->delay("create_object_validate");
-my $VALIDATE = new Libs::Validate( $CONF, $LOG );
+my $VALIDATE = Libs::Validate->new( $CONF, $LOG );
 $LOG->delay( "create_object_validate", "Created object VALIDATE" );
 
 $LOG->delay("create_object_dbi");
-my $DBI = new Libs::MyDBI( $CONF, $LOG, $VALIDATE );
+my $DBI = Libs::MyDBI->new( $CONF, $LOG, $VALIDATE );
 $LOG->delay( "create_object_dbi", "Created object DBI" );
 
 $LOG->delay("create_object_user");
-my $USER = new Libs::User( $CONF, $LOG, $VALIDATE, $DBI );
+my $USER = Libs::User->new( $CONF, $LOG, $VALIDATE, $DBI );
 $LOG->delay( "create_object_user", "Created object USER" );
 
 $LOG->delay("create_object_web");
 
-my $WEB = new Libs::Web( $CONF, $LOG, $VALIDATE, $DBI, $USER );
+my $WEB = Libs::Web->new( $CONF, $LOG, $VALIDATE, $DBI, $USER );
 $LOG->delay( "create_object_web", "Created object WEB" );
 
 $LOG->delay("create_object_entities");
-my $ENTITIES = new Libs::Entities( $CONF, $LOG, $VALIDATE, $DBI, $USER, $WEB );
+my $ENTITIES = Libs::Entities->new( $CONF, $LOG, $VALIDATE, $DBI, $USER, $WEB );
 $LOG->delay( "create_object_entities", "Created object ENTITIES" );
 
 $LOG->delay("create_object_services");
-my $SERVICES =
-  new Libs::Services( $CONF, $LOG, $VALIDATE, $DBI, $USER, $WEB, $ENTITIES );
+my $SERVICES = Libs::Services->new( $CONF, $LOG, $VALIDATE, $DBI, $USER, $WEB, $ENTITIES );
 $LOG->delay( "create_object_services", "Created object SERVICES" );
 
 $LOG->delay("create_object_sites");
-my $SITES =
-  new Libs::Sites( $CONF, $LOG, $VALIDATE, $DBI, $USER, $WEB, $ENTITIES,
-    $SERVICES );
+my $SITES = Libs::Sites->new( $CONF, $LOG, $VALIDATE, $DBI, $USER, $WEB, $ENTITIES, $SERVICES );
 $LOG->delay( "create_object_sites", "Created object SITES" );
 
 $LOG->delay("create_object_pages");
-my $PAGES =
-  new Libs::Pages( $CONF, $LOG, $VALIDATE, $DBI, $USER, $WEB, $ENTITIES,
-    $SERVICES, $SITES );
+my $PAGES = Libs::Pages->new( $CONF, $LOG, $VALIDATE, $DBI, $USER, $WEB, $ENTITIES, $SERVICES, $SITES );
 $LOG->delay( "create_object_pages", "Created object PAGES" );
 
 # UPLOUD LIMIT : http://stackoverflow.com/questions/23288560/how-to-set-in-perl-and-fcgi-the-post-max-limit
