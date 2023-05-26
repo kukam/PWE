@@ -6,6 +6,7 @@
 /META.yml
 /META.json
 /MYMETA.*
+/TODO.txt
 *.o
 *.pm.tdy
 *.bs
