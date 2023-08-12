@@ -78,37 +78,37 @@
         #    daomap_file 	=> "conf/daomap_db1.dump",
         #    dbversion_file  => "conf/mysql_dbversion.pl"
         #},
-        #'db1' => {
-        #    dbdriver 		=> "mariadb",
-        #    login 		    => "pwe",
-        #    password 		=> "pwe",
-        #    database 		=> "pwe",
-        #    host 		    => "mariadb",
-        #    port		    => 3306,
-        #    logfile		    => "log/mysql",
-        #    loglevel		=> 0,
-        #    dao 		    => 1,
-        #    db_pool         => 5,
-        #    trayconnect     => 10,
-        #    daomap_file 	=> "conf/daomap_db1.dump",
-        #    dbversion_file  => "conf/mariadb_dbversion.pl"
-        #},
         'db1' => {
-            dbdriver       => "postgres",
-            login          => "pwe",
-            password       => "pwe",
-            database       => "pwe",
-            port           => 5432,
-            schema         => "public",
-            host           => "localhost",
-            logfile        => "log/postgres",
-            loglevel       => 5,
-            dao            => 1,
-            db_pool        => 2,                            # 2-3 is good!
-            trayconnect    => 5,
-            daomap_file    => "conf/daomap_db2.dump",
-            dbversion_file => "conf/postgres_dbversion.pl"
+           dbdriver 		=> "mariadb",
+           login 		    => "pwe",
+           password 		=> "pwe",
+           database 		=> "pwe",
+           host 		    => "mariadb",
+           port		    => 3306,
+           logfile		    => "log/mysql",
+           loglevel		=> 0,
+           dao 		    => 1,
+           db_pool         => 5,
+           trayconnect     => 10,
+           daomap_file 	=> "conf/daomap_db1.dump",
+           dbversion_file  => "conf/mariadb_dbversion.pl"
         },
+        # 'db1' => {
+        #     dbdriver       => "postgres",
+        #     login          => "pwe",
+        #     password       => "pwe",
+        #     database       => "pwe",
+        #     port           => 5432,
+        #     schema         => "public",
+        #     host           => "localhost",
+        #     logfile        => "log/postgres",
+        #     loglevel       => 5,
+        #     dao            => 1,
+        #     db_pool        => 2,                            # 2-3 is good!
+        #     trayconnect    => 5,
+        #     daomap_file    => "conf/daomap_db2.dump",
+        #     dbversion_file => "conf/postgres_dbversion.pl"
+        # },
     },
 
     log => {
