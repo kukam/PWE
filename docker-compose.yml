@@ -59,8 +59,10 @@ services:
       - ./LXC/env_${COMPOSE_PROFILES:-unknown}.env
     volumes:
       - /Users/kukam/Workspace/pwe/pwe:/PWE # Devel PWE
-      - uploadfile:/PWE/webapps/${COMPOSE_PROFILES:-unknown}_web/uploadfile
-      - sessions:/PWE/webapps/${COMPOSE_PROFILES:-unknown}_web/sessions
+      - uploadfile:/PWE/webapps/static_web/uploadfile
+      - uploadfile:/PWE/webapps/generic_web/uploadfile
+      - sessions:/PWE/webapps/static_web/sessions
+      - sessions:/PWE/webapps/generic_web/sessions
       - /etc/localtime:/etc/localtime:ro
 
   webproxy:
