@@ -2,45 +2,61 @@ version: "3.7"
 
 name: pwe
 
-# How to start on MAC OS
-# static
-# MY_IP="$(for i in {0..10}; do ipconfig getifaddr en${i}; done | head -1)" COMPOSE_PROFILES="static" docker compose up --build --remove-orphans
-# generic
-# MY_IP="$(for i in {0..10}; do ipconfig getifaddr en${i}; done | head -1)" COMPOSE_PROFILES="generic" docker compose up --build --remove-orphans
-
 services:
-  database:
-    image: ${DB_DRIVER:-mariadb}:latest
+  postgres:
+    image: postgres:latest
     restart: unless-stopped
     profiles:
-      - generic
+      - postgres
     volumes:
-      - mariadb:/var/lib/mysql
-      #  - mysql:/var/lib/mysql
-      #  - postgres:/var/lib/postgresql/data
+      - postgres:/var/lib/postgresql/data
       - /etc/localtime:/etc/localtime:ro
     env_file:
-      - env_database.env
-    # ports:
-    #   # mysql -upwe -ppwe -P 7775 -h 127.0.0.1 pwe
-    #   - "${DATABASE_PUB_PORT:-7775}:${DB_PORT:-3306}"
+      - ./LXC/env_postgres.env
+    ports:
+      - "${DATABASE_PUB_PORT:-7775}:5432"
+
+  mariadb:
+    image: mariadb:latest
+    restart: unless-stopped
+    profiles:
+      - mariadb
+    volumes:
+      - mariadb:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - ./LXC/env_mariadb.env
+    ports:
+      - "${DATABASE_PUB_PORT:-7776}:3306"
+
+  mysql:
+    image: mysql:latest
+    restart: unless-stopped
+    profiles:
+      - mysql
+    volumes:
+      - mysql:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - ./LXC/env_mysql.env
+    ports:
+      - "${DATABASE_PUB_PORT:-7777}:3306"
 
   fcgi:
     image: kukam/pwe:latest
     restart: unless-stopped
-    #  restart: always
-    depends_on:
-      - database
     deploy:
       replicas: 3
     profiles:
       - static
-      - generic
+      - mysql
+      - mariadb
+      - postgres
     stdin_open: true
     tty: true
     env_file:
-      - env_common.env
-      - env_${COMPOSE_PROFILES:-unknown}.env
+      - ./LXC/env_common.env
+      - ./LXC/env_${COMPOSE_PROFILES:-unknown}.env
     volumes:
       - /Users/kukam/Workspace/pwe/pwe:/PWE # Devel PWE
       - uploadfile:/PWE/webapps/${COMPOSE_PROFILES:-unknown}_web/uploadfile
@@ -54,7 +70,9 @@ services:
       - fcgi
     profiles:
       - static
-      - generic
+      - mysql
+      - mariadb
+      - postgres
     stdin_open: true
     tty: true
     configs:
@@ -72,7 +90,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
 
-  # devops:
+  # for debuging:
   #   image: kukam/devops:main
   #   restart: unless-stopped
   #   stdin_open: true
@@ -96,7 +114,7 @@ volumes:
 
 configs:
   nginx_config:
-    file: ./default-nginx.conf
+    file: ./LXC/default-nginx.conf
 
 networks:
   default:
