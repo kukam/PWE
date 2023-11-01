@@ -43,7 +43,7 @@ services:
       - "${DATABASE_PUB_PORT:-7777}:3306"
 
   fcgi:
-    image: kukam/pwe:latest
+    image: kukam/pwe-${COMPOSE_PROFILES:-unknown}:latest
     restart: unless-stopped
     deploy:
       replicas: 3
@@ -54,6 +54,8 @@ services:
       - postgres
     stdin_open: true
     tty: true
+    environment:
+      PWE_PROFILE: ${COMPOSE_PROFILES:-unknown}
     env_file:
       - ./LXC/docker-compose_common.env
       - ./LXC/docker-compose_${COMPOSE_PROFILES:-unknown}.env

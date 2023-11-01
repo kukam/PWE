@@ -28,8 +28,6 @@ RUN set -x \
     #     Cz::Cstocs \
     #     Class::MOP
 
-ENV PWE_CONF_pwe_home '/PWE/webapps/'
-
 WORKDIR /PWE
 
 ADD Libs Libs

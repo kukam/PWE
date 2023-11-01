@@ -9,6 +9,7 @@ webapps/*/temp
 webapps/*/log
 webapps/*/uploadfile
 webapps/*/sessions
+webapps/*/conf/database.conf
 /META.yml
 /META.json
 /MYMETA.*

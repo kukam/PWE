@@ -12,6 +12,33 @@ docker buildx build --push \
     --no-cache .
 ```
 
+## How to build generic image to docker hub
+```
+docker buildx create --use
+docker buildx build --push \
+    -t kukam/pwe-generic:latest \
+    -t kukam/pwe-mysql:latest \
+    -t kukam/pwe-mariadb:latest \
+    -t kukam/pwe-postgres:latest \
+    --cache-from kukam/pwe-base:latest \
+    --build-arg BUILDKIT_INLINE_CACHE=1 \
+    --platform "linux/amd64,linux/arm64/v8" \
+    --no-cache \
+    -f webapps/generic.example.web/Dockerfile .
+```
+
+## How to build static image to docker hub
+```
+docker buildx create --use
+docker buildx build --push \
+    -t kukam/pwe-static:latest \
+    --cache-from kukam/pwe-base:latest \
+    --build-arg BUILDKIT_INLINE_CACHE=1 \
+    --platform "linux/amd64,linux/arm64/v8" \
+    --no-cache \
+    -f webapps/static.example.web/Dockerfile .
+```
+
 ## how to run in docker-compose
 ```
 # How to start on MAC OS
