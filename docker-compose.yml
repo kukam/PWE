@@ -12,7 +12,7 @@ services:
       - postgres:/var/lib/postgresql/data
       - /etc/localtime:/etc/localtime:ro
     env_file:
-      - ./LXC/env_postgres.env
+      - ./LXC/docker-compose_postgres.env
     ports:
       - "${DATABASE_PUB_PORT:-7775}:5432"
 
@@ -25,7 +25,7 @@ services:
       - mariadb:/var/lib/mysql
       - /etc/localtime:/etc/localtime:ro
     env_file:
-      - ./LXC/env_mariadb.env
+      - ./LXC/docker-compose_mariadb.env
     ports:
       - "${DATABASE_PUB_PORT:-7776}:3306"
 
@@ -38,7 +38,7 @@ services:
       - mysql:/var/lib/mysql
       - /etc/localtime:/etc/localtime:ro
     env_file:
-      - ./LXC/env_mysql.env
+      - ./LXC/docker-compose_mysql.env
     ports:
       - "${DATABASE_PUB_PORT:-7777}:3306"
 
@@ -55,14 +55,14 @@ services:
     stdin_open: true
     tty: true
     env_file:
-      - ./LXC/env_common.env
-      - ./LXC/env_${COMPOSE_PROFILES:-unknown}.env
+      - ./LXC/docker-compose_common.env
+      - ./LXC/docker-compose_${COMPOSE_PROFILES:-unknown}.env
     volumes:
-      - /Users/kukam/Workspace/pwe/pwe:/PWE # Devel PWE
-      - uploadfile:/PWE/webapps/static_web/uploadfile
-      - uploadfile:/PWE/webapps/generic_web/uploadfile
-      - sessions:/PWE/webapps/static_web/sessions
-      - sessions:/PWE/webapps/generic_web/sessions
+      - ${PWD}:/PWE # Devel PWE
+      - uploadfile:/PWE/examples/static_web/uploadfile
+      - uploadfile:/PWE/examples/generic_web/uploadfile
+      - sessions:/PWE/examples/static_web/sessions
+      - sessions:/PWE/examples/generic_web/sessions
       - /etc/localtime:/etc/localtime:ro
 
   webproxy:
@@ -75,8 +75,6 @@ services:
       - mysql
       - mariadb
       - postgres
-    stdin_open: true
-    tty: true
     configs:
       - source: nginx_config
         target: /etc/nginx/default.conf.template
@@ -92,18 +90,23 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
 
-  # for debuging:
+  # debuging:
   #   image: kukam/devops:main
   #   restart: unless-stopped
   #   stdin_open: true
   #   tty: true
-  #   networks:
-  #     - host
+  #   # networks:
+  #   #   - host
   #   profiles:
   #     - static
-  #     - generic
+  #     - mysql
+  #     - mariadb
+  #     - postgres
   #   environment:
   #     COMPOSE_PROFILES: ${COMPOSE_PROFILES:-unknown}
+  #   env_file:
+  #     - ./LXC/docker-compose_common.env
+  #     - ./LXC/docker-compose_${COMPOSE_PROFILES:-unknown}.env
   #   volumes:
   #     - /etc/localtime:/etc/localtime:ro
 
@@ -116,7 +119,7 @@ volumes:
 
 configs:
   nginx_config:
-    file: ./LXC/default-nginx.conf
+    file: ./LXC/docker-compose_nginx.conf
 
 networks:
   default:

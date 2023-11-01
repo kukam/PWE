@@ -3,9 +3,12 @@ package Libs::Config;
 use strict;
 
 sub new {
-    my ($class, $file) = @_;
+    my ($class, $mainconfig, $databaseconfig) = @_;
 
-    my $self = do($file);
+    die "$mainconfig not exist!" unless (-f $mainconfig);
+
+    my $self = do($mainconfig);
+    $self->{'dbi'} = do($databaseconfig) if (-f $databaseconfig);
     bless $self, $class;
 
     # Moznost prepsat konfiguraci pomoci globalnich promenych (Environment variables)

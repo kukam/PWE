@@ -1,8 +1,14 @@
 !Build/
 .last_cover_stats
 .vscode
+.sass-cache
 .DS_Store
 /ramdisk
+webapps/*/ramdisk
+webapps/*/temp
+webapps/*/log
+webapps/*/uploadfile
+webapps/*/sessions
 /META.yml
 /META.json
 /MYMETA.*
@@ -37,13 +43,3 @@ inc/
 /MANIFEST.bak
 /pm_to_blib
 /*.zip
-
-# PWE
-PWE.komodoproject
-webapps/
-examples/generic_web/log
-examples/generic_web/temp
-examples/generic_web/ramdisk
-examples/static_web/log
-examples/static_web/temp
-examples/static_web/ramdisk

@@ -3,6 +3,8 @@ FROM ubuntu:latest
 RUN set -x \
     && apt-get update \
     && apt-get install -y \
+        sass \
+        node-less \
         libcgi-fast-perl \
         libclass-inspector-perl \
         libmail-rfc822-address-perl \
@@ -26,26 +28,24 @@ RUN set -x \
     #     Cz::Cstocs \
     #     Class::MOP
 
-ADD LXC/entrypoint.sh /usr/local/bin/entrypoint.sh
+ENV PWE_CONF_pwe_home '/PWE/webapps/'
 
 WORKDIR /PWE
+
+ADD Libs Libs
+ADD Sites Sites
+ADD Pages Pages
 ADD assets assets
 ADD Entities Entities
-ADD examples webapps
-ADD Libs Libs
-ADD Pages Pages
 ADD Services Services
-ADD Sites Sites
 ADD templates templates
-ADD LICENSE LICENSE
 ADD favicon.ico favicon.ico
 ADD pwe.fcgi pwe.fcgi
 
-ENV PWE_CONF_pwe_home '/PWE/webapps/static_web'
+ADD LICENSE LICENSE
 
-VOLUME /PWE/webapps
 WORKDIR /PWE/webapps
 
-ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
+ENTRYPOINT []
 
-CMD ["perl", "pwe.fcgi"]
+CMD []

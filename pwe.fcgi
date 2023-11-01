@@ -30,7 +30,7 @@ $SIG{TERM} = \&end;
 
 CGI::Fast->file_handles( { fcgi_error_file_handle => IO::Handle->new } );
 
-my $CONF = Libs::Config->new('conf/webconfig.pl');
+my $CONF = Libs::Config->new('conf/web.conf','conf/database.conf');
 my $LOG  = Libs::Log->new($CONF);
 $LOG->info("Starting PWE server...");
 
@@ -104,8 +104,9 @@ while ( my $CGI = CGI::Fast->new() ) {
     # SET CHARSET
     $CGI->charset('UTF8');
 
-    #my $env  = $FCGI->GetEnvironment();
+    # SET ENVS
     my $env = \%ENV;
+
     my $sid = $CGI->cookie(
         $CONF->getValue( "http", "cookie_name", "UNKNOWN_SESSION_NAME" ) );
     my $page = (
@@ -166,11 +167,15 @@ while ( my $CGI = CGI::Fast->new() ) {
     elsif (
         -f $CONF->getValue( 'pwe', 'home', '' ) . "$env->{'SCRIPT_FILENAME'}" )
     {
+        $USER->setPage('systemPage');
+        $USER->setFunc('file');
         $result = $PAGES->callPageFunc( 'systemPage', 'file' );
     }
     elsif (
         -d $CONF->getValue( 'pwe', 'home', '' ) . "$env->{'SCRIPT_FILENAME'}" )
     {
+        $USER->setPage('systemPage');
+        $USER->setFunc('folder');
         $result = $PAGES->callPageFunc( 'systemPage', 'folder' );
     }
     else {
@@ -208,10 +213,6 @@ while ( my $CGI = CGI::Fast->new() ) {
         $result_info = "200, OK";
     }
 
-    $LOG->info(
-        "User call page finis: PID:$$ page:$page func:$func result:$result_info"
-    );
-
     $page = $USER->getPage();
     $func = $USER->getFunc();
 
@@ -219,6 +220,8 @@ while ( my $CGI = CGI::Fast->new() ) {
     $SERVICES->flush();
     $WEB->flush();
     $USER->flush();
+
+    $LOG->info("Page printed : PID:$$ page:$page func:$func result:'$result_info'");
     $LOG->debug("Fastcgi cycle ended");
 
     # CLEAR

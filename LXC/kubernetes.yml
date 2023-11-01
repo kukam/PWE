@@ -2,13 +2,13 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: pwe
+  name: pwe-example
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: pwe-secret
-  namespace: pwe
+  namespace: pwe-example
 type: kubernetes.io/tls
 data:
   tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUREekNDQWZlZ0F3SUJBZ0lKQU1SL0kxZ2h4dHhnTUEwR0NTcUdTSWIzRFFFQkN3VUFNQjR4SERBYUJnTlYKQkFNTUUzQjNaUzVyZFdKbExtWnlaV1ZpYjNndVkzb3dIaGNOTVRnd09ERTFNRGd3TURVM1doY05Namd3T0RFeQpNRGd3TURVM1dqQWVNUnd3R2dZRFZRUUREQk53ZDJVdWEzVmlaUzVtY21WbFltOTRMbU42TUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBcHJLcXJSTlZaUlpiNGlyQ2ZucnE2cjZaTDJxNmV4RjIKNXFPQ04wdWtTVTkzaFZYRUZ0MjF2SFQzeVFpQTBZWlRDVGF1ZG1YSDNkT0xnRjRLd2ZOU1BmczlRUjNrUnBMWgpVZGE0Z3NaYmVaUEJwYmpuaS9CTDBBdDVVbU1WSU5YeGVPeVJUR2VPRDBJcWhLSG5zYWxFSnRtVWZJTExqQk10CjhNY1Zkalc2dlZQdWt0ZXNwTVpUS09CczNsT1FWZ3dFR2JTOUxYZkliNnAvWUtWQnBrd2p1TnhWUlc3MXNQSFMKcDRqeTBTZXhaU3N1WlMxUVErenZ6RGFlSzRTWUI1VWE0K21naU9peXFVL1VUbEd0VUYzbDRzNzRjc3hCOGk2YwpYRjNuM3JNVlZBdVMzc0dvUEpGTm1reG52TGZldnVXbThpbGl1MFM5T1M5TXdLNFVlMFBYb1FJREFRQUJvMUF3ClRqQWRCZ05WSFE0RUZnUVVreUNvRGJvM0VYT203STd1TDlCTDh2KytLMjB3SHdZRFZSMGpCQmd3Rm9BVWt5Q28KRGJvM0VYT203STd1TDlCTDh2KytLMjB3REFZRFZSMFRCQVV3QXdFQi96QU5CZ2txaGtpRzl3MEJBUXNGQUFPQwpBUUVBSWttcEgvTkRvOFJSOS9vbDZrSnZFRTVleGh3YmY0aVB2M2VwWTVIQXd5bGdmV2hpdHNxSzF6YjRDNVFFCjhpZmFYYXNGczNyaVdVZm1WZHFhbVNtS3B2R0o5NmdIbVJvSmFYWHhVWVBRbG9SWCs2UURUb1FvVGh6RlBBWWkKY1BsNVZnU0hRRG5HVEVGZDQxeXp5WFFmUGYyQlg0amhHNzZnZnFYV213K3IydU5qdHZQQ3drdDVvRHdEV2I0eApsK3UxUjdka1c2NW45RUNhYjhwYW9TRmtpbXpzVnJpcURJRlZqL2lnOHl6d2VXK1NleTYvaFRGK0JpZXVYcEVlCmtaM1c3d1I0SEdLQUJ5L2xtMlBEMHJIRDJEL2x3b2F6MGt3NnBKTldDLzRWNDJUbUxsSUc3bExZdHQyVm4vcGUKWHV4MzAwcUhiam9lQ1FOVWwxMEltYjJTTWc9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
@@ -18,7 +18,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: pwe-nginx-config-map
-  namespace: pwe
+  namespace: pwe-example
   labels:
     name: pwe
     context: pwe
@@ -44,7 +44,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: pwe
-  namespace: pwe
+  namespace: pwe-example
   labels:
     name: pwe
     context: pwe
@@ -64,7 +64,7 @@ metadata:
     name: pwe
     context: pwe
   name: pwe
-  namespace: pwe
+  namespace: pwe-example
 spec:
   containers:
     - name: db
@@ -151,17 +151,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: pwe-nginx-ingress
-  namespace: pwe
+  namespace: pwe-example
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - pwe.kube.freebox.cz
+        - pwe-example.kube.freebox.cz
       secretName: pwe-secret
   rules:
-    - host: pwe.kube.freebox.cz
+    - host: pwe-example.kube.freebox.cz
       http:
         paths:
           - path: /

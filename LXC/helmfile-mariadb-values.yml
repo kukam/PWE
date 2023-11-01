@@ -1,0 +1,75 @@
+configMaps:
+  nginx-fcgi-config:
+    data:
+      default.conf: |-
+        server {
+          listen   80;
+          location / {
+              gzip off;
+              #fastcgi_keep_conn on;
+              fastcgi_pass pwe_balancer;
+              fastcgi_param SCRIPT_FILENAME $fastcgi_script_name;
+              include fastcgi_params;
+          }
+          error_log /dev/stdout info;
+          access_log /dev/stdout;
+        }
+        upstream pwe_balancer {
+            server 127.0.0.1:7779;
+        }
+
+deployments:
+  fcgi:
+    replicas: 3
+    containers:
+      - name: fcgi
+        image: kukam/pwe
+        imageTag: latest
+        imagePullPolicy: IfNotPresent
+        ports:
+          - name: fcgi
+            containerPort: 7779
+        env:
+          - name: FCGI_SOCKET_PATH
+            value: ":7779"
+          - name: PWE_CONF_pwe_home
+            value: "/PWE/webapps/static_web"
+      - name: nginx
+        image: nginx
+        imageTag: latest
+        imagePullPolicy: IfNotPresent
+        ports:
+          - name: http
+            containerPort: 80
+        volumeMounts:
+          - name: nginx-fcgi-config
+            mountPath: /etc/nginx/conf.d
+    volumes:
+      - name: nginx-fcgi-config
+        type: configMap
+
+  # nginx:
+  #   replicas: 1
+  #   volumes:
+  #     - name: nginx-fcgi-config
+  #       type: configMap
+  #   containers:
+  #     - name: nginx
+  #       image: nginx
+  #       imageTag: latest
+  #       imagePullPolicy: IfNotPresent
+  #       ports:
+  #         - name: http
+  #           containerPort: 80
+  #       volumeMounts:
+  #         - name: nginx-fcgi-config
+  #           # mountPath: /tmp/dusan
+  #           mountPath: /etc/nginx/conf.d
+
+services:
+  nginx-fcgi:
+    ports:
+      - name: http
+        protocol: TCP
+        port: 80
+        targetPort: 8888

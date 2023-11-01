@@ -1,0 +1,33 @@
+---
+
+helmDefaults:
+  wait: true
+  timeout: 1800
+
+repositories:
+  - name: nginx-ingress-controller
+    url: "https://charts.bitnami.com/bitnami"
+  - name: nixys-universal-chart
+    url: "https://registry.nixys.ru/chartrepo/public"
+
+# not good
+# repositories:
+#   - name: evgkrsk-universal-chart
+#     url: "https://evgkrsk.github.io/nxs-universal-chart"
+
+releases:
+  - name: ingress
+    namespace: ingress
+    chart: bitnami/nginx-ingress-controller
+    version: 9.7.9
+    createNamespace: true
+  - name: pwe
+    namespace: pwe
+    chart: nixys-universal-chart/nxs-universal-chart
+    version: 2.4.2
+    # chart: ./LXC/nxs-universal-chart/
+    # chart: evgkrsk-universal-chart/universal-chart
+    # version: 3.5.0
+    createNamespace: true
+    values:
+      - ./LXC/helmfile-static-values.yml
