@@ -53,9 +53,9 @@ sub default {
     my $out        = undef;
     my $home       = $CONF->getValue("pwe", "home");
     my $src_css    = $CONF->getValue("css", "src_css", "static");
-    my $less_bin   = $CONF->getValue("css", "less_bin", "/usr/bin/lessc");
-    my $less_src   = $CONF->getValue("css", "less_src", "/assets/less/main/main.less");
-    my $less_out   = $CONF->getValue("css", "less_out", "/assets/css/less-out.css");
+    my $scss_bin   = $CONF->getValue("css", "scss_bin", "/usr/bin/sass -C --scss --style=compressed");
+    my $scss_src   = $CONF->getValue("css", "scss_src", "/assets/scss/main/main.less");
+    my $scss_out   = $CONF->getValue("css", "scss_out", "/assets/css/less-out.css");
     my $static_css = $CONF->getValue("css", "static_css", "/assets/css/less-out.css");
 
     if ($src_css eq "static") {
@@ -64,10 +64,10 @@ sub default {
         while (<CSS>) { print $_; }
         close(CSS);
 
-    } elsif ($src_css eq "less") {
+    } elsif ($src_css eq "scss") {
 
         my $css = "";
-        open($out, "$less_bin $home$less_src |") || die "Failed: $!\n";
+        open($out, "$scss_bin $home$scss_src |") || die "Failed: $!\n";
         while (<$out>) {
             print $_;
             $css = "$css$_";
@@ -75,7 +75,7 @@ sub default {
         close($out);
 
         my $out = undef;
-        open($out, "> $home/$less_out") || die "Failed: $!\n";
+        open($out, "> $home/$scss_out") || die "Failed: $!\n";
         print $out $css;
         close($out);
     } else {

@@ -1,0 +1,187 @@
+body,
+html {
+    margin: 0;
+    height: 100%;
+    font-size: 16px;
+    font-family: Inter, arial, sans-serif;
+    background-color: #ece9e9
+}
+
+body.framed-tablet-v,
+html.framed-tablet-v {
+    min-width: 1000px
+}
+
+body.framed-tablet-h,
+html.framed-tablet-h {
+    min-width: 1300px
+}
+
+body.framed-mobile,
+html.framed-mobile {
+    min-width: 550px
+}
+
+#header {
+    position: relative;
+    top: 0;
+    left: 0;
+    height: 100px;
+    z-index: 10;
+    position: relative;
+    background-color: white
+}
+
+#devices {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+
+    border: #333;
+
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-right: -50%;
+    transform: translate(-50%, -50%)
+}
+
+#devices i {
+    font-size: 40px
+}
+
+#devices li {
+    display: inline-block;
+    float: left;
+    margin-right: 20px
+}
+
+#devices li a {
+    color: gray;
+    -webkit-transition: all .5s ease-in-out;
+    transition: all .5s ease-in-out
+}
+
+#devices li a.active,
+#devices li a:hover {
+    color: #df0067
+}
+
+@media (max-width:991.98px) {
+    #devices {
+        display: none
+    }
+}
+
+#devices a {
+    text-decoration: none;
+    border: none;
+    cursor: pointer
+}
+
+#iframe {
+    height: 100%;
+}
+
+#iframe, #header {
+    width: 100%
+}
+
+#iframe-container {
+    position: relative;
+    z-index: 9
+}
+
+#iframe-container,
+#iframe-container #iframe-wrapper {
+    -webkit-transition: all .2s ease-in-out;
+    transition: all .2s ease-in-out
+}
+
+#iframe-container #iframe-wrapper {
+    margin: 0 auto
+}
+
+#iframe-container #iframe-wrapper iframe {
+    display: block;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: #333;
+    -webkit-transition: all .1s ease-out;
+    transition: all .1s ease-out
+}
+
+#iframe-container.desktop {
+    position: absolute;
+    height: calc(100% - 50px);
+    width: 100%
+}
+
+#iframe-container.desktop #iframe-wrapper {
+    width: 100%;
+    height: 100%
+}
+
+#iframe-container.desktop #iframe-wrapper iframe {
+    top: 0
+}
+
+#iframe-container.desktop.full-screen {
+    height: 100%;
+    -webkit-transition: none;
+    transition: none
+}
+
+#iframe-container.tablet-h {
+    top: 20px;
+    height: 849px;
+    width: 100%;
+    background: url(/assets/images/tablet-h.svg) top center no-repeat
+}
+
+#iframe-container.tablet-h #iframe-wrapper {
+    display: block;
+    width: 1024px;
+    height: 768px
+}
+
+#iframe-container.tablet-h #iframe-wrapper iframe {
+    top: 30px;
+    left: -20px
+}
+
+#iframe-container.tablet-v {
+    top: 10px;
+    height: 1135px;
+    width: 100%;
+    background: url(/assets/images/tablet-v.svg) top center no-repeat
+}
+
+#iframe-container.tablet-v #iframe-wrapper {
+    display: block;
+    width: 768px;
+    height: 1024px
+}
+
+#iframe-container.tablet-v #iframe-wrapper iframe {
+    top: 31px
+}
+
+#iframe-container.mobile {
+    top: 10px;
+    height: 765px;
+    width: 100%;
+    background: url(/assets/images/mobil.svg) top center no-repeat
+}
+
+#iframe-container.mobile #iframe-wrapper {
+    display: block;
+    height: 667px;
+    width: 375px;
+    position: relative
+}
+
+#iframe-container.mobile #iframe-wrapper iframe {
+    top: 33px
+}

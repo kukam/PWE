@@ -156,6 +156,8 @@ sub printHttpHeader {
         $output = $self->genTmpl("templates/HttpHeaderAjax.tmpl", %tmpl);
     } elsif ($tmpl_type eq "ajax_redirect") {
         $output = $self->genTmpl("templates/HttpHeaderAjaxRedirect.tmpl", %tmpl);
+    } elsif ($tmpl_type eq "svg_xml") {
+        $output = $self->genTmpl("templates/HttpHeaderSVGXML.tmpl", %tmpl);
     } elsif ($tmpl_type eq "redirect") {
         $output = $self->genTmpl("templates/HttpHeaderRedirect.tmpl", %tmpl);
     } elsif ($tmpl_type eq "image" and $tmpl{'image'}) {
@@ -306,8 +308,10 @@ sub genTmpl {
     $tmpl{'script_page'}      = $USER->getValue("page", undef, "default");
     $tmpl{'script_func'}      = $USER->getValue("func", undef, "default");
     $tmpl{'start_time'}       = $USER->getValue("env", "APACHE_START_TIME", "");
-    $tmpl{'http_host'}        = $USER->getValue("env", "HTTP_HOST", $CONF->getValue("http", "base_url", "localhost"));
     $tmpl{'http_https'}       = ($USER->getValue("env", "HTTPS", undef) ? "https://" : "http://");
+    $tmpl{'http_host'}        = $USER->getValue("env", "HTTP_HOST", $CONF->getValue("http", "base_url", "localhost"));
+    $tmpl{'http_host_full'}   = $USER->getValue("env", "HTTP_HOST", $CONF->getValue("http", "base_url", "localhost"));
+    $tmpl{'http_referer'}     = ($USER->getValue("env", "HTTP_REFERER", $USER->getValue("env", "HTTP_HOST", $CONF->getValue("http", "base_url", "localhost"))));
     $tmpl{'server_name'}      = $USER->getValue("env", "SERVER_NAME", $CONF->getValue("http", "base_url", "localhost"));
     $tmpl{'request_uri'}      = $USER->getValue("env", "REQUEST_URI", "/");
     $tmpl{'use_language'}     = $USER->getValue("language", undef, "CZE");

@@ -1,0 +1,13 @@
+<body>
+   [% PROCESS templates/resource_bundle.tmpl %]
+   
+   [% IF html_main %]
+      [% INCLUDE $html_main %]
+   [% ELSIF print_main %]
+      [% print_main %]
+   [% ELSE %]
+      <h1>Unknown page.....</h1>
+   [% END %]
+
+</body>
+</html>

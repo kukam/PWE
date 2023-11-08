@@ -1,20 +1,2 @@
-<!-- Modal -->
-[% IF conf_development %]
-<div class="modal fade" id="DumpData" tabindex="-1" role="dialog" aria-labelledby="DumpData" aria-hidden="true">
-  <div class="modal-dialog" style="width: 960px">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-        <h4 class="modal-title" id="myModalLabel">Dump template data</h4>
-      </div>
-      
-      <div class="modal-body">
-        [% INCLUDE templates/DumpData.tmpl %]
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-[% END %]
+[% # INCLUDE templates/DumpData.tmpl %]
+<script src="assets/javascript/bootstrap-5.2.3/bootstrap.min.js"></script>

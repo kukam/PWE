@@ -1,0 +1,29 @@
+<div id="header">
+        <script>
+            function changeClass(cssclass) {
+                $("#iframe-container").removeClass();
+                $("#iframe-container").addClass(cssclass);
+                $('#devices li a').each(function() {
+                    if ($(this).hasClass(cssclass)) {
+                        $(this).addClass('active');
+                    }else{
+                        $(this).removeClass('active');
+                    }
+                });
+            }
+        </script>
+        <ul id="devices">
+            <li><a class="change-device desktop" onclick="changeClass('desktop')"><i class="fa-solid fa-display"></i></a></li>
+            <li><a class="change-device tablet-v active" onclick="changeClass('tablet-v')"><i class="fa-solid fa-tablet-screen-button"></i></a></li>
+            <li><a class="change-device tablet-h" onclick="changeClass('tablet-h')"><i class="fa-solid fa-tablet-screen-button fa-rotate-270"></i></a></li>
+            <li><a class="change-device mobile" onclick="changeClass('mobile')"><i class="fa-solid fa-mobile-screen-button"></i></a></li>
+        </ul>
+    </div>
+<div id="iframe">
+    <div id="iframe-container" class="tablet-v" lang="en">
+        <div id="iframe-wrapper">
+            <iframe frameborder="0" src="[% http_https %][% http_host_full %]"></iframe>
+        </div>
+    </div>
+</div>
+</div>

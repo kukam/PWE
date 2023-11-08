@@ -68,6 +68,8 @@ sub file {
         $WEB->printHttpHeader('type' => 'js');
     } elsif ($file =~ /\.css$/) {
         $WEB->printHttpHeader('type' => 'css');
+    } elsif ($file =~ /\.svg$/) {
+        $WEB->printHttpHeader('type' => 'svg_xml');
     } elsif ($file =~ /\.woff2$/) {
         $WEB->printHttpHeader('type' => 'font', font => "woff2");
     } else {
