@@ -13,20 +13,34 @@ RUN set -x \
         libdbi-perl \
         libdbd-mysql-perl \
         libdbd-pg-perl \
-        libnet-ssh2-perl \
         libimage-magick-perl \
         libdata-guid-perl \
         libdata-uuid-perl \
-        libmoose-perl \
+        libio-aio-perl \
         cstocs
-        # iputils-ping \
-        # net-tools \
-        # telnet \
-        # cpanminus \
-        # build-essential \
-    # && cpanm install \
-    #     Cz::Cstocs \
-    #     Class::MOP
+        # libnet-ssh2-perl \
+
+# Perl::LanguageServer
+# RUN set -x \
+#     && apt-get install -y \
+#         libmoose-perl \
+#         libdata-dump-perl \
+#         libpadwalker-perl \
+#         libcoro-perl \
+#         libanyevent-perl \
+#         libcompiler-lexer-perl \
+#         libclass-refresh-perl \
+#         libscalar-list-utils-perl \
+#         cpanminus \
+#         iputils-ping \
+#         net-tools \
+#         telnet \
+#         build-essential \
+#     && cpanm \
+#         Class::MOP \
+#         Cz::Cstocs \
+#         Perl::Critic \
+#         Perl::LanguageServer
 
 WORKDIR /PWE
 

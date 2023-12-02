@@ -8,4 +8,6 @@ ADD webapps/static.example.web static.example.web
 
 WORKDIR /PWE/webapps/static.example.web
 
+ENTRYPOINT []
+
 CMD ["perl", "pwe.fcgi"]

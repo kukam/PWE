@@ -28,11 +28,6 @@ sub new {
     return $self;
 }
 
-sub Service_Session {
-    my ($self, $input) = @_;
-    $SESSION = $input;
-}
-
 sub getDefaultTemplateValues {
     my $self = shift;
 

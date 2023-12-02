@@ -65,7 +65,7 @@ sub connect {
     $self->{'database'} = ($config->{'database'} ? $config->{'database'} : $self->{'database'});
     $self->{'encoding'} = ($config->{'encoding'} ? $config->{'encoding'} : $self->{'encoding'});
     $self->{'loglevel'} = ($config->{'loglevel'} ? $config->{'loglevel'} : $self->{'loglevel'});
-    $self->{'logfile'} = ($config->{'logfile'} ? (($homepath !~ /^\//) ? $homepath : "") . $config->{'logfile'} : $self->{'logfile'});
+    $self->{'logfile'} = ($config->{'logfile'} ? (($homepath !~ /^\//) ? "" : $homepath) . $config->{'logfile'} : $self->{'logfile'});
     $self->{'acommit'} = ($config->{'autocommit'} ? $config->{'autocommit'} : $self->{'acommit'});
 
     # CREATE CONNECTIONS

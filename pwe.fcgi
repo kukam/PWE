@@ -3,10 +3,12 @@
 use strict;
 use warnings;
 
-# use Cwd qw( abs_path );
+# use Cwd qw( abs_path realpath cwd );
 use File::Basename qw( dirname basename );
 
-# use lib dirname( abs_path( $0 ) );
+my $dirname = ((dirname($0) =~ /^\//) ? dirname($0)."/" : ((dirname($0) =~ /^\./) ? dirname($0)."/" : "./".dirname($0)."./" ));
+my $basename = basename($0); 
+
 use lib dirname($0);
 use CGI::Fast socket_perm => '0770';
 use CGI qw/ :standard /;
@@ -26,11 +28,11 @@ use POSIX qw(setsid);
 
 # require 'syscall.ph';
 
-$SIG{TERM} = \&end;
+local $SIG{TERM} = \&end;
 
 CGI::Fast->file_handles( { fcgi_error_file_handle => IO::Handle->new } );
 
-my $CONF = Libs::Config->new('conf/web.conf','conf/database.conf');
+my $CONF = Libs::Config->new($dirname,$basename,'conf/web.conf','conf/database.conf');
 my $LOG  = Libs::Log->new($CONF);
 $LOG->info("Starting PWE server...");
 
@@ -47,7 +49,6 @@ my $USER = Libs::User->new( $CONF, $LOG, $VALIDATE, $DBI );
 $LOG->delay( "create_object_user", "Created object USER" );
 
 $LOG->delay("create_object_web");
-
 my $WEB = Libs::Web->new( $CONF, $LOG, $VALIDATE, $DBI, $USER );
 $LOG->delay( "create_object_web", "Created object WEB" );
 
@@ -156,9 +157,9 @@ while ( my $CGI = CGI::Fast->new() ) {
     elsif ( $env->{'SCRIPT_FILENAME'} =~ /\.\./ ) {
         $result = 401;
     }
-    elsif (( basename($0) eq $env->{'SCRIPT_FILENAME'} )
-        or ( "/" . basename($0) eq $env->{'SCRIPT_FILENAME'} )
-        or ( basename($0) eq "." . $env->{'SCRIPT_FILENAME'} )
+    elsif (( $basename eq $env->{'SCRIPT_FILENAME'} )
+        or ( "/" . $basename eq $env->{'SCRIPT_FILENAME'} )
+        or ( $basename eq "." . $env->{'SCRIPT_FILENAME'} )
         or ( $env->{'SCRIPT_FILENAME'} eq "/" )
         or ( !$env->{'SCRIPT_FILENAME'} ) )
     {
@@ -221,7 +222,8 @@ while ( my $CGI = CGI::Fast->new() ) {
     $WEB->flush();
     $USER->flush();
 
-    $LOG->info("Page printed : PID:$$ page:$page func:$func result:'$result_info'");
+    my $script = $USER->getEnv('SCRIPT_FILENAME',$basename);
+    $LOG->info("Page printed : PID:$$ page:$page func:$func result:'$result_info' script:'$script'");
     $LOG->debug("Fastcgi cycle ended");
 
     # CLEAR

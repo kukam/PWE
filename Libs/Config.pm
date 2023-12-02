@@ -3,12 +3,14 @@ package Libs::Config;
 use strict;
 
 sub new {
-    my ($class, $mainconfig, $databaseconfig) = @_;
+    my ($class, $dirname, $basename, $mainconfig, $databaseconfig) = @_;
 
-    die "$mainconfig not exist!" unless (-f $mainconfig);
+    die "$mainconfig not exist!" unless (-f $dirname.$mainconfig);
 
-    my $self = do($mainconfig);
-    $self->{'dbi'} = do($databaseconfig) if (-f $databaseconfig);
+    my $self = do($dirname.$mainconfig);
+    $self->{'pwe'}->{'home'} = $dirname;
+    $self->{'pwe'}->{'cgi_script_name'} = $basename;
+    $self->{'dbi'} = do($dirname.$databaseconfig) if (-f $dirname.$databaseconfig);
     bless $self, $class;
 
     # Moznost prepsat konfiguraci pomoci globalnich promenych (Environment variables)

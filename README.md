@@ -16,7 +16,6 @@ docker buildx build --push \
 ```
 docker buildx create --use
 docker buildx build --push \
-    -t kukam/pwe-generic:latest \
     -t kukam/pwe-mysql:latest \
     -t kukam/pwe-mariadb:latest \
     -t kukam/pwe-postgres:latest \
@@ -57,3 +56,20 @@ docker-compose up --build --remove-orphans --attach fcgi
 ```
 
 ## how to run in kubernetes
+
+
+## perl local dependencies
+cpanm \
+    CGI::Fast \
+    Class::Inspector \
+    Cz::Cstocs \
+    Mail::RFC822::Address \
+    JSON \
+    Template \
+    List::Util \
+    Perl::Critic \
+    DynaLoader::bootstrap \
+    XSLoader::load \
+    DBI \
+    DBD::mysql \
+    JSON::XS
