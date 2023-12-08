@@ -20,27 +20,27 @@ RUN set -x \
         cstocs
         # libnet-ssh2-perl \
 
-# Perl::LanguageServer
-# RUN set -x \
-#     && apt-get install -y \
-#         libmoose-perl \
-#         libdata-dump-perl \
-#         libpadwalker-perl \
-#         libcoro-perl \
-#         libanyevent-perl \
-#         libcompiler-lexer-perl \
-#         libclass-refresh-perl \
-#         libscalar-list-utils-perl \
-#         cpanminus \
-#         iputils-ping \
-#         net-tools \
-#         telnet \
-#         build-essential \
-#     && cpanm \
-#         Class::MOP \
-#         Cz::Cstocs \
-#         Perl::Critic \
-#         Perl::LanguageServer
+# Perl Debugger & Tools, (Perl::LanguageServer)
+RUN set -x \
+    && apt-get install -y \
+        libmoose-perl \
+        libdata-dump-perl \
+        libpadwalker-perl \
+        libcoro-perl \
+        libanyevent-perl \
+        libcompiler-lexer-perl \
+        libclass-refresh-perl \
+        libscalar-list-utils-perl \
+        cpanminus \
+        iputils-ping \
+        net-tools \
+        telnet \
+        build-essential \
+    && cpanm \
+        Class::MOP \
+        Cz::Cstocs \
+        Perl::Critic \
+        Perl::LanguageServer
 
 WORKDIR /PWE
 

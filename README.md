@@ -1,6 +1,6 @@
 # Perl web engine (PWE)
 
-## How to build and push pwe-base to docker hub
+## How to build & push pwe-base
 ```
 # docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker buildx create --use
@@ -12,7 +12,7 @@ docker buildx build --push \
     --no-cache .
 ```
 
-## How to build generic image to docker hub
+## How to build & push pwe-generic image
 ```
 docker buildx create --use
 docker buildx build --push \
@@ -26,7 +26,7 @@ docker buildx build --push \
     -f webapps/generic.example.web/Dockerfile .
 ```
 
-## How to build static image to docker hub
+## How to build & push pwe-static image
 ```
 docker buildx create --use
 docker buildx build --push \
@@ -38,12 +38,12 @@ docker buildx build --push \
     -f webapps/static.example.web/Dockerfile .
 ```
 
-## how to run in docker-compose
+## how to run docker-compose
 ```
-# How to start on MAC OS
-export MY_IP="$(for i in {0..10}; do ipconfig getifaddr en${i}; done | head -1)"
+# How to start on MAC OS (It's no longer necessary)
+# export MY_IP="$(for i in {0..10}; do ipconfig getifaddr en${i}; done | head -1)"
 
-# Other system & MAC OS
+# Choose profile type
 export COMPOSE_PROFILES="static"
 # OR 
 export COMPOSE_PROFILES="mysql"
@@ -52,13 +52,17 @@ export COMPOSE_PROFILES="mariadb"
 # OR 
 export COMPOSE_PROFILES="postgres"
 
+COMPOSE_PROFILES=${COMPOSE_PROFILES:-mariadb} \
 docker-compose up --build --remove-orphans --attach fcgi
 ```
 
 ## how to run in kubernetes
+```
+helmfile -f helmfile.yaml sync
+```
 
-
-## perl local dependencies
+## perl local lib dependencies
+```
 cpanm \
     CGI::Fast \
     Class::Inspector \
@@ -72,4 +76,102 @@ cpanm \
     XSLoader::load \
     DBI \
     DBD::mysql \
+    IO::Socket::SSL \
     JSON::XS
+```
+
+## VS Code & Perl Debugging
+
+- install vsc modul 'Perl - Language Server and Debugger for Perl', published by 'Gerald Richter'
+- save settings.json and launch.json to the folder .vscode/
+- run docker-compose (how to run docker-compose)
+- vsc press F5
+- open http://127.0.0.1:7778/debug.cgi
+
+```
+# .vscode/settings.json
+{
+    "perl.containerCmd": "docker",
+    "perl.containerMode": "exec",
+    "perl.containerName": "pwe-debugger-1",
+    "perl.containerArgs": [],
+    "perl.perlInc": [
+        // path in the container (pwe-base)
+        "/usr/share/perl5",
+        "/PWE"
+    ],
+    "perl.fileFilter": [
+        "pm",
+        "pl",
+        "cgi",
+        "fcgi"
+    ],
+    "perl.showLocalVars": true
+}
+```
+
+```
+# .vscode/launch.json
+{
+  // Pro informace o možných atributech použijte technologii IntelliSense.
+  // Umístěním ukazatele myši zobrazíte popisy existujících atributů.
+  // Další informace najdete tady:
+  // https://go.microsoft.com/fwlink/?linkid=830387
+  // https://code.visualstudio.com/docs/editor/variables-reference
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "perl",
+      "request": "launch",
+      "name": "PWE Generic",
+      "program": "${workspaceFolder}/webapps/generic.example.web/debug.cgi",
+      "stopOnEntry": false,
+      "reloadModules": true,
+      // "args": [ "page=xxx", "func=sdf" ],
+      "env": {
+        "PERL5LIB": "/PWE/webapps/generic.example.web",
+        "FCGI_SOCKET_PATH": ":7779"
+      },
+      "pathMap": [
+        [
+        "file:///PWE/webapps/generic.example.web",
+        "file:///Users/kukam/Workspace/kukamovo/pwe/webapps/generic.example.web"
+        ]
+      ],
+    },
+    {
+      "type": "perl",
+      "request": "launch",
+      "name": "PWE Static",
+      "program": "${workspaceFolder}/webapps/static.example.web/debug.cgi",
+      "stopOnEntry": false,
+      "reloadModules": true,
+      // "args": [ "page=xxx", "func=sdf" ],
+      "env": {
+        "PERL5LIB": "/PWE/webapps/static.example.web",
+        "FCGI_SOCKET_PATH": ":7779"
+      },
+      "pathMap": [
+        [
+        "file:///PWE/webapps/static.example.web",
+        "file:///Users/kukam/Workspace/kukamovo/pwe/webapps/static.example.web"
+        ]
+      ],
+    },
+    {
+      "type": "perl",
+      "request": "launch",
+      "name": "debuging some scripts",
+      "program": "${workspaceFolder}/${relativeFile}",
+      "stopOnEntry": true,
+      "reloadModules": true,
+      "pathMap": [
+        [
+        "file:///PWE/",
+        "file:///Users/kukam/Workspace/kukamovo/pwe/"
+        ]
+      ]
+    }
+  ]
+}
+```
