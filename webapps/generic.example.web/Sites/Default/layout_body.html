@@ -1,49 +1,70 @@
 <body>
    [% PROCESS templates/resource_bundle.tmpl %]
-<ul class="nav navbar-nav">
-   <li><a href="[% script_name %]?page=showIcons&func=default">[% rb.a_menu_ikonky %]</a></li>
-   <li><a href="[% script_name %]?page=ajaxExamples&func=default">Ajax</a></li>
-   <li><a href="[% script_name %]?page=responsive&func=default">Responsive</a></li>
-   <li><a href="[% script_name %]?page=formExamples&func=default">[% rb.a_menu_formulare %]</a></li>
-   <li><a href="[% script_name %]?page=dbTableExamples&func=default">[% rb.a_menu_dbtabulky %]</a></li>
-</ul>
-<ul>
-   <li><a href="[% script_name %]?page=pweCreator&func=default">pweCreator</a></li>
-   <li><a href="[% script_name %]?page=default&func=setlanguage&lang=CZE">CZE</a></li>
-   <li><a href="[% script_name %]?page=default&func=setlanguage&lang=EN">EN</a></li>
-   [% IF conf_development %]
-   <li><a href="" data-toggle="modal" data-target="#DumpData">DataDump</a></li>
-   [% END %]
-</ul>            
-  
+   <br />
+   <div class="container">
+   <nav id="navbar-example" class="navbar navbar-default navbar-static" role="navigation">
+   <div class="container-fluid">
+     <div class="navbar-header">
+       <button class="navbar-toggle collapsed" type="button" data-toggle="collapse" data-target=".bs-example-js-navbar-collapse">
+         <span class="sr-only">Toggle navigation</span>
+         <span class="icon-bar"></span>
+         <span class="icon-bar"></span>
+         <span class="icon-bar"></span>
+       </button>
+       <a class="navbar-brand" href="/[% script_name %]">generic.example.com</a>
+     </div>
+     <div class="collapse navbar-collapse bs-example-js-navbar-collapse">
+         <ul class="nav navbar-nav">
+               <li [% IF idp == "showIcons" %]class="active"[% END %]><a href="https://fontawesome.com/search?o=r&m=free" target="_blank">[% rb.a_menu_ikonky %][% IF idp == "showIcons" %] <span class="sr-only">(current)</span>[% END %]</a></li>
+               <li [% IF idp == "ajaxExamples" %]class="active"[% END %]><a href="[% script_name %]?page=ajaxExamples&func=default">Ajax[% IF idp == "ajaxExamples" %] <span class="sr-only">(current)</span>[% END %]</a></li>
+               <li [% IF idp == "formExamples" %]class="active"[% END %]><a href="[% script_name %]?page=formExamples&func=default">[% rb.a_menu_formulare %][% IF idp == "formsExamples" %] <span class="sr-only">(current)</span>[% END %]</a></li>
+               <li [% IF idp == "dbTableExamples" %]class="active"[% END %]><a href="[% script_name %]?page=dbTableExamples&func=default">[% rb.a_menu_dbtabulky %][% IF idp == "dbTableExamples_default" %] <span class="sr-only">(current)</span>[% END %]</a></li>
+               <li [% IF idp == "NewBootstrap523" %]class="active"[% END %]><a href="[% script_name %]?page=NewBootstrap523&func=default">[% rb.a_menu_newbootstrap523 %][% IF idp == "NewBootstrap523_default" %] <span class="sr-only">(current)</span>[% END %]</a></li>
+         </ul>
+
+         <ul class="nav navbar-nav navbar-right">
+               <li [% IF idp == "pweCreator" %]class="active"[% END %]><a href="[% script_name %]?page=pweCreator&func=default">pweCreator <span class="sr-only">(current)</span></a></li>
+               <li [% IF use_language == "CZE" %]class="text-bold"[% END %]><a href="[% script_name %]?page=default&func=setlanguage&lang=CZE">CZE[% IF use_language == "CZE" %] <span class="sr-only">(current)</span>[% END %]</a></li>
+               <li [% IF use_language == "EN" %]class="text-bold"[% END %]><a href="[% script_name %]?page=default&func=setlanguage&lang=EN">EN[% IF use_language == "EN" %] <span class="sr-only">(current)</span>[% END %]</a></li>
+               <li>
+                     <!-- Button trigger modal -->
+                     <a href="" data-toggle="modal" data-target="#DumpData">DataDump</a>
+               </li>
+         </ul>            
+     </div><!-- /.nav-collapse -->
+   </div><!-- /.container-fluid -->
+ </nav>
+
 [% IF html_leftmenu %]
 
-   [% INCLUDE $html_leftmenu %]
+[% INCLUDE $html_leftmenu %]
 
-   <div>[% messenger %]</div>
-   
-   [% IF html_main %]
-      [% INCLUDE $html_main %]
-   [% ELSIF print_main %]
-      [% print_main %]
-      <h1>TODO: Doresit vykreslovani footer</h1>
-      [% # printnuti body_footer si musi zajistit stranka sama %]
-   [% END %]
-   
+<div id="messenger">[% messenger %]</div>
+
+[% IF html_main %]
+   [% INCLUDE $html_main %]
+[% ELSIF print_main %]
+   [% print_main %]
+   <h1>TODO: Doresit vykreslovani footer</h1>
+   [% # printnuti body_footer si musi zajistit stranka sama %]
+[% END %]
+
 [% ELSE %]
-   
-   <div>[% messenger %]</div>
-   
-   [% IF html_main %]
-      [% INCLUDE $html_main %]
-   [% ELSIF print_main %]
-      [% print_main %]
-      <h1>TODO: Doresit vykreslovani footer</h1>
-      [% # printnuti body_footer si musi zajistit stranka sama %]
-   [% END %]
+
+<div id="messenger">[% messenger %]</div>
+
+[% IF html_main %]
+   [% INCLUDE $html_main %]
+[% ELSIF print_main %]
+   [% print_main %]
+   <h1>TODO: Doresit vykreslovani footer</h1>
+   [% # printnuti body_footer si musi zajistit stranka sama %]
+[% END %]
 
 [% END %]
-    
+
+ </div> <!-- /container -->
+ 
 [% INCLUDE Sites/Default/layout_footer.html %]
 
 </body>

@@ -1,0 +1,50 @@
+<body>
+   [% PROCESS templates/resource_bundle.tmpl %]
+<ul class="nav navbar-nav">
+   <li><a href="[% script_name %]?page=showIcons&func=default">[% rb.a_menu_ikonky %]</a></li>
+   <li><a href="[% script_name %]?page=ajaxExamples&func=default">Ajax</a></li>
+   <li><a href="[% script_name %]?page=responsive&func=default">Responsive</a></li>
+   <li><a href="[% script_name %]?page=formExamples&func=default">[% rb.a_menu_formulare %]</a></li>
+   <li><a href="[% script_name %]?page=dbTableExamples&func=default">[% rb.a_menu_dbtabulky %]</a></li>
+</ul>
+<ul>
+   <li><a href="[% script_name %]?page=pweCreator&func=default">pweCreator</a></li>
+   <li><a href="[% script_name %]?page=default&func=setlanguage&lang=CZE">CZE</a></li>
+   <li><a href="[% script_name %]?page=default&func=setlanguage&lang=EN">EN</a></li>
+   [% IF conf_development %]
+   <li><a href="" data-toggle="modal" data-target="#DumpData">DataDump</a></li>
+   [% END %]
+</ul>            
+  
+[% IF html_leftmenu %]
+
+   [% INCLUDE $html_leftmenu %]
+
+   <div>[% messenger %]</div>
+   
+   [% IF html_main %]
+      [% INCLUDE $html_main %]
+   [% ELSIF print_main %]
+      [% print_main %]
+      <h1>TODO: Doresit vykreslovani footer</h1>
+      [% # printnuti body_footer si musi zajistit stranka sama %]
+   [% END %]
+   
+[% ELSE %]
+   
+   <div>[% messenger %]</div>
+   
+   [% IF html_main %]
+      [% INCLUDE $html_main %]
+   [% ELSIF print_main %]
+      [% print_main %]
+      <h1>TODO: Doresit vykreslovani footer</h1>
+      [% # printnuti body_footer si musi zajistit stranka sama %]
+   [% END %]
+
+[% END %]
+    
+[% INCLUDE Sites/NewBootstrap523/layout_footer.html %]
+
+</body>
+</html>

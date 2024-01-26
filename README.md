@@ -1,7 +1,8 @@
 # Perl web engine (PWE)
 
 ## How to build & push pwe-base
-```
+
+``` bash
 # docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker buildx create --use
 docker buildx build --push \
@@ -13,7 +14,8 @@ docker buildx build --push \
 ```
 
 ## How to build & push pwe-generic image
-```
+
+``` bash
 docker buildx create --use
 docker buildx build --push \
     -t kukam/pwe-mysql:latest \
@@ -27,7 +29,8 @@ docker buildx build --push \
 ```
 
 ## How to build & push pwe-static image
-```
+
+``` bash
 docker buildx create --use
 docker buildx build --push \
     -t kukam/pwe-static:latest \
@@ -39,7 +42,8 @@ docker buildx build --push \
 ```
 
 ## how to run docker-compose
-```
+
+``` bash
 # How to start on MAC OS (It's no longer necessary)
 # export MY_IP="$(for i in {0..10}; do ipconfig getifaddr en${i}; done | head -1)"
 
@@ -57,12 +61,14 @@ docker-compose up --build --remove-orphans --attach fcgi
 ```
 
 ## how to run in kubernetes
-```
+
+``` bash
 helmfile -f helmfile.yaml sync
 ```
 
 ## perl local lib dependencies
-```
+
+``` bash
 cpanm \
     CGI::Fast \
     Class::Inspector \
@@ -88,7 +94,7 @@ cpanm \
 - vsc press F5
 - open http://127.0.0.1:7778/debug.cgi
 
-```
+``` bash
 # .vscode/settings.json
 {
     "perl.containerCmd": "docker",
@@ -110,7 +116,7 @@ cpanm \
 }
 ```
 
-```
+``` bash
 # .vscode/launch.json
 {
   // Pro informace o možných atributech použijte technologii IntelliSense.
