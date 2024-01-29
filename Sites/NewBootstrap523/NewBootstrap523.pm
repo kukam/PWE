@@ -159,24 +159,5 @@ sub setAjax               { my $self = shift; return $WEB->setAjax(@_); }
 sub getScriptName         { my $self = shift; return $WEB->getScriptName(@_); }
 sub setIDP                { my $self = shift; return $WEB->setIDP(@_); }
 
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::Validate;
-    require Libs::DBI;
-    require Libs::Web;
-    require Libs::Entities;
-    require Services::Session::Session;
-
-    $CONF     = new Libs::Config;
-    $LOG      = new Libs::Log;
-    $VALIDATE = new Libs::Validate;
-    $ENTITIES = new Libs::Entities;
-    $DBI      = new Libs::DBI;
-    $WEB      = new Libs::Web;
-    $SESSION  = new Services::Session::Session;
-}
 
 1;

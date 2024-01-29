@@ -1,50 +1,70 @@
 <body>
-   [% PROCESS templates/resource_bundle.tmpl %]
-<ul class="nav navbar-nav">
-   <li><a href="[% script_name %]?page=showIcons&func=default">[% rb.a_menu_ikonky %]</a></li>
-   <li><a href="[% script_name %]?page=ajaxExamples&func=default">Ajax</a></li>
-   <li><a href="[% script_name %]?page=responsive&func=default">Responsive</a></li>
-   <li><a href="[% script_name %]?page=formExamples&func=default">[% rb.a_menu_formulare %]</a></li>
-   <li><a href="[% script_name %]?page=dbTableExamples&func=default">[% rb.a_menu_dbtabulky %]</a></li>
-</ul>
-<ul>
-   <li><a href="[% script_name %]?page=pweCreator&func=default">pweCreator</a></li>
-   <li><a href="[% script_name %]?page=default&func=setlanguage&lang=CZE">CZE</a></li>
-   <li><a href="[% script_name %]?page=default&func=setlanguage&lang=EN">EN</a></li>
-   [% IF conf_development %]
-   <li><a href="" data-toggle="modal" data-target="#DumpData">DataDump</a></li>
-   [% END %]
-</ul>            
-  
-[% IF html_leftmenu %]
 
-   [% INCLUDE $html_leftmenu %]
+  [% PROCESS templates/resource_bundle.tmpl %]
+  <header class="p-2 sticky-top bg-dark text-white">
+    <div class="navbar navbar-dark shadow-sm">
+      <div class="container">
+        <div class="con">
+        <a href="/" class="navbar-brand d-flex align-items-center">
+          <strong>Page Name</strong>
+        </a>          
+        </div>
+        <!-- d-xs-none d-sm-none d-md-none d-lg-none -->
+          <div class="d-none d-xl-block d-xxl-block">
+          <ul class="nav nav-pills">[% INCLUDE Sites/NewBootstrap523/nav_menu.tmpl %]</ul>
+        </div>
+        <div class="d-xl-none d-xxl-none">
+          <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasResponsive" aria-controls="offcanvasResponsive"><span class="navbar-toggler-icon"></span></button>        
+          <div class="offcanvas-xl offcanvas-end text-bg-dark" tabindex="-1" id="offcanvasResponsive" aria-labelledby="offcanvasResponsiveLabel">
+            <div class="offcanvas-header">
+              <h5 class="offcanvas-title" id="offcanvasResponsiveLabel">Responsive offcanvas</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#offcanvasResponsive" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body">
+              <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">[% INCLUDE Sites/NewBootstrap523/nav_menu.tmpl %]</ul>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </header>
 
-   <div>[% messenger %]</div>
-   
-   [% IF html_main %]
-      [% INCLUDE $html_main %]
-   [% ELSIF print_main %]
-      [% print_main %]
-      <h1>TODO: Doresit vykreslovani footer</h1>
-      [% # printnuti body_footer si musi zajistit stranka sama %]
-   [% END %]
-   
-[% ELSE %]
-   
-   <div>[% messenger %]</div>
-   
-   [% IF html_main %]
-      [% INCLUDE $html_main %]
-   [% ELSIF print_main %]
-      [% print_main %]
-      <h1>TODO: Doresit vykreslovani footer</h1>
-      [% # printnuti body_footer si musi zajistit stranka sama %]
-   [% END %]
 
-[% END %]
-    
-[% INCLUDE Sites/NewBootstrap523/layout_footer.html %]
+  [% IF html_leftmenu %]
+
+  [% INCLUDE $html_leftmenu %]
+
+  <div>[% messenger %]</div>
+
+  [% IF html_main %]
+  <main class="container">
+    [% INCLUDE $html_main %]
+  </main>
+  [% ELSIF print_main %]
+  [% print_main %]
+  <h1>TODO: Doresit vykreslovani footer</h1>
+  [% # printnuti body_footer si musi zajistit stranka sama %]
+  [% END %]
+
+  [% ELSE %]
+
+  <div>[% messenger %]</div>
+
+  [% IF html_main %]
+  <main class="container">
+    [% INCLUDE $html_main %]
+  </main>
+  [% ELSIF print_main %]
+  [% print_main %]
+  <h1>TODO: Doresit vykreslovani footer</h1>
+  [% # printnuti body_footer si musi zajistit stranka sama %]
+  [% END %]
+  [% END %]
+
+  [% INCLUDE Sites/NewBootstrap523/DumpData.tmpl %]
+  <script src="assets/javascript/bootstrap-5.2.3/bootstrap.min.js"></script>
 
 </body>
+
 </html>

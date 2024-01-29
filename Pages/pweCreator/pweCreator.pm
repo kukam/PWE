@@ -43,7 +43,7 @@ sub new {
     return $self;
 }
 
-sub Site_Default {
+sub Site_NewBootstrap523 {
     my ($self, $input) = @_;
     $WEB = $input;
 }
