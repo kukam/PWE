@@ -1,1 +1,1 @@
-../../../../assets/javascript/pwe.js
+../../../../webappsCommons/assets/javascript/pwe.js

@@ -1,1 +1,1 @@
-../../../../assets/javascript/ajaxprogress.js
+../../../../webappsCommons/assets/javascript/ajaxprogress.js

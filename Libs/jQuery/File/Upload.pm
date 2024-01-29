@@ -14,7 +14,6 @@ use Image::Magick;
 use Cwd 'abs_path';
 use URI;
 use Data::GUID;
-use File::Basename;
 
 #use LWP::UserAgent;
 #use LWP::Protocol::https;
@@ -132,7 +131,8 @@ sub upload_dir {
 
     #set upload_dir to directory of this script if not provided
     if (!(defined $self->{upload_dir})) {
-        $self->{upload_dir} = abs_path(basename($0));
+        my $script_name = $CONF->getValue('pwe', 'cgi_script_name', "unknown_script_name");
+        $self->{upload_dir} = abs_path($script_name);
         $self->{upload_dir} =~ s/(.*)\/.*/$1/;
         $self->{upload_dir} .= '/files';
     }

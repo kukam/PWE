@@ -1,4 +1,4 @@
-package Sites::Responsive::Responsive;
+package Sites::Error::Error;
 
 use strict;
 
@@ -18,10 +18,10 @@ sub new {
     $ENTITIES = $entities;
 
     my $self = {
-        'web_site'      => "responsive",
-        'web_index'     => "/responsive",
-        'layout_header' => "Sites/Responsive/layout_header.html",
-        'layout_body'   => "Sites/Responsive/layout_body.html",
+        'web_site'      => "error",
+        'web_index'     => "/error ",
+        'layout_header' => "Sites/Error/layout_header.html",
+        'layout_body'   => "Sites/Error/layout_body.html",
     };
 
     bless $self, $class;

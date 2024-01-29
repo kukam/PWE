@@ -1,1 +1,1 @@
-../../../Entities/Entity.pm
+../../../webappsCommons/Entities/Entity.pm

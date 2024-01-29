@@ -6,7 +6,6 @@ use Template;
 
 #use XML::Simple;
 use Sys::Hostname;
-use File::Basename;
 use Cz::Cstocs 'utf8_ascii';
 
 my ($CONF, $LOG, $VALIDATE, $DBI, $USER);
@@ -21,7 +20,7 @@ sub new {
     $VALIDATE = $validate;
 
     my $self = {
-        'script_name'   => $CONF->getValue("pwe", "cgi_script_name", basename($0)),
+        'script_name'   => $CONF->getValue('pwe', 'cgi_script_name', "unknown_script_name"),
         'layout_header' => "templates/LayoutHeader.html",
         'layout_body'   => "templates/LayoutBody.html",
         'rb_map'        => {},
