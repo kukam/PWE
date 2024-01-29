@@ -1,4 +1,4 @@
-[% PROCESS templates/resource_bundle.tmpl %]
+[% PROCESS templatesCommons/resource_bundle.tmpl %]
 
 [% SET rb.msg.form_dump_email = "Email = $email" %]
 [% SET rb.msg.form_dump_fullname = "$form_fullname = $fullname" %]
@@ -8,4 +8,4 @@
 [% IF browse_url %]
 [% SET rb.msg.form_dump_browse_files = "<a href=\"$browse_url\">$rb.msg_browser</a>" %]
 [% END %]
-[% INCLUDE templates/messenger.html %]
+[% INCLUDE templatesCommons/messenger.tmpl %]

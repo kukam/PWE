@@ -1,4 +1,4 @@
 [% FOREACH page IN [ 'ajaxExamples', 'formExamples', 'dbTableExamples', 'NewBootstrap523', 'pweCreator', 'responsive' ] %]
-<li class="nav-item"><a href="[% script_name %]?page=[% page %]&func=default" class="nav-link text-white" aria-current="page">[% INCLUDE templates/rb_value.tmpl key="$page" %]</a></li>
+<li class="nav-item"><a href="[% script_name %]?page=[% page %]&func=default" class="nav-link text-white" aria-current="page">[% INCLUDE templatesCommons/rb_value.tmpl key="$page" %]</a></li>
 [% END %]
-<li class="nav-item"><a href="" class="nav-link text-white px-1 active" data-bs-toggle="modal" data-bs-target="#DumpData">[% INCLUDE templates/rb_value.tmpl key="datadump" %]</a></li>
+<li class="nav-item"><a href="" class="nav-link text-white px-1 active" data-bs-toggle="modal" data-bs-target="#DumpData">[% INCLUDE templatesCommons/rb_value.tmpl key="datadump" %]</a></li>

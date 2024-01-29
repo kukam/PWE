@@ -1,6 +1,7 @@
 package Libs::Log;
 
 use strict;
+use lib 'lib';
 use Libs::Send;
 use Time::HiRes;
 

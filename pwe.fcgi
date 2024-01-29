@@ -9,6 +9,7 @@ use File::Basename qw( dirname basename );
 my $dirname = ((dirname($0) =~ /^\//) ? dirname($0)."/" : ((dirname($0) =~ /^\./) ? dirname($0)."/" : "./".dirname($0)."./" ));
 my $basename = basename($0); 
 
+use lib 'lib';
 use lib dirname($0);
 use CGI::Fast socket_perm => '0770';
 use CGI qw/ :standard /;

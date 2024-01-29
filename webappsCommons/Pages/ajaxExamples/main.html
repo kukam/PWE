@@ -1,4 +1,4 @@
-[% PROCESS templates/resource_bundle.tmpl %]
+[% PROCESS templatesCommons/resource_bundle.tmpl %]
 <h1 class="page-header">[% rb.h1 %]</h1>
 
 <table class="table table-bordered">
@@ -15,10 +15,10 @@
           <td>replaceHTMLSimple (HTML)</td>
           <td>
 
-            <a id="replaceHTMLSimple_I_SRC" class="btn btn-primary" [% INCLUDE templates/href.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_I_DST')" %]>[% rb.a_prepsat %] element I</a>
-            <a id="replaceHTMLSimple_II_SRC" class="btn btn-primary" [% INCLUDE templates/href.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_prepsat %] element II</a>
-            <a id="replaceHTMLSimple_404_SRC" class="btn btn-primary btn-danger" [% INCLUDE templates/href.tmpl ajaxhtml="1" href="$script_name?page=errorPage&func=e404&mypage=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_stranka %] 400</a>
-            <a id="replaceHTMLSimple_500_SRC" class="btn btn-primary btn-danger" [% INCLUDE templates/href.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=replaceHTMLSimpleError" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_stranka2 %] 500</a>
+            <a id="replaceHTMLSimple_I_SRC" class="btn btn-primary" [% INCLUDE templatesCommons/ahref.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_I_DST')" %]>[% rb.a_prepsat %] element I</a>
+            <a id="replaceHTMLSimple_II_SRC" class="btn btn-primary" [% INCLUDE templatesCommons/ahref.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_prepsat %] element II</a>
+            <a id="replaceHTMLSimple_404_SRC" class="btn btn-primary btn-danger" [% INCLUDE templatesCommons/ahref.tmpl ajaxhtml="1" href="$script_name?page=errorPage&func=e404&mypage=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_stranka %] 400</a>
+            <a id="replaceHTMLSimple_500_SRC" class="btn btn-primary btn-danger" [% INCLUDE templatesCommons/ahref.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=replaceHTMLSimpleError" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_stranka2 %] 500</a>
           </td>
           <td><div id="replaceHTMLSimple_I_DST">---------</div></td>
           <td><div id="replaceHTMLSimple_II_DST">---------</div></td>
@@ -26,9 +26,9 @@
         <tr>
           <td>replaceHTML (JSON)</td>
           <td>
-            <a id="replaceHTML_I_SRC" class="btn btn-primary" [% INCLUDE templates/href.tmpl ajaxjson="1" href="$script_name?page=ajaxExamples&func=replaceHTML" %]>[% rb.a_prepsat_vse %]</a>
-            <a id="replaceHTML_400_SRC" class="btn btn-primary btn-danger" [% INCLUDE templates/href.tmpl ajaxjson="1" href="$script_name?page=errorPage&func=e404&mypage=replaceHTML" %]>[% rb.a_stranka %] 404</a>
-            <a id="replaceHTML_500_SRC" class="btn btn-primary btn-danger" [% INCLUDE templates/href.tmpl ajaxjson="1" href="$script_name?page=ajaxExamples&func=replaceHTMLError" %]>[% rb.a_stranka2 %] 500</a>
+            <a id="replaceHTML_I_SRC" class="btn btn-primary" [% INCLUDE templatesCommons/ahref.tmpl ajaxjson="1" href="$script_name?page=ajaxExamples&func=replaceHTML" %]>[% rb.a_prepsat_vse %]</a>
+            <a id="replaceHTML_400_SRC" class="btn btn-primary btn-danger" [% INCLUDE templatesCommons/ahref.tmpl ajaxjson="1" href="$script_name?page=errorPage&func=e404&mypage=replaceHTML" %]>[% rb.a_stranka %] 404</a>
+            <a id="replaceHTML_500_SRC" class="btn btn-primary btn-danger" [% INCLUDE templatesCommons/ahref.tmpl ajaxjson="1" href="$script_name?page=ajaxExamples&func=replaceHTMLError" %]>[% rb.a_stranka2 %] 500</a>
           </td>
           <td><div id="replaceHTML_I">---------</div></td>
           <td><div id="replaceHTML_II">---------</div></td>
@@ -36,8 +36,8 @@
                 <tr>
           <td>replaceHTMLSimple (REDIRECT HTML)</td>
           <td>
-            <a id="replaceHTMLSimpleRedirect" class="btn btn-primary" [% INCLUDE templates/href.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=redirectAjax" src="null" dst="null" %]>[% rb.a_redirect %]</a>
-            <a id="replaceHTMLSimpleRedirect2" class="btn btn-primary btn-danger" [% INCLUDE templates/href.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=redirectAjax2" src="null" dst="null" %]>[% rb.a_redirect2 %]</a>
+            <a id="replaceHTMLSimpleRedirect" class="btn btn-primary" [% INCLUDE templatesCommons/ahref.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=redirectAjax" src="null" dst="null" %]>[% rb.a_redirect %]</a>
+            <a id="replaceHTMLSimpleRedirect2" class="btn btn-primary btn-danger" [% INCLUDE templatesCommons/ahref.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=redirectAjax2" src="null" dst="null" %]>[% rb.a_redirect2 %]</a>
           </td>
           <td></td>
           <td></td>
@@ -46,8 +46,8 @@
                 <tr>
           <td>replaceHTML (REDIRECT JSON)</td>
           <td>
-            <a id="replaceHTMLRedirect" class="btn btn-primary" [% INCLUDE templates/href.tmpl ajaxjson="1" href="$script_name?page=ajaxExamples&func=redirectAjax" src="null" dst="null" %]>[% rb.a_redirect %]</a>
-            <a id="replaceHTMLRedirect2" class="btn btn-primary btn-danger" [% INCLUDE templates/href.tmpl ajaxjson="1" href="$script_name?page=ajaxExamples&func=redirectAjax2" src="null" dst="null" %]>[% rb.a_redirect2 %]</a>
+            <a id="replaceHTMLRedirect" class="btn btn-primary" [% INCLUDE templatesCommons/ahref.tmpl ajaxjson="1" href="$script_name?page=ajaxExamples&func=redirectAjax" src="null" dst="null" %]>[% rb.a_redirect %]</a>
+            <a id="replaceHTMLRedirect2" class="btn btn-primary btn-danger" [% INCLUDE templatesCommons/ahref.tmpl ajaxjson="1" href="$script_name?page=ajaxExamples&func=redirectAjax2" src="null" dst="null" %]>[% rb.a_redirect2 %]</a>
           </td>
           <td></td>
           <td></td>

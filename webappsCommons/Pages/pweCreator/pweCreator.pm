@@ -131,9 +131,9 @@ sub cpage {
     close(MAIN);
 
     open(MSG, '>', $home . $pagesdir . "/" . $pagename . "/msg.html");
-    print MSG "[% PROCESS templates/resource_bundle.tmpl %]\n";
+    print MSG "[% PROCESS templatesCommons/resource_bundle.tmpl %]\n";
     print MSG "\n";
-    print MSG "[% INCLUDE templates/messenger.html %]\n";
+    print MSG "[% INCLUDE templatesCommons/messenger.tmpl %]\n";
     print MSG "\n";
     close(MSG);
 

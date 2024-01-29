@@ -4,12 +4,12 @@
 
 [% IF active == 't' || active == 1 %]
     [% SET active = 'f' %]
-    <a class="btn btn-success" [% INCLUDE templates/href.tmpl href="$href$active" ajaxjson="$enable_ajax" %]>
+    <a class="btn btn-success" [% INCLUDE templatesCommons/ahref.tmpl href="$href$active" ajaxjson="$enable_ajax" %]>
         <i class="fa-solid fa-circle-check"></i>
     </a>
 [% ELSE %]
     [% SET active = 't' %]
-    <a class="btn btn-danger" [% INCLUDE templates/href.tmpl href="$href$active" ajaxjson="$enable_ajax" %]>
+    <a class="btn btn-danger" [% INCLUDE templatesCommons/ahref.tmpl href="$href$active" ajaxjson="$enable_ajax" %]>
         <i class="fa-solid fa-circle-xmark"></i>
     </a>
 [% END %]

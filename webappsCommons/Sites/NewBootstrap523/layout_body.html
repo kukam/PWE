@@ -1,6 +1,6 @@
 <body>
 
-  [% PROCESS templates/resource_bundle.tmpl %]
+  [% PROCESS templatesCommons/resource_bundle.tmpl %]
   <header class="p-2 sticky-top bg-dark text-white">
     <div class="navbar navbar-dark shadow-sm">
       <div class="container">
@@ -60,7 +60,7 @@
   [% END %]
   [% END %]
 
-  [% INCLUDE Sites/NewBootstrap523/DumpData.tmpl %]
+  [% INCLUDE Sites/NewBootstrap523/DataDumper.html %]
   <script src="assets/javascript/bootstrap-5.2.3/bootstrap.min.js"></script>
 
 </body>

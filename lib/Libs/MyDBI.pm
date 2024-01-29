@@ -1,6 +1,7 @@
 package Libs::MyDBI;
 
 use strict;
+use lib 'lib';
 use Libs::MyDBI::DAO;
 
 my ($CONF, $LOG, $VALIDATE);

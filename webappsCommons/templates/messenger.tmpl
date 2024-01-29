@@ -1,9 +1,6 @@
-[% PROCESS templates/resource_bundle.tmpl %]
+[% PROCESS templatesCommons/resource_bundle.tmpl %]
 [% IF msg_error %]
-<div id="messenger-body" class="alert alert-danger alert-fixed-top" role="alert">
-  <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-  <strong>[% IF $idp.messanger_error_title %][% $idp.messanger_error_title %][% ELSIF rb.$idp.messanger_error_title %][% rb.$idp.messanger_error_title %][% ELSE %][% messanger_error_title %][% END %]</strong>
-    <ul>
+  <ul>
     [% FOREACH v = msg_error %]
 	[% IF msg.$v %]
 	    <li>[% msg.$v %]</li>
@@ -15,12 +12,8 @@
     [% END %]
     </ul>
 	[% IF disable_scrolltomessenger %]<span id="disablescrolltomessenger"><!--javascript property--></span>[% END %]
-</div>
 [% END %]
-
 [% IF msg_allright %]
-<div id="messenger-body" class="alert alert-success alert-fixed-top" role="alert">
-  <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
   <strong>[% IF $idp.messanger_error_title %][% $idp.messanger_allright_title %][% ELSIF rb.$idp.messanger_allright_title %][% rb.$idp.messanger_allright_title %][% ELSIF rb.messanger_allright_title %][% rb.messanger_allright_title %][% ELSE %][% messanger_allright_title %][% END %]</strong>
     <ul>
     [% FOREACH v = msg_allright %]
@@ -34,5 +27,4 @@
     [% END %]
     </ul>
 	[% IF disable_scrolltomessenger %]<span id="disablescrolltomessenger"><!--javascript property--></span>[% END %]
-</div>
 [% END %]

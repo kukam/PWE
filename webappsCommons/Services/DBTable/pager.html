@@ -23,16 +23,16 @@
 <nav>
   <ul class="pager">
     [% IF gopage == 1 %]
-        <li class="previous disabled"><a [% INCLUDE templates/href.tmpl href="$script$gopage" ajaxjson="$enable_ajax" %]><span aria-hidden="true">&larr;</span> [% rb.dbtable_older %]</a></li>
+        <li class="previous disabled"><a [% INCLUDE templatesCommons/ahref.tmpl href="$script$gopage" ajaxjson="$enable_ajax" %]><span aria-hidden="true">&larr;</span> [% rb.dbtable_older %]</a></li>
     [% ELSE %]
         [% SET older = (gopage - 1) %]
-        <li class="previous"><a [% INCLUDE templates/href.tmpl href="$script$older" ajaxjson="$enable_ajax" %]><span aria-hidden="true">&larr;</span> [% rb.dbtable_older %]</a></li>
+        <li class="previous"><a [% INCLUDE templatesCommons/ahref.tmpl href="$script$older" ajaxjson="$enable_ajax" %]><span aria-hidden="true">&larr;</span> [% rb.dbtable_older %]</a></li>
     [% END %]
     [% IF endpage == gopage %]
-        <li class="next disabled"><a [% INCLUDE templates/href.tmpl href="$script$endpage" ajaxjson="$enable_ajax" %]>[% rb.dbtable_newer %] <span aria-hidden="true">&rarr;</span></a></li>
+        <li class="next disabled"><a [% INCLUDE templatesCommons/ahref.tmpl href="$script$endpage" ajaxjson="$enable_ajax" %]>[% rb.dbtable_newer %] <span aria-hidden="true">&rarr;</span></a></li>
     [% ELSE %]
         [% SET next = (gopage + 1) %]
-        <li class="next"><a [% INCLUDE templates/href.tmpl href="$script$next" ajaxjson="$enable_ajax" %]>[% rb.dbtable_newer %] <span aria-hidden="true">&rarr;</span></a></li>
+        <li class="next"><a [% INCLUDE templatesCommons/ahref.tmpl href="$script$next" ajaxjson="$enable_ajax" %]>[% rb.dbtable_newer %] <span aria-hidden="true">&rarr;</span></a></li>
     [% END %]
   </ul>
 </nav>

@@ -1,4 +1,4 @@
-package Sites::Error::Error;
+package Sites::Responsive::Responsive;
 
 use strict;
 
@@ -18,10 +18,10 @@ sub new {
     $ENTITIES = $entities;
 
     my $self = {
-        'web_site'      => "error",
-        'web_index'     => "/error ",
-        'layout_header' => "Sites/Error/layout_header.html",
-        'layout_body'   => "Sites/Error/layout_body.html",
+        'web_site'      => "responisve",
+        'web_index'     => "/responisve ",
+        'layout_header' => "Sites/Responsive/layout_header.html",
+        'layout_body'   => "Sites/Responsive/layout_body.html",
     };
 
     bless $self, $class;
@@ -65,15 +65,12 @@ sub printHtmlLayout {
     $WEB->printHtmlLayout(%tmpl);
 }
 
-sub getValue              { my $self = shift; return $WEB->getValue(@_); }
-sub findResourceBundles   { my $self = shift; return $WEB->findResourceBundles(@_); }
-sub getResourceBundleList { my $self = shift; return $WEB->getResourceBundleList(@_); }
-sub genTmpl               { my $self = shift; return $WEB->genTmpl(@_); }
-sub printHttpHeader       { my $self = shift; return $WEB->printHttpHeader(@_); }
-sub convertToRewrite      { my $self = shift; return $WEB->convertToRewrite(@_); }
-sub renderReplaceJSON     { my $self = shift; return $WEB->renderReplaceJSON(@_); }
-sub setAjax               { my $self = shift; return $WEB->setAjax(@_); }
-sub getScriptName         { my $self = shift; return $WEB->getScriptName(@_); }
-sub setIDP                { my $self = shift; return $WEB->setIDP(@_); }
+sub AUTOLOAD {
+    my $self = shift;
+    my $name = $AUTOLOAD;
+    $name =~ s/.*://;
+    return if ($name =~ /^DESTROY$/);
+    return $WEB->$name(@_);
+}
 
 1;

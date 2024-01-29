@@ -25,7 +25,7 @@ sub new {
     return $self;
 }
 
-sub Site_Default {
+sub Site_Error {
     my ($self, $input) = @_;
     $WEB = $input;
 }
@@ -62,8 +62,8 @@ sub e400 {
     }
 
     $WEB->printHttpHeader('type' => 'error', 'status' => 400);
-    $WEB->printHtmlHeader('title' => '400 Bad parameter', 'layout_header' => $CONF->getValue('http', 'layout_error_header', "templates/LayoutErrorHeader.html"));
-    $WEB->printHtmlLayout('layout_body' => $CONF->getValue('http', 'layout_error_body', "templates/LayoutErrorBody.html"));
+    $WEB->printHtmlHeader('title' => '400 Bad parameter');
+    $WEB->printHtmlLayout();
 }
 
 sub e401 {
@@ -79,8 +79,8 @@ sub e401 {
     }
 
     $WEB->printHttpHeader('type' => 'error', 'status' => '401');
-    $WEB->printHtmlHeader('title' => '401 Access denied', 'layout_header' => $CONF->getValue('http', 'layout_error_header', "templates/LayoutErrorHeader.html"));
-    $WEB->printHtmlLayout('layout_body' => $CONF->getValue('http', 'layout_error_body', "templates/LayoutErrorBody.html"));
+    $WEB->printHtmlHeader('title' => '401 Access denied');
+    $WEB->printHtmlLayout();
 
 }
 
@@ -97,8 +97,8 @@ sub e404 {
     }
 
     $WEB->printHttpHeader('type' => 'error', 'status' => 404);
-    $WEB->printHtmlHeader('title' => '404 Page not found', 'layout_header' => $CONF->getValue('http', 'layout_error_header', "templates/LayoutErrorHeader.html"));
-    $WEB->printHtmlLayout('layout_body' => $CONF->getValue('http', 'layout_error_body', "templates/LayoutErrorBody.html"));
+    $WEB->printHtmlHeader('title' => '404 Page not found');
+    $WEB->printHtmlLayout();
 }
 
 sub e500 {
@@ -114,8 +114,8 @@ sub e500 {
     }
 
     $WEB->printHttpHeader('type' => 'error', 'status' => '500');
-    $WEB->printHtmlHeader('title' => '500 Internal error', 'layout_header' => $CONF->getValue('http', 'layout_error_header', "templates/LayoutErrorHeader.html"));
-    $WEB->printHtmlLayout('layout_body' => $CONF->getValue('http', 'layout_error_body', "templates/LayoutErrorBody.html"));
+    $WEB->printHtmlHeader('title' => '500 Internal error');
+    $WEB->printHtmlLayout();
 
 }
 
@@ -136,8 +136,8 @@ sub cgi_error {
     $error =~ s/^(\d+).*/$1/;
 
     $WEB->printHttpHeader('type' => 'error', 'status' => $error);
-    $WEB->printHtmlHeader('title' => "$error CGI Error", 'status' => $error, 'layout_header' => $CONF->getValue('http', 'layout_error_header', "templates/LayoutErrorHeader.html"));
-    $WEB->printHtmlLayout('layout_body' => $CONF->getValue('http', 'layout_error_body', "templates/LayoutErrorBody.html"));
+    $WEB->printHtmlHeader('title' => "$error CGI Error", 'status' => $error);
+    $WEB->printHtmlLayout();
 
 }
 
