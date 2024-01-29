@@ -56,8 +56,22 @@ export COMPOSE_PROFILES="mariadb"
 # OR 
 export COMPOSE_PROFILES="postgres"
 
-COMPOSE_PROFILES=${COMPOSE_PROFILES:-mariadb} \
-docker-compose up --build --remove-orphans --attach fcgi
+COMPOSE_PROFILES=${COMPOSE_PROFILES:-mariadb} docker-compose up --build --remove-orphans --attach fcgi
+```
+
+## how to run docker-compose-debugger
+
+``` bash
+# Choose profile type
+export COMPOSE_PROFILES="static"
+# OR 
+export COMPOSE_PROFILES="mysql"
+# OR 
+export COMPOSE_PROFILES="mariadb"
+# OR 
+export COMPOSE_PROFILES="postgres"
+
+COMPOSE_PROFILES=${COMPOSE_PROFILES:-mariadb} docker-compose up -d debugger
 ```
 
 ## how to run in kubernetes
@@ -90,7 +104,8 @@ cpanm \
 
 - install vsc modul 'Perl - Language Server and Debugger for Perl', published by 'Gerald Richter'
 - save settings.json and launch.json to the folder .vscode/
-- run docker-compose (how to run docker-compose)
+- run docker-compose (how to run title:docker-compose-debugger)
+- run docker-compose (how to run title:docker-compos)
 - vsc press F5
 - open http://127.0.0.1:7778/debug.cgi
 

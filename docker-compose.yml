@@ -102,10 +102,7 @@ services:
     #   - default
     #   - debug
     profiles:
-      - static
-      - mysql
-      - mariadb
-      - postgres
+      - debugger
     environment:
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-mariadb}
     env_file:
