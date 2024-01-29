@@ -298,7 +298,7 @@ sub genTmpl {
     $LOG->delay("gen_tmpl");
 
     # SET default values
-    $tmpl{'idp'}         = $self->getValue("idp",         undef);
+    $tmpl{'idp'}         = $self->getValue("idp", undef);
     $tmpl{'script_name'} = $self->getValue("script_name", 'pwe.fcgi');
     $tmpl{'parameters'}  = $self->getParameters();
 
