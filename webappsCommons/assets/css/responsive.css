@@ -137,7 +137,7 @@ html.framed-mobile {
     top: 20px;
     height: 849px;
     width: 100%;
-    background: url(/assets/images/tablet-h.svg) top center no-repeat
+    background: url(/assets/images/pwe/tablet-h.svg) top center no-repeat
 }
 
 #iframe-container.tablet-h #iframe-wrapper {
@@ -155,7 +155,7 @@ html.framed-mobile {
     top: 10px;
     height: 1135px;
     width: 100%;
-    background: url(/assets/images/tablet-v.svg) top center no-repeat
+    background: url(/assets/images/pwe/tablet-v.svg) top center no-repeat
 }
 
 #iframe-container.tablet-v #iframe-wrapper {
@@ -172,7 +172,7 @@ html.framed-mobile {
     top: 10px;
     height: 765px;
     width: 100%;
-    background: url(/assets/images/mobil.svg) top center no-repeat
+    background: url(/assets/images/pwe/mobil.svg) top center no-repeat
 }
 
 #iframe-container.mobile #iframe-wrapper {

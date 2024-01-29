@@ -7,7 +7,7 @@ function addprogress(dst, process_status) {
     }
 
     var id = dst.attr('id');
-    var div = "<div id=\"" + id + "-progress\"><center><img src=\"assets/images/ajax-loader.gif\"/> <span id=\"" + id + "-percent_progress\"></span></center></div>";
+    var div = "<div id=\"" + id + "-progress\"><center><img src=\"assets/images/pwe/ajax-loader.gif\"/> <span id=\"" + id + "-percent_progress\"></span></center></div>";
 
     if (process_status == 'start') {
         $("body").last().after(div);
