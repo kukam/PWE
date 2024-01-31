@@ -717,17 +717,4 @@ sub flush {
     $self->{'options'}        = {};
 }
 
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::DBI;
-    require Libs::Validate;
-    $LOG      = new Libs::Log;
-    $CONF     = new Libs::Config;
-    $DBI      = new Libs::DBI;
-    $VALIDATE = new Libs::Validate;
-}
-
 1;

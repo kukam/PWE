@@ -44,13 +44,9 @@ RUN set -x \
 
 WORKDIR /PWE
 
-ADD Libs Libs
-ADD Sites Sites
-ADD Pages Pages
-ADD assets assets
-ADD Entities Entities
-ADD Services Services
+ADD lib lib
 ADD templates templates
+ADD webappsCommons webappsCommons
 ADD favicon.ico favicon.ico
 ADD pwe.fcgi pwe.fcgi
 

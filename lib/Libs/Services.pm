@@ -265,23 +265,4 @@ sub isExistServiceMethod {
     return 1;
 }
 
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::DBI;
-    require Libs::User;
-    require Libs::Web;
-    require Libs::Validate;
-    require Libs::Entities;
-    $LOG      = new Libs::Log;
-    $CONF     = new Libs::Config;
-    $DBI      = new Libs::DBI;
-    $USER     = new Libs::User;
-    $WEB      = new Libs::Web;
-    $VALIDATE = new Libs::Validate;
-    $ENTITIES = new Libs::Entities;
-}
-
 1;

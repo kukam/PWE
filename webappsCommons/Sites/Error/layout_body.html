@@ -1,8 +1,10 @@
 <body>
    [% PROCESS templatesCommons/resource_bundle.tmpl %]
    [% IF html_main %]
+      [% messenger %]
       [% INCLUDE $html_main %]
    [% ELSIF print_main %]
+      [% messenger %]
       [% print_main %]
    [% ELSE %]
       <h1>Unknown page.....</h1>

@@ -34,25 +34,6 @@ sub Service_UserAccount {
     $USER = $input;
 }
 
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::Validate;
-    require Libs::DBI;
-    require Libs::Entities;
-    require Services::UserAccount::UserAccount;
-    require Sites::Default::Default;
-    $CONF     = new Libs::Config;
-    $LOG      = new Libs::Log;
-    $VALIDATE = new Libs::Validate;
-    $DBI      = new Libs::DBI;
-    $ENTITIES = new Libs::Entities;
-    $USER     = new Services::UserAccount::UserAccount;
-    $WEB      = new Sites::Default::Default;
-}
-
 sub default {
     my $self = shift;
 
@@ -62,7 +43,7 @@ sub default {
     $WEB->setIDP($idp);
     $WEB->printHttpHeader();
     $WEB->printHtmlHeader();
-    $WEB->printHtmlLayout(html_main => "Pages/default/main.html",);
+    $WEB->printHtmlLayout(html_main => "Pages/default/main.html");
 }
 
 sub setlanguage {

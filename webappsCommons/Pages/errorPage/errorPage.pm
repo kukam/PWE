@@ -30,25 +30,6 @@ sub Site_Error {
     $WEB = $input;
 }
 
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::Validate;
-    require Libs::DBI;
-    require Libs::Entities;
-    require Libs::User;
-    require Sites::Default::Default;
-    $CONF     = new Libs::Config;
-    $LOG      = new Libs::Log;
-    $VALIDATE = new Libs::Validate;
-    $DBI      = new Libs::DBI;
-    $ENTITIES = new Libs::Entities;
-    $USER     = new Libs::User;
-    $WEB      = new Sites::Default::Default;
-}
-
 sub e400 {
     my $self = shift;
 
@@ -63,7 +44,7 @@ sub e400 {
 
     $WEB->printHttpHeader('type' => 'error', 'status' => 400);
     $WEB->printHtmlHeader('title' => '400 Bad parameter');
-    $WEB->printHtmlLayout();
+    $WEB->printHtmlLayout(html_main => "Pages/errorPage/main.html");
 }
 
 sub e401 {
@@ -80,7 +61,7 @@ sub e401 {
 
     $WEB->printHttpHeader('type' => 'error', 'status' => '401');
     $WEB->printHtmlHeader('title' => '401 Access denied');
-    $WEB->printHtmlLayout();
+    $WEB->printHtmlLayout(html_main => "Pages/errorPage/main.html");
 
 }
 
@@ -98,7 +79,7 @@ sub e404 {
 
     $WEB->printHttpHeader('type' => 'error', 'status' => 404);
     $WEB->printHtmlHeader('title' => '404 Page not found');
-    $WEB->printHtmlLayout();
+    $WEB->printHtmlLayout(html_main => "Pages/errorPage/main.html");
 }
 
 sub e500 {
@@ -115,7 +96,7 @@ sub e500 {
 
     $WEB->printHttpHeader('type' => 'error', 'status' => '500');
     $WEB->printHtmlHeader('title' => '500 Internal error');
-    $WEB->printHtmlLayout();
+    $WEB->printHtmlLayout(html_main => "Pages/errorPage/main.html");
 
 }
 
@@ -137,7 +118,7 @@ sub cgi_error {
 
     $WEB->printHttpHeader('type' => 'error', 'status' => $error);
     $WEB->printHtmlHeader('title' => "$error CGI Error", 'status' => $error);
-    $WEB->printHtmlLayout();
+    $WEB->printHtmlLayout(html_main => "Pages/errorPage/main.html");
 
 }
 

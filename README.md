@@ -41,6 +41,21 @@ docker buildx build --push \
     -f webapps/static.example.web/Dockerfile .
 ```
 
+## how to run docker-compose-debugger
+
+``` bash
+# Choose profile type
+export COMPOSE_PROFILES="static"
+# OR 
+export COMPOSE_PROFILES="mysql"
+# OR 
+export COMPOSE_PROFILES="mariadb"
+# OR 
+export COMPOSE_PROFILES="postgres"
+
+COMPOSE_PROFILES=${COMPOSE_PROFILES:-mariadb} docker-compose up -d debugger
+```
+
 ## how to run docker-compose
 
 ``` bash
@@ -57,21 +72,6 @@ export COMPOSE_PROFILES="mariadb"
 export COMPOSE_PROFILES="postgres"
 
 COMPOSE_PROFILES=${COMPOSE_PROFILES:-mariadb} docker-compose up --build --remove-orphans --attach fcgi
-```
-
-## how to run docker-compose-debugger
-
-``` bash
-# Choose profile type
-export COMPOSE_PROFILES="static"
-# OR 
-export COMPOSE_PROFILES="mysql"
-# OR 
-export COMPOSE_PROFILES="mariadb"
-# OR 
-export COMPOSE_PROFILES="postgres"
-
-COMPOSE_PROFILES=${COMPOSE_PROFILES:-mariadb} docker-compose up -d debugger
 ```
 
 ## how to run in kubernetes
