@@ -10,6 +10,18 @@ docker buildx build --push \
     --cache-from kukam/pwe-base:latest \
     --build-arg BUILDKIT_INLINE_CACHE=1 \
     --platform "linux/amd64,linux/arm64/v8" \
+    --target pwe-base \
+    --no-cache .
+```
+
+```bash
+docker buildx create --use
+docker buildx build --push \
+    -t kukam/pwe-debugger:latest \
+    --cache-from kukam/pwe-base:latest \
+    --build-arg BUILDKIT_INLINE_CACHE=1 \
+    --platform "linux/amd64,linux/arm64/v8" \
+    --target pwe-debugger \
     --no-cache .
 ```
 
@@ -44,16 +56,7 @@ docker buildx build --push \
 ## how to run docker-compose-debugger
 
 ``` bash
-# Choose profile type
-export COMPOSE_PROFILES="static"
-# OR 
-export COMPOSE_PROFILES="mysql"
-# OR 
-export COMPOSE_PROFILES="mariadb"
-# OR 
-export COMPOSE_PROFILES="postgres"
-
-COMPOSE_PROFILES=${COMPOSE_PROFILES:-mariadb} docker-compose up -d debugger
+docker-compose up -d debugger
 ```
 
 ## how to run docker-compose
@@ -150,7 +153,7 @@ cpanm \
       "reloadModules": true,
       // "args": [ "page=xxx", "func=sdf" ],
       "env": {
-        "PERL5LIB": "/PWE/webapps/generic.example.web",
+        "PERL5LIB": "/PWE/webapps/generic.example.web/lib",
         "FCGI_SOCKET_PATH": ":7779"
       },
       "pathMap": [
@@ -169,7 +172,7 @@ cpanm \
       "reloadModules": true,
       // "args": [ "page=xxx", "func=sdf" ],
       "env": {
-        "PERL5LIB": "/PWE/webapps/static.example.web",
+        "PERL5LIB": "/PWE/webapps/static.example.web/lib",
         "FCGI_SOCKET_PATH": ":7779"
       },
       "pathMap": [
