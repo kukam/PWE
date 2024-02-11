@@ -18,7 +18,7 @@ sub new {
     
     my $self = {
         'session' => {
-            # Via Entities::Session
+            # Data seved in the file.
         }
     };
         
@@ -34,49 +34,52 @@ sub newSession {
     my $who    = $USER->getValue("env", "HTTP_USER_AGENT", "UNKNOWN");
     my $expire = (time() + ((3600 * 24) * $CONF->getValue("http", "cookie_expire_guest", 100)));
 
-    while (1) {
-        
-        my $SESSION = $ENTITIES->createEntityObject('Session', {'where' => "sid = ?", 'conds' => [$sid]});
-
-        if (!$SESSION->expire()) {
-            # NEW SESSION
-            $SESSION->sid($sid);
-            $SESSION->expire($expire);
-        } elsif ($SESSION->expire() < time()) {
-            # OLD SESSION
-            $SESSION->DELETE_ROW;
-            $SESSION->logit;
-            if ($SESSION->error()) {
-                $SESSION->rollback;
-            } else {
-                $SESSION->commit;
-            }
-            next;
-        }
-
-        $SESSION->ipaddres($ip);
-        $SESSION->useragent($who);
-        $SESSION->flush;
-        $SESSION->logit;
-
-        if ($SESSION->error()) {
-            $SESSION->rollback;
-        } else {
-            # SET VALUE FROM DB
-            $self->{'session'} = $SESSION->getMirroredData();
-            $SESSION->commit;
-        }
-
-        last;
-    }                    
-    
     # SET NEW VALUE FROM BROWSER
     $self->setValue('ipaddres',$ip);
     $self->setValue('useragent',$who);
     
     # SET LANG TO USER OBJECT
-    $USER->setLanguage($self->getValue('lang'));
-    
+    my $def_lang = $CONF->getValue("web", "def_language", "EN");
+    $USER->setLanguage($self->getValue('lang',$def_lang));
+
+    # TODO: Dopsat smazani session data v USER objektu.
+
+    # while (1) {
+        
+    #     my $SESSION = $ENTITIES->createEntityObject('Session', {'where' => "sid = ?", 'conds' => [$sid]});
+
+    #     if (!$SESSION->expire()) {
+    #         # NEW SESSION
+    #         $SESSION->sid($sid);
+    #         $SESSION->expire($expire);
+    #     } elsif ($SESSION->expire() < time()) {
+    #         # OLD SESSION
+    #         $SESSION->DELETE_ROW;
+    #         $SESSION->logit;
+    #         if ($SESSION->error()) {
+    #             $SESSION->rollback;
+    #         } else {
+    #             $SESSION->commit;
+    #         }
+    #         next;
+    #     }
+
+    #     $SESSION->ipaddres($ip);
+    #     $SESSION->useragent($who);
+    #     $SESSION->flush;
+    #     $SESSION->logit;
+
+    #     if ($SESSION->error()) {
+    #         $SESSION->rollback;
+    #     } else {
+    #         # SET VALUE FROM DB
+    #         $self->{'session'} = $SESSION->getMirroredData();
+    #         $SESSION->commit;
+    #     }
+
+    #     last;
+    # }                    
+        
     return $self->{'session'};
 }
 
@@ -132,21 +135,23 @@ sub flush {
     my $self = shift;
 
     my $sid = $USER->getSid();
+
+    # TODO: Dopsat proces flushnuti dat sessions do USER->setOpts();
     
-    my $SESSION = $ENTITIES->createEntityObject('Session', {'where' => "sid = ?", 'conds' => [$sid]});
+    # my $SESSION = $ENTITIES->createEntityObject('Session', {'where' => "sid = ?", 'conds' => [$sid]});
 
-    # Save to db    
-    foreach my $key (keys %{$self->{'session'}}) {
-        $SESSION->$key($self->getValue($key));
-    }
+    # # Save to db    
+    # foreach my $key (keys %{$self->{'session'}}) {
+    #     $SESSION->$key($self->getValue($key));
+    # }
 
-    $SESSION->logit;
-    $SESSION->flush;
-    if ($SESSION->error()) {
-        $SESSION->rollback;
-    } else {
-        $SESSION->commit;
-    }
+    # $SESSION->logit;
+    # $SESSION->flush;
+    # if ($SESSION->error()) {
+    #     $SESSION->rollback;
+    # } else {
+    #     $SESSION->commit;
+    # }
 
     # CLEAR OBJ.DATA
     delete $self->{'session'};

@@ -132,26 +132,4 @@ sub AUTOLOAD {
     return $SESSION->$name(@_);
 }
 
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::Validate;
-    require Libs::DBI;
-    require Libs::Entities;
-    require Libs::User;
-    require Libs::Web;
-    require Services::Session::Session;
-
-    $CONF     = new Libs::Config;
-    $LOG      = new Libs::Log;
-    $VALIDATE = new Libs::Validate;
-    $DBI      = new Libs::DBI;
-    $ENTITIES = new Libs::Entities;
-    $USER     = new Libs::User;
-    $WEB      = new Libs::Web;
-    $SESSION  = new Services::Session::Session;
-}
-
 1;

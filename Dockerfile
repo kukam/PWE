@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:latest as pwe-base
 
 RUN set -x \
     && apt-get update \
@@ -17,30 +17,8 @@ RUN set -x \
         libdata-guid-perl \
         libdata-uuid-perl \
         libio-aio-perl \
-        cstocs
-        # libnet-ssh2-perl \
-
-# Perl Debugger & Tools, (Perl::LanguageServer)
-RUN set -x \
-    && apt-get install -y \
         libmoose-perl \
-        libdata-dump-perl \
-        libpadwalker-perl \
-        libcoro-perl \
-        libanyevent-perl \
-        libcompiler-lexer-perl \
-        libclass-refresh-perl \
-        libscalar-list-utils-perl \
-        cpanminus \
-        iputils-ping \
-        net-tools \
-        telnet \
-        build-essential \
-    && cpanm \
-        Class::MOP \
-        Cz::Cstocs \
-        Perl::Critic \
-        Perl::LanguageServer
+        cstocs
 
 WORKDIR /PWE
 
@@ -57,3 +35,27 @@ WORKDIR /PWE/webapps
 ENTRYPOINT []
 
 CMD []
+
+# Perl Debugger & Tools, (Perl::LanguageServer)
+FROM kukam/pwe-base:latest as pwe-debugger
+
+RUN set -x \
+    && apt-get install -y \
+        libdata-dump-perl \
+        libpadwalker-perl \
+        libcoro-perl \
+        libanyevent-perl \
+        libcompiler-lexer-perl \
+        libclass-refresh-perl \
+        libscalar-list-utils-perl \
+        cpanminus \
+        iputils-ping \
+        net-tools \
+        telnet \
+        build-essential \
+    && cpanm \
+        Perl::Critic \
+        Perl::LanguageServer
+        # Class::MOP \
+        # Cz::Cstocs
+        # libnet-ssh2-perl \

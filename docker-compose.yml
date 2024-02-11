@@ -54,6 +54,7 @@ services:
       - postgres
     stdin_open: true
     tty: true
+    # command: "sleep infinity"
     environment:
       PWE_PROFILE: ${COMPOSE_PROFILES:-mariadb}
     env_file:
@@ -93,7 +94,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
 
   debugger:
-    image: kukam/pwe-${COMPOSE_PROFILES:-mariadb}:latest
+    image: kukam/pwe-debugger:latest
     restart: unless-stopped
     stdin_open: true
     tty: true
