@@ -523,19 +523,4 @@ sub flush {
     $self->{'idp'}  = undef;
 }
 
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::DBI;
-    require Libs::User;
-    require Libs::Validate;
-    $LOG      = new Libs::Log;
-    $CONF     = new Libs::Config;
-    $DBI      = new Libs::DBI;
-    $USER     = new Libs::User;
-    $VALIDATE = new Libs::Validate;
-}
-
 1;

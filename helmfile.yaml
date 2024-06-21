@@ -5,8 +5,8 @@ helmDefaults:
   timeout: 1800
 
 repositories:
-  - name: nginx-ingress-controller
-    url: "https://charts.bitnami.com/bitnami"
+  # - name: nginx-ingress-controller
+  #   url: "https://charts.bitnami.com/bitnami"
   - name: nixys-universal-chart
     url: "https://registry.nixys.ru/chartrepo/public"
 
@@ -16,11 +16,11 @@ repositories:
 #     url: "https://evgkrsk.github.io/nxs-universal-chart"
 
 releases:
-  - name: ingress
-    namespace: ingress
-    chart: bitnami/nginx-ingress-controller
-    version: 9.7.9
-    createNamespace: true
+  # - name: ingress
+  #   namespace: ingress
+  #   chart: bitnami/nginx-ingress-controller
+  #   version: 9.7.9
+  #   createNamespace: true
   - name: pwe
     namespace: pwe
     chart: nixys-universal-chart/nxs-universal-chart

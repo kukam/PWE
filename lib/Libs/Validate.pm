@@ -2,6 +2,8 @@ package Libs::Validate;
 
 use strict;
 use warnings;
+use lib 'lib';
+use lib '../lib';
 use vars qw(@ISA);
 use Libs::Validate::MySQL;
 use Libs::Validate::Postgres;
@@ -219,15 +221,6 @@ sub AUTOLOAD {
     $LOG->sendErrorReport("VALIDATE", undef, $name, "Unknwon method name:$name");
     die "Internal error, unknown method name:$name";
     exit;
-}
-
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    $LOG  = new Libs::Log;
-    $CONF = new Libs::Config;
 }
 
 1;

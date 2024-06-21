@@ -8,19 +8,20 @@
   [% SET script = "$table.script&tableid=$table.id&ordercolumn=$ordercolumn&orderby=" %]
 [% END %]
 
-
 [% UNLESS orderby %]
     [% SET orderby = table.orderby %]
 [% END %]
 
-[% UNLESS enable_ajax %]
-  [% SET enable_ajax = 0 %]
-[% END %]
-
 [% IF orderby == "ASC" %]
 [% SET o = "DESC" %]
-<a [% INCLUDE templatesCommons/ahref.tmpl href="$script$o" ajaxjson="$enable_ajax" %]>[% thname %][% IF table.ordercolumn == ordercolumn %] <i class="glyphicon glyphicon-open"></i>[% END %]</a>
+<a [% INCLUDE templates/ajax_json.tmpl href="$script$o" %]>
+  [% INCLUDE templates/rb_value.tmpl key="table_head_$ordercolumn" %]
+  [% IF table.ordercolumn == ordercolumn %] <i class="fa-solid fa-arrow-down-short-wide"></i>[% END %]
+</a>
 [% ELSE %]
 [% SET o = "ASC" %]
-<a [% INCLUDE templatesCommons/ahref.tmpl href="$script$o" ajaxjson="$enable_ajax" %]>[% thname %][% IF table.ordercolumn == ordercolumn %] <i class="glyphicon glyphicon-save"></i>[% END %]</a>
+<a [% INCLUDE templates/ajax_json.tmpl href="$script$o" %]>
+  [% INCLUDE templates/rb_value.tmpl key="table_head_$ordercolumn" %]
+  [% IF table.ordercolumn == ordercolumn %] <i class="fa-solid fa-arrow-down-wide-short"></i>[% END %]
+</a>
 [% END %]

@@ -2,6 +2,7 @@ package Libs::Log;
 
 use strict;
 use lib 'lib';
+use lib '../lib';
 use Libs::Send;
 use Time::HiRes;
 
@@ -230,13 +231,6 @@ sub sendErrorReport {
             last;
         }
     }
-}
-
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    $CONF = new Libs::Config;
 }
 
 1;

@@ -197,21 +197,4 @@ sub isExistEntity {
     return 0;
 }
 
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::DBI;
-    require Libs::User;
-    require Libs::Web;
-    require Libs::Validate;
-    $LOG      = new Libs::Log;
-    $CONF     = new Libs::Config;
-    $DBI      = new Libs::DBI;
-    $USER     = new Libs::User;
-    $WEB      = new Libs::Web;
-    $VALIDATE = new Libs::Validate;
-}
-
 1;

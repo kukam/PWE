@@ -24,59 +24,61 @@
   [% SET script = "$table.script&tableid=$table.id&gopage=" %]
 [% END %]
 
-[% IF enable_ajax %]
-    [% SET ajaxjson = 1 %]
-    [% SET ajaxhtml = 0 %]
-[% ELSIF ajaxjson %]
-    [% SET ajaxjson = 1 %]
-[% ELSIF ajaxhtml %]
-    [% SET ajaxhtml = 1 %]
-[% ELSE %]
-    [% SET ajaxjson = 0 %]
-    [% SET ajaxhtml = 0 %]
-    [% SET enable_ajax = 0 %]
-[% END %]
-
-[% IF endpage != 1 %]
-    <nav>
-    <ul class="pagination">
+[% IF endpage > 0 %]
+<nav aria-label="Page navigation example">
+    <ul class="pagination justify-content-left">
 
     [% # Posuneme se o jednu stranu zpet %]
     [% IF gopage > 1 %]
         [% SET older = (gopage - 1) %]
-        <li><a [% INCLUDE templatesCommons/ahref.tmpl href="$script$older" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]><span aria-hidden="true">&laquo;</span><span class="sr-only">[% rb.dbtable_older %]</span></a></li>
+        <li class="page-item">
+            <a class="page-link" [% INCLUDE templates/ajax_json.tmpl href="$script$older" %]>[% rb.dbtable_older %]</a>
+        </li>
     [% ELSE %]
-        <li class="disabled"><a [% INCLUDE templatesCommons/ahref.tmpl href="$script$gopage" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]><span aria-hidden="true">&laquo;</span><span class="sr-only">[% rb.dbtable_older %]</span></a></li>
+        <li class="page-item disabled">
+            <a class="page-link" [% INCLUDE templates/ajax_json.tmpl href="$script$gopage" %]>[% rb.dbtable_older %]</a>
+        </li>
     [% END %]
 
     [% # Moznost prejit na zacatek %]
     [% IF gopage >= nlimit %]
         [% SET first = 1 %]
-        <li><a style="margin-right: 10px;" [% INCLUDE templatesCommons/ahref.tmpl href="$script$first" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]>1</a></li>
+        <li class="page-item">
+            <a class="page-link" [% INCLUDE templates/ajax_json.tmpl href="$script$first" %]>1</a>
+        </li>
     [% END %]    
     
     [% SET count = 0 %]
     [% # Vypsani seznamu stranek %]
     [% FOREACH p = pagelist %]
 	[% count = p %]
-        <li [% IF p == gopage %]class="active"[% END %]><a [% INCLUDE templatesCommons/ahref.tmpl href="$script$p" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]>[% p %]</a></li>
+        <li [% IF p == gopage %]class="page-item active"[% ELSE %]class="page-item"[% END %]>
+            <a class="page-link" [% INCLUDE templates/ajax_json.tmpl href="$script$p" %]>[% p %]</a>
+        </li>
     [% END %]
     
     [% # Moznost skocit az na konec %]
     [% IF count != endpage %]
-        <li><a style="margin-left: 10px;" [% INCLUDE templatesCommons/ahref.tmpl href="$script$endpage" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]>[% endpage %]</a></li>
+        <li class="page-item">
+            <a class="page-link" [% INCLUDE templates/ajax_json.tmpl href="$script$endpage" %]>[% endpage %]</a>
+        </li>
     [% END %]
     
-     [% # Posuneme se o jednu stranu dal %]
+    [% # Posuneme se o jednu stranu dal %]
     [% IF gopage != endpage && endpage > gopage %]
         [% SET newer = (gopage + 1) %]
-        <li><a [% INCLUDE templatesCommons/ahref.tmpl href="$script$newer" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]><span aria-hidden="true">&raquo;</span><span class="sr-only">[% rb.dbtable_newer %]</span></a></li>
+        <li class="page-item">
+            <a class="page-link" [% INCLUDE templates/ajax_json.tmpl href="$script$newer" %]>[% rb.dbtable_newer %]</a>
+        </li>
     [% ELSE %]
-        <li class="disabled"><a [% INCLUDE templatesCommons/ahref.tmpl href="$script$gopage" ajaxjson="$ajaxjson" ajaxhtml="$ajaxhtml" %]"><span aria-hidden="true">&raquo;</span><span class="sr-only">[% rb.dbtable_newer %]</span></a></li>
+        <li class="page-item disabled">
+            <a class="page-link" [% INCLUDE templates/ajax_json.tmpl href="$script$gopage" %]">[% rb.dbtable_newer %]</a>
+        </li>
     [% END %]
     
     </ul>
-    </nav>
+</nav>
+
 [% END %]
 
 

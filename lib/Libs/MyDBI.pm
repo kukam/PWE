@@ -2,6 +2,7 @@ package Libs::MyDBI;
 
 use strict;
 use lib 'lib';
+use lib '../lib';
 use Libs::MyDBI::DAO;
 
 my ($CONF, $LOG, $VALIDATE);
@@ -600,17 +601,6 @@ sub testConnection {
         }
     }
     $LOG->delay("test_connection_db_total", "Test total connection finish");
-}
-
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::Validate;
-    $LOG      = new Libs::Log;
-    $CONF     = new Libs::Config;
-    $VALIDATE = new Libs::Validate;
 }
 
 1;

@@ -1064,27 +1064,4 @@ sub isExistPageFunc {
     return 1;
 }
 
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::DBI;
-    require Libs::User;
-    require Libs::Web;
-    require Libs::Services;
-    require Libs::Validate;
-    require Libs::Entities;
-    require Libs::Sites;
-    $LOG      = new Libs::Log;
-    $CONF     = new Libs::Config;
-    $DBI      = new Libs::DBI;
-    $USER     = new Libs::User;
-    $WEB      = new Libs::Web;
-    $SERVICES = new Libs::Services;
-    $VALIDATE = new Libs::Validate;
-    $ENTITIES = new Libs::Entities;
-    $SITES    = new Libs::Sites;
-}
-
 1;

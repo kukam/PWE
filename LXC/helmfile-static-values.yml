@@ -23,7 +23,7 @@ deployments:
     replicas: 3
     containers:
       - name: fcgi
-        image: kukam/pwe
+        image: kukam/pwe-static
         imageTag: latest
         imagePullPolicy: IfNotPresent
         env:
@@ -55,7 +55,10 @@ deployments:
       - name: nginx-fcgi-config
         type: configMap
       - name: upload-fcgi-dir
-        type: pvc
+        # type: pvc
+        type: emptyDir
+        sizeLimit: 10Mi
+        medium: Memory
       - name: ramdisk-fcgi-dir
         type: emptyDir
         sizeLimit: 10Mi
@@ -65,11 +68,12 @@ deployments:
         sizeLimit: 10Mi
         medium: Memory
 
-pvcs:
-  upload-fcgi-dir:
-    accessModes:
-    - ReadWriteMany
-    size: 1Gi
+# pvcs:
+#   upload-fcgi-dir:
+#     storageClassName: azurefile-csi
+#     accessModes:
+#       - ReadWriteMany
+#       # size: 1Gi
 
 services:
   nginx-svc:
@@ -80,12 +84,12 @@ services:
         port: 80
         targetPort: 80
 
-ingresses:
-  pwe.kube.freebox.cz:
-    annotations:
-      kubernetes.io/ingress.class: "nginx"
-    hosts:
-    - paths:
-      - serviceName: nginx-svc
-        servicePort: http
+# ingresses:
+#   pwe.kube.freebox.cz:
+#     annotations:
+#       kubernetes.io/ingress.class: "nginx"
+#     hosts:
+#     - paths:
+#       - serviceName: nginx-svc
+#         servicePort: http
 

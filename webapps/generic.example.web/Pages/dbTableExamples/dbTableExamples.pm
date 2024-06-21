@@ -26,7 +26,8 @@ sub new {
     return $self;
 }
 
-sub Site_NewBootstrap523 {
+# sub Site_NewBootstrap523 {
+sub Site_Default {
     my ($self, $input) = @_;
     $WEB = $input;
 }
@@ -39,30 +40,6 @@ sub Service_DBTable {
 sub Service_Accounts {
     my ($self, $input) = @_;
     $ACCOUNT = $input;
-}
-
-# KOMODO-IDE/KOMODO-EDIT
-sub KOMODO {
-    return;
-    require Libs::Config;
-    require Libs::Log;
-    require Libs::Validate;
-    require Libs::DBI;
-    require Libs::Entities;
-    require Libs::User;
-    require Sites::Default::Default;
-    require Services::DBTable::DBTable;
-    require Services::Accounts::Accounts;
-
-    $CONF     = new Libs::Config;
-    $LOG      = new Libs::Log;
-    $VALIDATE = new Libs::Validate;
-    $DBI      = new Libs::DBI;
-    $ENTITIES = new Libs::Entities;
-    $USER     = new Libs::User;
-    $WEB      = new Sites::Default::Default;
-    $TABLE    = new Services::DBTable::DBTable;
-    $ACCOUNT  = new Services::Accounts::Accounts;
 }
 
 sub default {
