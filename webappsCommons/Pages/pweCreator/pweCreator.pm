@@ -43,9 +43,16 @@ sub new {
     return $self;
 }
 
-sub Site_NewBootstrap523 {
+# sub Site_NewBootstrap523 {
+#     my ($self, $input) = @_;
+#     $WEB = $input;
+#     return undef;
+# }
+
+sub Site_Default {
     my ($self, $input) = @_;
     $WEB = $input;
+    return undef;
 }
 
 # KOMODO-IDE/KOMODO-EDIT
