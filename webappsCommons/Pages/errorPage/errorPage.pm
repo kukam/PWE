@@ -25,7 +25,8 @@ sub new {
     return $self;
 }
 
-sub Site_Error {
+# sub Site_Error {
+sub Site_Default {
     my ($self, $input) = @_;
     $WEB = $input;
 }

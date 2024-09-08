@@ -8,7 +8,7 @@ repositories:
   # - name: nginx-ingress-controller
   #   url: "https://charts.bitnami.com/bitnami"
   - name: nixys-universal-chart
-    url: "https://registry.nixys.ru/chartrepo/public"
+    url: "https://registry.nixys.ip/chartrepo/public"
 
 # not good
 # repositories:

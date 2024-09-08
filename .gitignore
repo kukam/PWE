@@ -4,6 +4,7 @@
 .sass-cache
 .DS_Store
 /ramdisk
+/pwe-stable
 webapps/*/ramdisk
 webapps/*/temp
 webapps/*/log

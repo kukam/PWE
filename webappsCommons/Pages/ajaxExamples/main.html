@@ -17,8 +17,8 @@
 
             <a id="replaceHTMLSimple_I_SRC" class="btn btn-primary" [% INCLUDE templates/ahref.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_I_DST')" %]>[% rb.a_prepsat %] element I</a>
             <a id="replaceHTMLSimple_II_SRC" class="btn btn-primary" [% INCLUDE templates/ahref.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_prepsat %] element II</a>
-            <a id="replaceHTMLSimple_404_SRC" class="btn btn-primary btn-danger" [% INCLUDE templates/ahref.tmpl ajaxhtml="1" href="$script_name?page=errorPage&func=e404&mypage=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_stranka %] 400</a>
-            <a id="replaceHTMLSimple_500_SRC" class="btn btn-primary btn-danger" [% INCLUDE templates/ahref.tmpl ajaxhtml="1" href="$script_name?page=ajaxExamples&func=replaceHTMLSimpleError" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_stranka2 %] 500</a>
+            <a id="replaceHTMLSimple_404_SRC" class="btn btn-primary btn-danger" [% INCLUDE templates/ajax_html.tmpl href="$script_name?page=errorPage&func=e404&mypage=replaceHTMLSimple" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_stranka %] 400</a>
+            <a id="replaceHTMLSimple_500_SRC" class="btn btn-primary btn-danger" [% INCLUDE templates/ajax_html.tmpl href="$script_name?page=ajaxExamples&func=replaceHTMLSimpleError" dst="\$('#replaceHTMLSimple_II_DST')" %]>[% rb.a_stranka2 %] 500</a>
           </td>
           <td><div id="replaceHTMLSimple_I_DST">---------</div></td>
           <td><div id="replaceHTMLSimple_II_DST">---------</div></td>
