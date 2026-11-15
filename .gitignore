@@ -4,12 +4,6 @@
 .sass-cache
 .DS_Store
 /ramdisk
-webapps/*/ramdisk
-webapps/*/temp
-webapps/*/log
-webapps/*/uploadfile
-webapps/*/sessions
-webapps/*/conf/database.conf
 /META.yml
 /META.json
 /MYMETA.*
@@ -17,6 +11,31 @@ webapps/*/conf/database.conf
 *.o
 *.pm.tdy
 *.bs
+
+# webapps/: vlastni weby vyvojaru NEJSOU soucasti repozitare enginu (maji vlastni git repo,
+# naklonovany do webapps/<web>); verzovane jsou jen vzorove weby a README.
+webapps/*
+!webapps/README.md
+!webapps/.htaccess
+!webapps/example.web/
+!webapps/example-db.web/
+
+# docasna data webu (i ve vzorovych webech)
+webapps/*/ramdisk
+webapps/*/temp
+webapps/*/log
+webapps/*/uploadfile
+webapps/*/sessions
+webapps/*/conf/database.conf
+webapps/*/conf/local.env
+
+# historicke weby - jen ke cteni, mimo git
+webapps-example/
+
+# testy enginu - docasna data fixture aplikaci
+PWE/t/fixtures/app*/ramdisk/
+# testy enginu - zamek pracovni kopie (PWE/tools/run-tests.sh), existuje jen po dobu behu testu
+PWE/t/.run-tests.lock/
 
 # Devel::Cover
 cover_db/
@@ -39,8 +58,12 @@ inc/
 /blib/
 /_eumm/
 /*.gz
-/Makefile
 /Makefile.old
 /MANIFEST.bak
 /pm_to_blib
 /*.zip
+
+# nasazeni do Kubernetes: mistni nastaveni a hesla (kubernetes/README.md) - nikdy do gitu
+kubernetes/local.env
+kubernetes/secrets-*.yml
+!kubernetes/secrets-*.example.yml

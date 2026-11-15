@@ -1,0 +1,13 @@
+# Ladeni z prikazove radky (v kontejneru s Perl zavislostmi, engine v /PWE/PWE):
+#
+#   . vars
+#   QUERY_STRING='page=default&func=default' perl /PWE/PWE/pwe.fcgi
+#
+# Pohodlneji z hostitele (z korene repozitare): PWE/tools/pwe-cgi.sh example.web 'page=default&func=default'
+
+export PERL5LIB="$(pwd):/PWE/PWE"
+export PWE_CONF_pwe_home="$(pwd)/"
+export PWE_CONF_pwe_core=/PWE/PWE/
+export SCRIPT_FILENAME=/pwe.fcgi
+export REQUEST_METHOD=GET
+unset FCGI_SOCKET_PATH

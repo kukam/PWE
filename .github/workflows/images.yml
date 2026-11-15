@@ -1,0 +1,582 @@
+# Images - sestaveni, otestovani a publikace kontejnerovych image PWE do GitHub Container Registry.
+#
+# Sestavuje vsech 7 image z jednoho vicestupnoveho PWE/docker/Dockerfile pres docker-bake.hcl:
+#   pwe-base, pwe (nosic kodu enginu), pwe-static, pwe-mariadb, pwe-mysql, pwe-postgres, pwe-debugger
+# a publikuje je do ghcr.io/<vlastnik repozitare malymi pismeny>/<nazev>.
+#
+# Tagy: vsechny image maji JEN tag podle vetve; image pwe ma navic tag verze (obsah PWE/VERSION).
+#   vetev pwe.ai -> ghcr.io/kukam/pwe-base:pwe.ai, ..., ghcr.io/kukam/pwe:pwe.ai + ghcr.io/kukam/pwe:2.2.0
+# Nazev vetve se na tag prevadi funkci z PWE/tools/lib/images.sh - stejnym pravidlem, jakym si tag
+# pocitaji lokalni nastroje (make images, make test, make run), aby CI i vyvojar mluvili o temze image.
+# Beh skonci chybou hned v kroku Meta, kdyz by tag nebyl jednoznacny:
+#   - vetev pojmenovana jako verze (X.Y.Z, napr. 2.1.0): tag vetve by se zamenil s tagem verze image pwe,
+#   - vetev, ktera dava stejny tag jako jina vetev repozitare (feature/kosik a feature-kosik).
+#
+# Prubeh: meta -> build linux/amd64 (--load) -> testy enginu a kompilace v pwe-base -> kourove kontroly
+# (PWE/tools/smoke-images.sh) -> overeni, ze commit je stale hlavou vetve -> build linux/arm64 v emulaci
+# (--load) a tytez kourove kontroly nad nim -> publikace obou platforem z cache builderu -> souhrn.
+# Do registru se tedy nenahraje nic, co neproslo kontrolami - ani platforma linux/arm64.
+# Pull request konci po kontrolach linux/amd64: nic se neprihlasuje ani nepublikuje (tag "pr-<cislo>"
+# existuje jen na runneru).
+#
+# Zmeny, ktere testy enginu ctou, ale image z nich nevznikaji (vzorove weby, docker-compose, Makefile),
+# tento workflow nespousti - hlida je lehky .github/workflows/tests.yml (jen testy, nic nepublikuje).
+#
+# Volitelne zrcadlo na Docker Hub: nastav promennou repozitare DOCKERHUB_NAMESPACE (napr. "kukam")
+# a secrets DOCKERHUB_USERNAME + DOCKERHUB_TOKEN. Chybi-li cokoli z toho, publikuje se jen do ghcr.io.
+#
+# Proc prime volani "docker buildx bake" a ne docker/bake-action: je to tentyz prikaz, ktery lokalne
+# spousti PWE/tools/build-images.sh (stejny soubor, stejne promenne REGISTRIES/TAG/VERSION/SOURCE),
+# takze kroky jdou vyzkouset mimo GitHub; bake-action navic definici ve vychozim stavu bere z gitu
+# (remote bake definition), ne z checkoutu. Cenou je jedna akce navic
+# (crazy-max/ghaction-github-runtime), ktera krokum "run" zpristupni token pro cache type=gha.
+#
+# Proc bez provenance/sbom: atestace pridaji do indexu image ke kazde platforme dalsi manifest
+# "unknown/unknown". Bez nich tag ukazuje na cisty index se dvema platformami (linux/amd64 a
+# linux/arm64), ktery ctou vsechny nastroje vcetne "docker manifest inspect", a publikovane image
+# jsou presne ty, ktere prosly kontrolami. Zapnuti = smazat --provenance=false --sbom=false.
+#
+# Akce jsou pripnute na SHA commitu (verze je v komentari za nim); nove verze navrhuje Dependabot
+# (.github/dependabot.yml). Jeho vetve (dependabot/**) bezi jen jako pull request - nic nepublikuji.
+name: Images
+
+on:
+  push:
+    # jen vetve (push gitoveho tagu workflow nespousti - image se taguji podle vetve); vetve Dependabota
+    # se sestavi a otestuji jako pull request, push do nich by jen zkousel publikovat s tokenem pro cteni
+    branches:
+      - '**'
+      - '!dependabot/**'
+    paths:
+      - 'PWE/**'
+      - 'docker-bake.hcl'
+      - '.dockerignore'
+      - 'LICENSE'
+      - '.github/workflows/images.yml'
+  pull_request:
+    paths:
+      - 'PWE/**'
+      - 'docker-bake.hcl'
+      - '.dockerignore'
+      - 'LICENSE'
+      - '.github/workflows/images.yml'
+  workflow_dispatch:
+    inputs:
+      no_cache:
+        description: 'Sestavit bez cache (stahne aktualni balicky Ubuntu; z CPAN se pri sestaveni nic neinstaluje)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Behy nad stejnou vetvi (stejnym pull requestem) jdou po sobe. Novy push zrusi rozbehnuty beh jen
+# u pull requestu; publikujici beh se nerusi (zruseni uprostred nahravani by v registru nechalo smes
+# starych a novych image) - dalsi push ceka ve fronte, GitHub v ni drzi jen ten nejnovejsi.
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  images:
+    name: Build, test, publish
+    runs-on: ubuntu-latest
+    # studeny build linux/arm64 bezi v emulaci (QEMU) a trva radove desitky minut; s cache jednotky minut
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      BAKE_FILE: docker-bake.hcl
+      # cile v docker-bake.hcl (= stage v PWE/docker/Dockerfile); podle nich se jmenuji i scope cache
+      BAKE_TARGETS: base pwe static mariadb mysql postgres debugger
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # TAG, VERSION, REGISTRIES, SOURCE a CREATED pro docker-bake.hcl (REVISION = github.sha). Nazev vetve je neduveryhodny vstup:
+      # do skriptu jde jen pres promenne prostredi, nikdy vyrazem workflow primo v textu "run".
+      - name: Meta
+        id: meta
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+          # secrets nejdou pouzit v "if:" - do skriptu jde jen informace, ze existuji
+          DOCKERHUB_SECRETS: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+          # jen pro cteni seznamu vetvi (git ls-remote); checkout prihlaseni v repozitari nenechava
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Token slouzi jen prikazu git ls-remote (soukromy repozitar by bez nej seznam vetvi nevydal).
+          # Z prostredi se hned odstrani, aby ho nezdedil skript z repozitare (PWE/tools/lib/images.sh).
+          git_auth=""
+          if [ -n "${GH_TOKEN:-}" ]; then
+            git_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+            echo "::add-mask::$git_auth"
+          fi
+          unset GH_TOKEN
+          ls_remote() {
+            if [ -n "$git_auth" ]; then
+              GIT_TERMINAL_PROMPT=0 GIT_CONFIG_COUNT=1 \
+                GIT_CONFIG_KEY_0="http.$GITHUB_SERVER_URL/.extraheader" \
+                GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $git_auth" \
+                timeout 60 git ls-remote "$@"
+            else
+              GIT_TERMINAL_PROMPT=0 timeout 60 git ls-remote "$@"
+            fi
+          }
+
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            if [[ ! "${PR_NUMBER:-}" =~ ^[0-9]+$ ]]; then
+              echo "::error::Chybi cislo pull requestu"
+              exit 1
+            fi
+            ref="pr-$PR_NUMBER"
+            publish=false
+          else
+            if [ "${GITHUB_REF_TYPE:-branch}" != "branch" ]; then
+              echo "::error::Image se taguji jen podle vetve - workflow spust nad vetvi, ne nad tagem"
+              exit 1
+            fi
+            ref="$GITHUB_REF_NAME"
+            publish=true
+          fi
+
+          # jediny zdroj pravidla "nazev vetve -> tag" je PWE/tools/lib/images.sh
+          sanitize() { bash PWE/tools/lib/images.sh pwe_image_tag_sanitize "$1"; }
+          tag="$(sanitize "$ref")"
+          if [[ ! "$tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "::error file=PWE/tools/lib/images.sh::pwe_image_tag_sanitize nevratil platny tag image"
+            printf 'ref: %s\ntag: %s\n' "$ref" "$tag"
+            exit 1
+          fi
+
+          # Tag tvaru verze patri jen image pwe (pwe:<PWE/VERSION>): vetev "2.1.0" by ho prepsala jinym
+          # enginem a ostatni image by dostaly tagy, ktere vypadaji jako verze. Kontroluje se prevedeny
+          # tag, ne nazev vetve - i "-2.1.0" dava 2.1.0.
+          if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Nazev vetve dava tag tvaru verze X.Y.Z - zamenil by se s tagem verze image pwe; prejmenuj vetev (napr. release-$tag nebo v$tag)"
+            printf 'ref: %s\ntag: %s\n' "$ref" "$tag"
+            exit 1
+          fi
+
+          # Prevod neni proste zobrazeni (vetev "-master" i prazdny vysledek davaji "master"). Tohle je
+          # ochrana pred NAHODNOU kolizi s tagem hlavni vetve, ne bezpecnostni hranice: kdo smi do
+          # repozitare zapisovat, muze si workflow ve sve vetvi upravit, a tag verze image pwe publikuje
+          # beh z kterekoli vetve. Image hlavni vetve chrani jen pravidla vetvi a prava k balickum.
+          for protected in master "${DEFAULT_BRANCH:-master}"; do
+            if [ "$ref" != "$protected" ] && [ "$tag" = "$(sanitize "$protected")" ]; then
+              echo "::error::Nazev vetve dava stejny tag image jako vetev $protected - prejmenuj vetev"
+              printf 'ref: %s\ntag: %s\n' "$ref" "$tag"
+              exit 1
+            fi
+          done
+
+          # Kolize s ostatnimi vetvemi repozitare: feature/kosik i feature-kosik davaji tag feature-kosik
+          # a jejich behy (kazdy ve sve skupine concurrency) by si image navzajem prepisovaly. Selze beh
+          # obou vetvi, dokud se jedna neprejmenuje nebo nesmaze. Kdyz seznam vetvi nejde nacist, beh
+          # pokracuje s varovanim.
+          if [ "$publish" = "true" ]; then
+            if heads="$(ls_remote --heads origin 2> "$RUNNER_TEMP/ls-remote.err")"; then
+              collision=""
+              while IFS=$'\t' read -r _ head; do
+                other="${head#refs/heads/}"
+                if [ -z "$other" ] || [ "$other" = "$head" ] || [ "$other" = "$ref" ]; then
+                  continue
+                fi
+                if [ "$(sanitize "$other")" = "$tag" ]; then
+                  collision="$other"
+                  break
+                fi
+              done <<< "$heads"
+              if [ -n "$collision" ]; then
+                echo "::error::Vetev dava stejny tag image jako jina vetev repozitare - prepisovaly by si image; jednu z nich prejmenuj"
+                printf 'ref: %s\njina vetev: %s\ntag: %s\n' "$ref" "$collision" "$tag"
+                exit 1
+              fi
+            else
+              echo "::warning::Seznam vetvi se nepodarilo nacist (git ls-remote) - kolize tagu s jinou vetvi se neoveruje"
+              sed 's/^/  /' "$RUNNER_TEMP/ls-remote.err" || true
+            fi
+          fi
+
+          version="$(tr -d '[:space:]' < PWE/VERSION)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=PWE/VERSION::PWE/VERSION nema tvar X.Y.Z"
+            printf 'version: %s\n' "$version"
+            exit 1
+          fi
+
+          owner="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          image_prefix="ghcr.io/$owner"
+          registries="$image_prefix"
+
+          # zrcadlo na Docker Hub jen pri publikaci a jen kdyz je nastavena promenna i oba secrets
+          dockerhub=false
+          if [ "$publish" = "true" ] && [ -n "${DOCKERHUB_NAMESPACE:-}" ]; then
+            if [ "${DOCKERHUB_SECRETS:-false}" = "true" ]; then
+              namespace="$(printf '%s' "$DOCKERHUB_NAMESPACE" | tr '[:upper:]' '[:lower:]')"
+              if [[ ! "$namespace" =~ ^[a-z0-9]+([._-][a-z0-9]+)*$ ]]; then
+                echo "::error::Promenna repozitare DOCKERHUB_NAMESPACE neni platny namespace Docker Hubu"
+                exit 1
+              fi
+              registries="$registries,docker.io/$namespace"
+              dockerhub=true
+            else
+              echo "::warning::DOCKERHUB_NAMESPACE je nastaven, ale chybi secrets DOCKERHUB_USERNAME/DOCKERHUB_TOKEN - zrcadlo na Docker Hub se preskakuje"
+            fi
+          fi
+
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "registries=$registries"
+            echo "image_prefix=$image_prefix"
+            echo "source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "publish=$publish"
+            echo "dockerhub=$dockerhub"
+          } >> "$GITHUB_OUTPUT"
+
+          printf 'ref=%s tag=%s version=%s registries=%s publish=%s dockerhub=%s\n' \
+            "$ref" "$tag" "$version" "$registries" "$publish" "$dockerhub"
+
+      # emulace arm64 je potreba jen pred publikaci (testovaci build je linux/amd64 = platforma runneru)
+      - name: Set up QEMU
+        if: steps.meta.outputs.publish == 'true'
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # zpristupni krokum "run" ACTIONS_RUNTIME_TOKEN a adresu cache sluzby (cache type=gha)
+      - name: Expose GitHub runtime
+        uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
+
+      # Build pro testy: jen platforma runneru, vysledek se nahraje do lokalniho Dockeru (--load).
+      # Cache type=gha ma pro kazdy cil dva scope podle platformy: "images-<cil>-amd64" zapisuje tento
+      # krok (kazdy beh vcetne pull requestu), "images-<cil>-arm64" krok s buildem linux/arm64 (jen beh,
+      # ktery publikuje) - beh, ktery skonci na testech, tak cache arm64 neprepise.
+      # no_cache=true cache necte, jen ji obnovi.
+      - name: Build (linux/amd64)
+        env:
+          REGISTRIES: ${{ steps.meta.outputs.registries }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SOURCE: ${{ steps.meta.outputs.source }}
+          # popisky image pwe (commit a cas buildu) - ve vsech buildech behu stejne hodnoty, aby
+          # publikovane image byly presne ty, ktere prosly testy
+          REVISION: ${{ github.sha }}
+          CREATED: ${{ steps.meta.outputs.created }}
+          NO_CACHE: ${{ inputs.no_cache }}
+        run: |
+          set -euo pipefail
+          read -r -a targets <<< "$BAKE_TARGETS"
+
+          args=(-f "$BAKE_FILE" --provenance=false --sbom=false)
+          args+=(--set '*.platform=linux/amd64')
+          for t in "${targets[@]}"; do
+            if [ "${NO_CACHE:-false}" != "true" ]; then
+              args+=(--set "$t.cache-from=type=gha,scope=images-$t-amd64")
+            fi
+            args+=(--set "$t.cache-to=type=gha,mode=max,scope=images-$t-amd64,ignore-error=true")
+          done
+
+          # vysledna konfigurace do logu a kontrola pravidla tagu: kazdy image ma tag vetve,
+          # tag verze ma jen (a prave) image pwe a tag vetve nema tvar verze
+          docker buildx bake "${args[@]}" --print "${targets[@]}" > "$RUNNER_TEMP/bake.json"
+          jq -r '.target | to_entries[] | "\(.key): \(.value.tags | join(" "))"' "$RUNNER_TEMP/bake.json"
+          if ! jq -e --arg tag "$TAG" --arg version "$VERSION" '
+                .target as $t
+                | ($t | to_entries | all(.key as $k | .value.tags
+                    | (any(endswith(":" + $tag))
+                       and all(endswith(":" + $tag) or ($k == "pwe" and endswith(":" + $version))))))
+                  and ($t.pwe.tags | any(endswith(":" + $version)))
+                  and ($tag | test("^[0-9]+\\.[0-9]+\\.[0-9]+$") | not)
+              ' "$RUNNER_TEMP/bake.json" > /dev/null; then
+            echo "::error file=docker-bake.hcl::Tagy neodpovidaji pravidlu: vsude tag vetve (ne tvaru verze), verze jen u pwe"
+            exit 1
+          fi
+
+          docker buildx bake "${args[@]}" --load "${targets[@]}"
+
+          # vsechny tagy musi byt v lokalnim Dockeru: testy a kontroly nesmi misto cerstveho buildu
+          # potichu stahnout starsi image z registru
+          while read -r image; do
+            info="$(docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' "$image")"
+            printf '%s  %s\n' "$info" "$image"
+          done < <(jq -r '.target[].tags[]' "$RUNNER_TEMP/bake.json")
+
+      - name: Engine tests (pwe-base)
+        env:
+          PWE_TEST_IMAGE: ${{ steps.meta.outputs.image_prefix }}/pwe-base:${{ steps.meta.outputs.tag }}
+        run: bash PWE/tools/run-tests.sh
+
+      - name: Compile check (pwe-base)
+        env:
+          PWE_TEST_IMAGE: ${{ steps.meta.outputs.image_prefix }}/pwe-base:${{ steps.meta.outputs.tag }}
+        run: bash PWE/tools/perl-compile.sh
+
+      # Kourove kontroly: kazdy image obsahuje to, co ma, a nic, co mit nema (seznam kontrol je
+      # v hlavicce skriptu). Tentyz skript jde pustit lokalne po "make images".
+      - name: Smoke checks (linux/amd64)
+        env:
+          PWE_IMAGE_REGISTRY: ${{ steps.meta.outputs.image_prefix }}
+          PWE_IMAGE_TAG: ${{ steps.meta.outputs.tag }}
+        run: bash PWE/tools/smoke-images.sh --platform linux/amd64 --pull never
+
+      # Publikuje jen beh, jehoz commit je stale hlavou vetve - nebo se od hlavy lisi jen mimo vstupy
+      # image (cesty z on.push.paths; takovy novejsi push beh Images vubec nespusti, publikovat tedy musi
+      # tento beh). Chrani to pred rucnim opakovanim stareho behu (Re-run), ktery by tagy vetve
+      # i pwe:<verze> vratil na starsi kod, a setri emulovany build behu, ktery predbehl novejsi push
+      # se zmenou image. Staci overit jednou tady: behy teze vetve jdou po sobe (concurrency), takze beh
+      # nad novejsim commitem publikuje vzdy az po tomto. Kdyz overeni technicky selze, publikuje se
+      # s varovanim.
+      - name: Branch head
+        id: head
+        if: steps.meta.outputs.publish == 'true'
+        env:
+          # jen pro cteni hlavy vetve (git ls-remote); checkout prihlaseni v repozitari nenechava
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          git_auth=""
+          if [ -n "${GH_TOKEN:-}" ]; then
+            git_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+            echo "::add-mask::$git_auth"
+          fi
+          unset GH_TOKEN
+          ls_remote() {
+            if [ -n "$git_auth" ]; then
+              GIT_TERMINAL_PROMPT=0 GIT_CONFIG_COUNT=1 \
+                GIT_CONFIG_KEY_0="http.$GITHUB_SERVER_URL/.extraheader" \
+                GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $git_auth" \
+                timeout 60 git ls-remote "$@"
+            else
+              GIT_TERMINAL_PROMPT=0 timeout 60 git ls-remote "$@"
+            fi
+          }
+          git_fetch() {
+            if [ -n "$git_auth" ]; then
+              GIT_TERMINAL_PROMPT=0 GIT_CONFIG_COUNT=1 \
+                GIT_CONFIG_KEY_0="http.$GITHUB_SERVER_URL/.extraheader" \
+                GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $git_auth" \
+                timeout 120 git fetch "$@"
+            else
+              GIT_TERMINAL_PROMPT=0 timeout 120 git fetch "$@"
+            fi
+          }
+
+          publish=true
+          # vzor ls-remote odpovida i delsim jmenum se stejnym koncem - hlava se bere z radku s presnym jmenem
+          if heads="$(ls_remote --heads origin "refs/heads/$GITHUB_REF_NAME" 2> "$RUNNER_TEMP/ls-remote.err")"; then
+            head="$(printf '%s\n' "$heads" | REF="refs/heads/$GITHUB_REF_NAME" awk -F '\t' '$2 == ENVIRON["REF"] { print $1 }')"
+            if [ "$head" = "$GITHUB_SHA" ]; then
+              echo "Commit $GITHUB_SHA je hlavou vetve - image se publikuji"
+            elif [ -z "$head" ]; then
+              echo "::notice title=Publikace preskocena::Vetev uz v repozitari neni - image se nepublikuji"
+              publish=false
+            elif [[ "$head" =~ ^[0-9a-f]{40,64}$ ]]; then
+              # Lisi se hlava od tohoto commitu ve vstupech image? Seznam cest musi odpovidat on.push.paths.
+              rc=0
+              git_fetch --quiet --no-tags --depth=1 origin "$head" 2> "$RUNNER_TEMP/fetch.err" || rc=$?
+              if [ "$rc" -eq 0 ]; then
+                git diff --quiet "$GITHUB_SHA" "$head" -- PWE docker-bake.hcl .dockerignore LICENSE .github/workflows/images.yml 2>> "$RUNNER_TEMP/fetch.err" || rc=$?
+              fi
+              if [ "$rc" -eq 0 ]; then
+                echo "Hlava vetve $head se od $GITHUB_SHA lisi jen mimo vstupy image (beh Images pro ni nevznikne) - image se publikuji"
+              elif [ "$rc" -eq 1 ]; then
+                echo "::notice title=Publikace preskocena::Hlava vetve $head meni vstupy image - image publikuje beh nad ni, tento ne"
+                publish=false
+              else
+                echo "::warning::Rozdil vstupu image proti hlave vetve $head se nepodarilo zjistit - publikuje se bez overeni"
+                sed 's/^/  /' "$RUNNER_TEMP/fetch.err" || true
+              fi
+            else
+              echo "::warning::Hlavu vetve se nepodarilo overit (necekany vystup git ls-remote) - publikuje se bez overeni"
+            fi
+          else
+            echo "::warning::Hlavu vetve se nepodarilo overit (git ls-remote selhal) - publikuje se bez overeni"
+            sed 's/^/  /' "$RUNNER_TEMP/ls-remote.err" || true
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+      # Platforma linux/arm64 PRED publikaci: sestavi se v emulaci (QEMU), nacte do lokalniho Dockeru
+      # a projde stejnymi kourovymi kontrolami jako linux/amd64 (testy enginu bezi jen nad amd64 - kod
+      # enginu je cisty Perl, na platforme zavisi jen balicky image). Image se nacitaji pod jmenem, ktere
+      # existuje jen na runneru (localhost/pwe-arm64/...), aby neprepsaly otestovane image linux/amd64;
+      # od publikovanych se lisi jen jmenem, takze krok Publish je vezme z cache builderu.
+      # Cache "images-<cil>-arm64" se zapisuje uz tady: drahy emulovany build neprijde nazmar, ani kdyz
+      # kontroly nebo publikace selzou.
+      - name: Build (linux/arm64)
+        if: steps.head.outputs.publish == 'true'
+        env:
+          REGISTRIES: localhost/pwe-arm64
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SOURCE: ${{ steps.meta.outputs.source }}
+          REVISION: ${{ github.sha }}
+          CREATED: ${{ steps.meta.outputs.created }}
+          NO_CACHE: ${{ inputs.no_cache }}
+        run: |
+          set -euo pipefail
+          read -r -a targets <<< "$BAKE_TARGETS"
+
+          args=(-f "$BAKE_FILE" --provenance=false --sbom=false)
+          args+=(--set '*.platform=linux/arm64')
+          for t in "${targets[@]}"; do
+            if [ "${NO_CACHE:-false}" != "true" ]; then
+              args+=(--set "$t.cache-from=type=gha,scope=images-$t-arm64")
+            fi
+            args+=(--set "$t.cache-to=type=gha,mode=max,scope=images-$t-arm64,ignore-error=true")
+          done
+
+          docker buildx bake "${args[@]}" --print "${targets[@]}" | jq -r '.target[].tags[]' > "$RUNNER_TEMP/arm64-images.txt"
+          df -h /
+          docker buildx bake "${args[@]}" --load "${targets[@]}"
+
+          while read -r image; do
+            info="$(docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' "$image")"
+            printf '%s  %s\n' "$info" "$image"
+          done < "$RUNNER_TEMP/arm64-images.txt"
+
+      # Kontroly v emulaci trvaji minuty; limit je pojistka proti zaseknutemu emulovanemu procesu.
+      # Po kontrole se image arm64 z Dockeru mazou (misto na disku runneru) - publikace je bere z cache
+      # builderu, ne z Dockeru.
+      - name: Smoke checks (linux/arm64)
+        if: steps.head.outputs.publish == 'true'
+        timeout-minutes: 30
+        env:
+          PWE_IMAGE_REGISTRY: localhost/pwe-arm64
+          PWE_IMAGE_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          bash PWE/tools/smoke-images.sh --platform linux/arm64 --pull never
+          xargs -r docker image rm < "$RUNNER_TEMP/arm64-images.txt" > /dev/null || true
+          df -h /
+
+      - name: Login to ghcr.io
+        if: steps.head.outputs.publish == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: steps.head.outputs.publish == 'true' && steps.meta.outputs.dockerhub == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Publikace: nic se uz nestavi - obe platformy se berou z cache builderu z predchozich kroku
+      # (stejne vrstvy, jake prosly testy a kourovymi kontrolami). Cache type=gha se tu jen cte, jako
+      # pojistka pro pripad, ze builder mezitim cast sve cache uvolnil; no_cache=true ji necte.
+      # Index obou platforem dostava anotace OCI (source, licenses, description): u viceplatformniho
+      # image bere GitHub popis balicku a prirazeni k repozitari z anotaci indexu, ne z popisku (LABEL)
+      # jednotlivych image. Hodnoty se ctou z popisku otestovaneho image linux/amd64, takze jediny
+      # zdroj textu zustava PWE/docker/Dockerfile.
+      - name: Publish (linux/amd64, linux/arm64)
+        id: publish
+        if: steps.head.outputs.publish == 'true'
+        env:
+          REGISTRIES: ${{ steps.meta.outputs.registries }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SOURCE: ${{ steps.meta.outputs.source }}
+          REVISION: ${{ github.sha }}
+          CREATED: ${{ steps.meta.outputs.created }}
+          NO_CACHE: ${{ inputs.no_cache }}
+        run: |
+          set -euo pipefail
+          read -r -a targets <<< "$BAKE_TARGETS"
+
+          args=(-f "$BAKE_FILE" --provenance=false --sbom=false)
+          args+=(--set '*.platform=linux/amd64,linux/arm64')
+          for t in "${targets[@]}"; do
+            if [ "${NO_CACHE:-false}" != "true" ]; then
+              args+=(--set "$t.cache-from=type=gha,scope=images-$t-amd64")
+              args+=(--set "$t.cache-from=type=gha,scope=images-$t-arm64")
+            fi
+
+            # anotace indexu: source z kroku Meta, licenses a description z popisku otestovaneho image
+            image="$(jq -r --arg t "$t" '.target[$t].tags[0]' "$RUNNER_TEMP/bake.json")"
+            args+=(--set "$t.annotations=index:org.opencontainers.image.source=$SOURCE")
+            for key in licenses description; do
+              value="$(docker image inspect --format "{{ index .Config.Labels \"org.opencontainers.image.$key\" }}" "$image")"
+              if [ -n "$value" ]; then
+                args+=(--set "$t.annotations=index:org.opencontainers.image.$key=$value")
+              else
+                echo "::warning::Image $image nema popisek org.opencontainers.image.$key - index zustane bez teto anotace"
+              fi
+            done
+          done
+
+          docker buildx bake "${args[@]}" --print "${targets[@]}" \
+            | jq -r '.target | to_entries[] | "\(.key): \(.value.annotations // [] | join(" | "))"'
+          docker buildx bake "${args[@]}" --push --metadata-file "$RUNNER_TEMP/bake-metadata.json" "${targets[@]}"
+
+      # Souhrn se pise i po chybe nebo zruseni behu: je z nej videt, co se (ne)publikovalo a proc.
+      - name: Summary
+        if: always()
+        env:
+          PUBLISH: ${{ steps.meta.outputs.publish }}
+          HEAD_PUBLISH: ${{ steps.head.outputs.publish }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          read -r -a targets <<< "$BAKE_TARGETS"
+          {
+            if [ -s "$RUNNER_TEMP/bake-metadata.json" ]; then
+              echo "### Publikovane image (linux/amd64, linux/arm64)"
+              echo
+              echo "| Image | Tagy | Digest |"
+              echo "|---|---|---|"
+              for t in "${targets[@]}"; do
+                jq -r --arg t "$t" '
+                  .[$t] as $m
+                  | [ $m["image.name"] | split(",")[] | capture("^(?<repo>.+):(?<tag>[^:/]+)$") ]
+                  | group_by(.repo)[]
+                  | "| `\(.[0].repo)` | \(map("`" + .tag + "`") | join(", ")) | `\($m["containerimage.digest"])` |"
+                ' "$RUNNER_TEMP/bake-metadata.json"
+              done
+            else
+              if [ "$PUBLISH_OUTCOME" = "failure" ] || [ "$PUBLISH_OUTCOME" = "cancelled" ]; then
+                echo "### Publikace neskoncila uspesne ($PUBLISH_OUTCOME)"
+                echo
+                echo "Cile se do registru nahravaji samostatne - cast image uz v nem muze byt z tohoto behu. Spust beh znovu (Re-run)."
+              elif [ "$JOB_STATUS" != "success" ]; then
+                echo "### Beh skoncil stavem $JOB_STATUS - image se nepublikovaly"
+              elif [ "$PUBLISH" != "true" ]; then
+                echo "### Image sestaveny a otestovany, nepublikovany (pull request)"
+              elif [ "$HEAD_PUBLISH" != "true" ]; then
+                echo "### Image sestaveny a otestovany, nepublikovany (commit uz neni hlavou vetve nebo vetev zanikla)"
+              else
+                echo "### Image sestaveny a otestovany, nepublikovany"
+              fi
+              if [ -s "$RUNNER_TEMP/bake.json" ]; then
+                echo
+                echo "| Cil | Tagy |"
+                echo "|---|---|"
+                for t in "${targets[@]}"; do
+                  jq -r --arg t "$t" '
+                    "| \($t) | \(.target[$t].tags | map("`" + . + "`") | join(", ")) |"
+                  ' "$RUNNER_TEMP/bake.json"
+                done
+              fi
+            fi
+            echo
+            echo "Commit \`$GITHUB_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"

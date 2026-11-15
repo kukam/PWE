@@ -1,0 +1,31 @@
+# Kontext pro docker build (PWE/docker/Dockerfile a webapps/<web>/Dockerfile se stavi z korene repozitare)
+# **/.git: weby ve webapps/<web> maji vlastni git repozitar - jeho historie do image webu nepatri
+.git
+**/.git
+webapps-example
+webapps/*/ramdisk
+webapps/*/log
+webapps/*/sessions
+webapps/*/uploadfile
+webapps/*/temp
+webapps/*/conf/local.env
+webapps/*/conf/database.conf
+# Soukrome klice, certifikaty a lokalni promenne prostredi webu se do image webu NEZAPEKAJI - v celem
+# adresari webu (napr. conf/csob/private.pem, keys/rsa_<merchantId>.key, conf/local.env, .env); kontejneru
+# se dodavaji mountem nebo jako Secret. Verejne klice (*.pub, *.crt) a vzory (*.env.example) zustavaji.
+# Vzor webapps/*/**/ plati pro soubor primo v adresari webu i v libovolnem podadresari.
+webapps/*/**/*.pem
+webapps/*/**/*.PEM
+webapps/*/**/*.key
+webapps/*/**/*.KEY
+webapps/*/**/*.p12
+webapps/*/**/*.pfx
+webapps/*/**/*.env
+# Lokalni nastaveni editoru
+webapps/*/.vscode
+PWE/t/fixtures/app*/ramdisk
+**/.DS_Store
+# mistni nastaveni a hesla nasazeni do Kubernetes (kubernetes/README.md) do kontextu buildu nepatri
+kubernetes/local.env
+kubernetes/secrets-*.yml
+!kubernetes/secrets-*.example.yml

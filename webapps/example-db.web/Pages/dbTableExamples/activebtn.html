@@ -1,0 +1,15 @@
+[% UNLESS enable_ajax %]
+    [% SET enable_ajax = 0 %]
+[% END %]
+
+[% IF active == 't' || active == 1 %]
+    [% SET active = 'f' %]
+    <a class="btn btn-sm btn-success" title="active" [% INCLUDE templates/href.tmpl href="$href$active" ajaxjson="$enable_ajax" %]>
+        <i class="fa-solid fa-check"></i>
+    </a>
+[% ELSE %]
+    [% SET active = 't' %]
+    <a class="btn btn-sm btn-danger" title="inactive" [% INCLUDE templates/href.tmpl href="$href$active" ajaxjson="$enable_ajax" %]>
+        <i class="fa-solid fa-xmark"></i>
+    </a>
+[% END %]

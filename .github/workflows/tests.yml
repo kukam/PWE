@@ -1,0 +1,91 @@
+# Tests - testy enginu pro zmeny, ktere testy ctou, ale image z nich nevznikaji.
+#
+# Sestaveni a publikaci image hlida .github/workflows/images.yml; ten sleduje jen vstupy image
+# (PWE/**, docker-bake.hcl, .dockerignore, LICENSE) a testy enginu pousti pred publikaci sam.
+# Sada PWE/t ale cte i soubory mimo tyto cesty:
+#   webapps/example.web, webapps/example-db.web   PWE/t/11-smoke-example.t (requesty na vzorovy web),
+#                                                 PWE/t/14-tools.t (Dockerfile vzorovych webu = vystup generatoru)
+#   docker-compose.yml                            PWE/t/14-tools.t (image, entrypoint a profil sluzeb)
+# Zmena jen v nich by se bez tohoto workflow projevila az cervenym behem Images u dalsi, nesouvisejici
+# zmeny enginu. Stejne se hlida zbytek toho, s cim pracuji nastroje v PWE/tools: docker-compose/**
+# (soubory stacku, ktery spousti run-webapp.sh), kubernetes/** (k8s.sh; PWE/t/22-k8s-tool.t cte values
+# a vzor hesel), .gitignore (PWE/t/22-k8s-tool.t hlida, ze hesla a mistni nastaveni nejdou do gitu)
+# a Makefile (vstup do nastroju).
+#
+# Workflow je zamerne lehky: sestavi jen cil base (image pwe-base, stejny, v jakem testy pousti
+# Images), pusti PWE/tools/run-tests.sh a PWE/tools/perl-compile.sh a nic nepublikuje - zadne prihlaseni
+# do registru, opravneni jen contents: read, jedina cizi akce je checkout.
+#
+# Cache type=gha se necte. Vyzadovala by builder docker-container a akci, ktera krokum zpristupni
+# ACTIONS_RUNTIME_TOKEN (tedy i skriptum z pull requestu); usetrila by asi minutu sestaveni jednoho
+# image u workflow, ktery bezi zridka, a svazala by ho s nazvy cache ve workflow Images.
+name: Tests
+
+on:
+  push:
+    # vetve Dependabota bezi jen jako pull request
+    branches:
+      - '**'
+      - '!dependabot/**'
+    paths:
+      - 'webapps/example.web/**'
+      - 'webapps/example-db.web/**'
+      - 'docker-compose.yml'
+      - 'docker-compose/**'
+      - 'kubernetes/**'
+      - '.gitignore'
+      - 'Makefile'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    paths:
+      - 'webapps/example.web/**'
+      - 'webapps/example-db.web/**'
+      - 'docker-compose.yml'
+      - 'docker-compose/**'
+      - 'kubernetes/**'
+      - '.gitignore'
+      - 'Makefile'
+      - '.github/workflows/tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# novy push do stejne vetve (stejneho pull requestu) rozbehnuty beh zrusi - nic se nepublikuje
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Engine tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Image jen pro tento beh: jmeno existuje jen na runneru (localhost/...), z registru se nic
+      # nestahuje a nic se do nej nenahrava. REGISTRIES a TAG cte docker-bake.hcl.
+      REGISTRIES: localhost/pwe-tests
+      TAG: ci
+      PWE_TEST_IMAGE: localhost/pwe-tests/pwe-base:ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # vychozi builder runneru (ovladac docker) - vysledek je rovnou v lokalnim Dockeru
+      - name: Build pwe-base (linux/amd64)
+        run: |
+          set -euo pipefail
+          docker buildx bake -f docker-bake.hcl --provenance=false --sbom=false \
+            --set '*.platform=linux/amd64' --load base
+          docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' "$PWE_TEST_IMAGE"
+
+      - name: Engine tests (pwe-base)
+        run: bash PWE/tools/run-tests.sh
+
+      - name: Compile check (pwe-base)
+        run: bash PWE/tools/perl-compile.sh

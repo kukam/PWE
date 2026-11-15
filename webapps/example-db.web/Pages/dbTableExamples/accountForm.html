@@ -1,0 +1,17 @@
+[% SET enable_ajax = 1 %]
+[% IF enable_ajax %]<script>$(function() { AjaxFormAppender($("#[% formid %]")); });</script>[% END %]
+<form [% IF formid %]id="[% formid %]"[% END %] action="[% script_name %]?page=[% script_page %]&func=default" method="POST">
+   <input type="hidden" name="page" value="[% script_page %]" />
+   <input type="hidden" name="func" value="form" />
+  <div class="row mb-3">
+    <label for="[% formid %]_fullname" class="col-sm-2 col-form-label">[% rb.form_fullname_page %]</label>
+    <div class="col-sm-10">
+      <input type="text" class="form-control" id="[% formid %]_fullname" name="fullname" placeholder="[% rb.form_fullname_placeholder %]" />
+    </div>
+  </div>
+  <div class="row">
+    <div class="offset-sm-2 col-sm-10">
+      <input type="submit" class="btn btn-primary" name="button" value="[% rb.form_button_page %]" />
+    </div>
+  </div>
+</form>

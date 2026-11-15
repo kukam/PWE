@@ -1,0 +1,39 @@
+[% PROCESS templates/resource_bundle.tmpl %]
+[% # Flash zprava (Bootstrap 5): msg_error / msg_allright = pole klicu, text z rb.msg.<klic> nebo msg.<klic> %]
+[% IF msg_error %]
+<div id="messenger-body" class="alert alert-danger alert-dismissible fade show" role="alert">
+  <strong>[% IF $idp.messanger_error_title %][% $idp.messanger_error_title %][% ELSIF rb.$idp.messanger_error_title %][% rb.$idp.messanger_error_title %][% ELSIF rb.messanger_error_title %][% rb.messanger_error_title %][% ELSE %][% messanger_error_title %][% END %]</strong>
+    <ul class="mb-0">
+    [% FOREACH v = msg_error %]
+	[% IF msg.$v %]
+	    <li>[% msg.$v %]</li>
+	[% ELSIF rb.msg.$v %]
+	    <li>[% rb.msg.$v %]</li>
+	[% ELSE %]
+	    <li>[[% "msg.$v" %]]</li>
+	[% END %]
+    [% END %]
+    </ul>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+	[% IF disable_scrolltomessenger %]<span id="disablescrolltomessenger"><!--javascript property--></span>[% END %]
+</div>
+[% END %]
+
+[% IF msg_allright %]
+<div id="messenger-body" class="alert alert-success alert-dismissible fade show" role="alert">
+  <strong>[% IF $idp.messanger_allright_title %][% $idp.messanger_allright_title %][% ELSIF rb.$idp.messanger_allright_title %][% rb.$idp.messanger_allright_title %][% ELSIF rb.messanger_allright_title %][% rb.messanger_allright_title %][% ELSE %][% messanger_allright_title %][% END %]</strong>
+    <ul class="mb-0">
+    [% FOREACH v = msg_allright %]
+	[% IF msg.$v %]
+	    <li>[% msg.$v %]</li>
+	[% ELSIF rb.msg.$v %]
+	    <li>[% rb.msg.$v %]</li>
+	[% ELSE %]
+	    <li>[[% "msg.$v" %]]</li>
+	[% END %]
+    [% END %]
+    </ul>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+	[% IF disable_scrolltomessenger %]<span id="disablescrolltomessenger"><!--javascript property--></span>[% END %]
+</div>
+[% END %]

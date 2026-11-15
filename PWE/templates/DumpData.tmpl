@@ -1,0 +1,16 @@
+<pre id='DATA_DUMPER' style='text-align: left;'>
+    [% PERL %]
+        # Vypis promennych sablony (jen pwe.development). POZOR: $stash je zivy objekt Template Toolkitu -
+        # nesmi se menit (smazani _PARENT by rozbilo lokalizaci promennych a data by pretekala mezi requesty,
+        # protoze engine drzi objekt Template v cache). Proto se dumpuje melka kopie bez internich klicu.
+        use Data::Dumper;
+        local $Data::Dumper::Sortkeys = 1;
+        my %dump = %{$stash};
+        delete @dump{qw(_PARENT _DEBUG global dec inc)};
+        my $dmp = Dumper(\%dump);
+        $dmp =~ s/&/&amp;/g;
+        $dmp =~ s/</&lt;/g;
+        $dmp =~ s/>/&gt;/g;
+        print $dmp;
+    [% END %]
+</pre>

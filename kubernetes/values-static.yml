@@ -1,0 +1,283 @@
+# Nasazeni vzoroveho webu BEZ databaze (webapps/example.web) do Kubernetes.
+#
+#   chart:   oci://registry.nixys.ru/nuc/nxs-universal-chart, verze 3.2.2
+#   release: pwe-static  ->  https://pwe-static.<domena>
+#   postup:  kubernetes/README.md  (make k8s-image K8S=static; make k8s-deploy K8S=static)
+#
+# Jeden pod = dva kontejnery: nginx (port 80) a engine (FastCGI na portu 7779, z jinych podu zavrenem). Statiku - static/
+# a assets/ webu a assets/ enginu - zkopiruje pri startu initContainer z image webu do sdileneho svazku
+# a nginx ji posila primo, stejne jako ve vyvojovem stacku (docker-compose/docker-compose_nginx.conf).
+#
+# Vlastni web (bez databaze): zkopiruj tento soubor jako values-<nazev>.yml, uprav generic.pweWeb,
+# generic.pweImage (a pripadne generic.pweHost), sestav image (make k8s-image K8S=<nazev>) a nasad ho
+# (make k8s-deploy K8S=<nazev>, release pwe-<nazev>). Podrobnosti: kubernetes/README.md, Vlastni web.
+
+generic:
+  # --- nastaveni PWE: cte je i PWE/tools/k8s.sh a pouzivaji je sablony niz ({{ .Values.generic.pwe... }}) ---
+  pweWeb: example.web              # adresar webu ve webapps/ (image se stavi z webapps/<web>/Dockerfile)
+  pweProfile: static               # profil behoveho image; tento soubor je pro web bez databaze
+  pweImage: pwe-example-static     # nazev image webu (bez registru a tagu)
+  pweHost: ""                      # cela adresa webu, napr. www.mujweb.cz; prazdne = <release>.<pweDomain>
+  # --- nasledujici ctyri hodnoty prepisuje make k8s-deploy podle kubernetes/local.env (--set-string) ---
+  pweRegistry: docker.io/kukam     # registr, ze ktereho image webu taha cluster   (K8S_PULL_REGISTRY)
+  pweImageTag: master              # tag image webu, pripadne tag@sha256:<digest>    (K8S_IMAGE_TAG)
+  pweDomain: example.com           # web pobezi na https://<release>.<pweDomain>     (K8S_DOMAIN)
+  pweIssuer: letsencrypt           # ClusterIssuer cert-manageru pro certifikat      (K8S_ISSUER)
+  # --- dalsi hodnoty make k8s-deploy sam neprepisuje: zmen je tady, nebo je predej pres K8S_HELM_ARGS
+  #     (napr. --set-string generic.pweNginxImage=harbor.example.com/dockerhub/library/nginx) ---
+  pweNginxImage: nginx             # image webserveru (bez tagu)
+  pweNginxImageTag: stable
+  pweTimezone: Europe/Prague       # casove pasmo kontejneru enginu (promenna TZ)
+  # ConfigMapy a Secrety jako bezne zdroje releasu (vychozi chovani chartu z nich dela helm hooky,
+  # ktere helm uninstall nemaze).
+  hookAnnotations: {}
+
+configMaps:
+  nginx-conf:
+    data:
+      default.conf: |
+        # HTTPS konci na ingressu, do podu jde HTTP. Engine podle promenne HTTPS voli typ session
+        # cookie a schema odkazu, proto se mu puvodni schema predava z hlavicky X-Forwarded-Proto.
+        map $http_x_forwarded_proto $pwe_https {
+            default "";
+            https   on;
+        }
+
+        server {
+            listen 80;
+            server_tokens off;
+
+            # nahravane soubory: stejny limit jako pwe.cgi_maxfilesize webu (100 MB)
+            client_max_body_size 100m;
+
+            # skutecna adresa klienta z hlavicky ingressu (engine ji cte z REMOTE_ADDR)
+            set_real_ip_from 0.0.0.0/0;
+            real_ip_header   X-Forwarded-For;
+
+            # kontrola zivosti samotneho nginx (sondy podu)
+            location = /healthz {
+                access_log off;
+                default_type text/plain;
+                return 200 "ok\n";
+            }
+
+            # Statika primo z disku: nejdrive static/, assets/ a uploadfile/ webu, pak assets/ enginu.
+            location ~ ^/(assets|static|uploadfile)/ {
+                root /srv/web;
+                try_files $uri @engine_assets;
+                expires 7d;
+                access_log off;
+            }
+
+            location @engine_assets {
+                root /srv/engine;
+                expires 7d;
+                access_log off;
+            }
+
+            location / {
+                gzip off;
+                fastcgi_pass 127.0.0.1:7779;
+                include fastcgi_params;
+                fastcgi_param SCRIPT_FILENAME $fastcgi_script_name;
+                fastcgi_param HTTPS $pwe_https if_not_empty;
+                # Casove pasmo pro requesty: FastCGI pri kazdem requestu nahradi prostredi enginu
+                # parametry od nginx, takze promenna TZ kontejneru plati jen pri startu enginu.
+                fastcgi_param TZ "{{ .Values.generic.pweTimezone }}";
+                # Verze statiky pro odkazy typu site.css?v=... (sablony ji znaji jako start_time).
+                # Meni se s kazdym novym image, takze prohlizec po nasazeni nacte nove soubory.
+                fastcgi_param APACHE_START_TIME "{{ .Values.generic.pweImageTag | sha1sum | trunc 10 }}";
+            }
+
+            error_log  /dev/stderr warn;
+            access_log /dev/stdout;
+        }
+
+deployments:
+  web:
+    replicas: 2
+    extraSelectorLabels:
+      app.kubernetes.io/component: web
+    terminationGracePeriodSeconds: 20
+    automountServiceAccountToken: false     # pody nepotrebuji pristup k API clusteru
+    securityContext:
+      seccompProfile:
+        type: RuntimeDefault
+    initContainers:
+      - name: static
+        image: "{{ .Values.generic.pweRegistry }}/{{ .Values.generic.pweImage }}"
+        imageTag: "{{ .Values.generic.pweImageTag }}"
+        command: ["sh", "-c"]
+        args:
+          - |
+            set -eu
+            web="/PWE/webapps/{{ .Values.generic.pweWeb }}"
+            mkdir -p /srv/engine /srv/web/uploadfile
+            cp -a /PWE/PWE/assets /srv/engine/
+            for dir in static assets; do
+                if [ -d "$web/$dir" ]; then cp -a "$web/$dir" /srv/web/; fi
+            done
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+          - name: static
+            mountPath: /srv
+    containers:
+      - name: fcgi
+        image: "{{ .Values.generic.pweRegistry }}/{{ .Values.generic.pweImage }}"
+        imageTag: "{{ .Values.generic.pweImageTag }}"
+        # Pred SIGTERM pocka 5 s: ingress mezitim vyradi pod z endpointu a rozpracovane pozadavky dobehnou.
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "5"]
+        ports:
+          - name: fcgi
+            containerPort: 7779
+        env:
+          # FastCGI posloucha na vsech rozhranich podu (engine adresu host:port nepodporuje - nastavuje
+          # socket_perm a CGI::Fast pak zkousi chmod). Z jinych podu je port 7779 zavreny pravidlem
+          # networkPolicies.web niz.
+          - name: FCGI_SOCKET_PATH
+            value: ":7779"
+          # TZ pro start enginu (pro requesty ho predava nginx, viz fastcgi_param TZ)
+          - name: TZ
+            value: "{{ .Values.generic.pweTimezone }}"
+          - name: PWE_CONF_pwe_development
+            value: "0"
+          - name: PWE_CONF_http_base_url
+            value: '{{ .Values.generic.pweHost | default (printf "%s.%s" .Release.Name .Values.generic.pweDomain) }}'
+          - name: PWE_CONF_log_logout
+            value: "STDERR"
+          - name: PWE_CONF_log_loglevel
+            value: "2"
+        # Sonda zkousi spojeni zevnitr kontejneru (nezavisi na sitovych pravidlech podu).
+        # Socket otevre engine az po pripojeni k databazi a migracich (checkDbversion): do te doby hlida
+        # jen startupProbe (az 10 min = K8S_TIMEOUT), takze liveness engine nezabije uprostred migrace.
+        startupProbe:
+          exec:
+            command: ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/7779"]
+          periodSeconds: 5
+          failureThreshold: 120
+        readinessProbe:
+          exec:
+            command: ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/7779"]
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/7779"]
+          periodSeconds: 20
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+        # Engine bezi jako root (jako ve vyvojovem stacku), ale bez linuxovych opravneni:
+        # zapisuje jen do adresaru sveho webu.
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+          - name: uploadfile
+            mountPath: "/PWE/webapps/{{ .Values.generic.pweWeb }}/uploadfile"
+      - name: nginx
+        image: "{{ .Values.generic.pweNginxImage }}"
+        imageTag: "{{ .Values.generic.pweNginxImageTag }}"
+        # Pred SIGTERM pocka 5 s: ingress mezitim vyradi pod z endpointu a rozpracovane pozadavky dobehnou.
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "5"]
+        ports:
+          - name: http
+            containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 20
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+        # nginx potrebuje jen navazat port 80 a prepnout pracovni procesy na uzivatele nginx
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+            add: ["NET_BIND_SERVICE", "CHOWN", "SETUID", "SETGID"]
+        volumeMounts:
+          - name: nginx-conf
+            mountPath: /etc/nginx/conf.d
+          - name: static
+            mountPath: /srv
+            readOnly: true
+          - name: uploadfile
+            mountPath: /srv/web/uploadfile
+            readOnly: true
+    volumes:
+      - name: nginx-conf          # ConfigMap <release>-nginx-conf (viz configMaps)
+        type: configMap
+      - name: static              # kopie statiky z image webu (plni ji initContainer)
+        type: emptyDir
+      # Nahrane soubory jsou jen v tomto podu a zaniknou s nim. Pro skutecny web je nahrad svazkem
+      # sdilenym mezi pody: type: pvc + polozka v pvcs s accessModes ReadWriteMany.
+      - name: uploadfile
+        type: emptyDir
+
+services:
+  web:
+    extraSelectorLabels:
+      app.kubernetes.io/component: web
+    ports:
+      - name: http
+        port: 80
+        targetPort: http
+
+ingresses:
+  web:
+    ingressClassName: nginx
+    annotations:
+      # Web bez databaze si stav navstevnika (jazyk, prihlaseni) uklada do souboru v podu
+      # (pwe.save_opt_to = file), proto musi navstevnik zustat u stejneho podu.
+      nginx.ingress.kubernetes.io/affinity: "cookie"
+      nginx.ingress.kubernetes.io/session-cookie-name: "pwe-pod"
+      nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    certManager:
+      originalIssuerName: "{{ .Values.generic.pweIssuer }}"
+    hosts:
+      - hostname: '{{ .Values.generic.pweHost | default (printf "%s.%s" .Release.Name .Values.generic.pweDomain) }}'
+        paths:
+          - path: /
+            serviceName: web
+            servicePort: http
+
+# Sitova pravidla: do podu webu smi zvenku jen port 80 (nginx; ingress controller i ostatni pody).
+# Port enginu 7779 je dostupny jen uvnitr podu (nginx -> 127.0.0.1) - jinak by jiny pod mohl obejit
+# ingress i nginx a podvrhnout enginu adresu klienta nebo HTTPS. Pravidla musi podporovat sitovy plugin
+# clusteru (Calico, Cilium ...); bez nej se tise ignoruji. Port 80 lze dal omezit jen na namespace
+# ingress controlleru (from: namespaceSelector).
+networkPolicies:
+  web:
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/instance: "{{ .Release.Name }}"
+        app.kubernetes.io/component: web
+    policyTypes: ["Ingress"]
+    ingress:
+      - ports:
+          - port: 80
+            protocol: TCP

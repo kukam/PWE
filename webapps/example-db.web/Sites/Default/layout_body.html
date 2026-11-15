@@ -1,0 +1,35 @@
+<body>
+[% PROCESS templates/resource_bundle.tmpl %]
+<nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom mb-4">
+  <div class="container">
+    <a class="navbar-brand" href="[% script_name %]">example-db.web</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#pwe-navbar" aria-controls="pwe-navbar" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="pwe-navbar">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link[% IF idp == "default_page" %] active[% END %]" href="[% script_name %]?page=default&func=default">[% rb.a_menu_home %]</a></li>
+        <li class="nav-item"><a class="nav-link[% IF idp == "ajaxExamples" %] active[% END %]" href="[% script_name %]?page=ajaxExamples&func=default">Ajax</a></li>
+        <li class="nav-item"><a class="nav-link[% IF idp == "formExamples" %] active[% END %]" href="[% script_name %]?page=formExamples&func=default">[% rb.a_menu_formulare %]</a></li>
+        <li class="nav-item"><a class="nav-link[% IF idp == "dbTableExamples" %] active[% END %]" href="[% script_name %]?page=dbTableExamples&func=default">[% rb.a_menu_dbtabulky %]</a></li>
+        <li class="nav-item"><a class="nav-link" href="[% script_name %]?page=responsive&func=default">[% rb.a_menu_responsive %]</a></li>
+        <li class="nav-item"><a class="nav-link" href="https://fontawesome.com/search?o=r&m=free" target="_blank" rel="noopener">[% rb.a_menu_ikonky %]</a></li>
+      </ul>
+      <ul class="navbar-nav ms-auto">
+        [% IF group.admin %]<li class="nav-item"><a class="nav-link[% IF idp == "pweCreator" %] active[% END %]" href="[% script_name %]?page=pweCreator&func=default">pweCreator</a></li>[% END %]
+        [% FOREACH l IN languages %]<li class="nav-item"><a class="nav-link[% IF use_language == l %] active fw-bold[% END %]" href="[% script_name %]?page=default&func=setlanguage&lang=[% l %]">[% l %]</a></li>[% END %]
+        [% IF conf_development %]<li class="nav-item"><a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#DumpData">DataDump</a></li>[% END %]
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+  [% IF html_leftmenu %][% INCLUDE $html_leftmenu %][% END %]
+  <div id="messenger">[% messenger %]</div>
+  [% IF html_main %][% INCLUDE $html_main %][% ELSIF print_main %][% print_main %][% END %]
+</div>
+
+[% INCLUDE Sites/Default/layout_footer.html %]
+</body>
+</html>

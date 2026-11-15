@@ -1,0 +1,10 @@
+# Dependabot - jednou tydne navrhne nove verze akci pouzitych ve workflow (.github/workflows/*.yml).
+# Akce jsou pripnute na SHA commitu s verzi v komentari ("uses: owner/repo@<sha> # vX.Y.Z"); Dependabot
+# v pull requestu zmeni SHA i komentar. Jeho pull request spusti workflow jako kazdy jiny (sestaveni
+# a testy, nic se nepublikuje); push do vetvi dependabot/** workflow nespousti.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,0 +1,39 @@
+[% # Jednoduchy pager "starsi / novejsi" (Bootstrap 5 nema .pager, pouziva se .pagination) %]
+[% UNLESS gopage %]
+    [% SET gopage = table.gopage %]
+[% END %]
+
+[% UNLESS endpage %]
+    [% SET endpage = table.endpage %]
+[% END %]
+
+[% IF script && table.appendurl %]
+    [% SET script = "$script&tableid=$table.id&$table.appendurl&gopage=" %]
+[% ELSIF table.appendurl %]
+  [% SET script = "$table.script&tableid=$table.id&$table.appendurl&gopage=" %]
+[% ELSIF script %]
+  [% SET script = "$script&tableid=$table.id&gopage=" %]
+[% ELSE %]
+  [% SET script = "$table.script&tableid=$table.id&gopage=" %]
+[% END %]
+
+[% UNLESS enable_ajax %]
+  [% SET enable_ajax = 0 %]
+[% END %]
+
+<nav aria-label="pager">
+  <ul class="pagination justify-content-between">
+    [% IF gopage == 1 %]
+        <li class="page-item disabled"><a class="page-link" tabindex="-1" aria-disabled="true" [% INCLUDE templates/href.tmpl href="$script$gopage" ajaxjson="$enable_ajax" %]><span aria-hidden="true">&larr;</span> [% rb.dbtable_older %]</a></li>
+    [% ELSE %]
+        [% SET older = (gopage - 1) %]
+        <li class="page-item"><a class="page-link" [% INCLUDE templates/href.tmpl href="$script$older" ajaxjson="$enable_ajax" %]><span aria-hidden="true">&larr;</span> [% rb.dbtable_older %]</a></li>
+    [% END %]
+    [% IF endpage == gopage %]
+        <li class="page-item disabled"><a class="page-link" tabindex="-1" aria-disabled="true" [% INCLUDE templates/href.tmpl href="$script$endpage" ajaxjson="$enable_ajax" %]>[% rb.dbtable_newer %] <span aria-hidden="true">&rarr;</span></a></li>
+    [% ELSE %]
+        [% SET next = (gopage + 1) %]
+        <li class="page-item"><a class="page-link" [% INCLUDE templates/href.tmpl href="$script$next" ajaxjson="$enable_ajax" %]>[% rb.dbtable_newer %] <span aria-hidden="true">&rarr;</span></a></li>
+    [% END %]
+  </ul>
+</nav>

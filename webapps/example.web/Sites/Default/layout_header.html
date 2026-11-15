@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="[% IF use_language == 'EN' %]en[% ELSE %]cs[% END %]" data-bs-theme="light">
+  <head>
+    [% PROCESS templates/resource_bundle.tmpl %]
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="[% conf_description %]">
+    <title>[% IF title %][% title %][% ELSE %][% conf_title %][% END %]</title>
+    [% # Bootstrap 5.3, Font Awesome 6, jQuery 4 a pwe.js se serviruji z enginu (PWE/assets) %]
+    <link rel="stylesheet" href="assets/css/bootstrap-5.3.8/bootstrap.min.css" />
+    <link rel="stylesheet" href="assets/css/fontawesome-free-6.4.2/all.min.css" />
+    [% IF css == "static" %]
+    <link rel="stylesheet" href="static/css/site.css?v=[% start_time %]" />
+    [% ELSE %]
+    <link rel="stylesheet" href="[% script_name %]?page=css&func=default&random=[% random_number %]" />
+    [% END %]
+    <script src="assets/javascript/jquery-4.0.0/jquery-4.0.0.min.js"></script>
+    <script src="assets/javascript/bootstrap-5.3.8/bootstrap.bundle.min.js"></script>
+    <script src="assets/javascript/ajaxprogress.js"></script>
+    <script src="assets/javascript/pwe.js"></script>
+  </head>

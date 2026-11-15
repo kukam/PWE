@@ -1,0 +1,8 @@
+/* Vlastni styly vzoroveho webu. Bootstrap 5.3.8, Font Awesome 6.4.2, jQuery 4.0.0 a pwe.js
+   se serviruji z enginu (PWE/assets), sem patri jen to, co je specificke pro tento web. */
+
+body { padding-bottom: 2rem; }
+
+#messenger .alert { margin-top: 1rem; }
+
+.pwe-footer { font-size: 90%; }

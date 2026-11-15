@@ -1,0 +1,18 @@
+[% PROCESS templates/resource_bundle.tmpl %]
+<h1 class="border-bottom pb-2 mb-4">[% rb.h1 %]</h1>
+
+<h2 class="h4">AJAX [% rb.h2 %]</h2>
+<div class="accordion mb-4" id="accordion_ajax">
+[% INCLUDE "Pages/formExamples/panel.html" parent = "accordion_ajax", enable_ajax_form = 1, formtitle = 'method="POST" enctype="multipart/form-data"', method = "POST", formid = "ajax_form_post_multipart", fileupload="1", enctype="multipart/form-data" %]
+[% INCLUDE "Pages/formExamples/panel.html" parent = "accordion_ajax", enable_ajax_form = 1, formtitle = 'method="POST" enctype="application/x-www-form-urlencoded"', method = "POST", formid = "ajax_form_post" %]
+[% INCLUDE "Pages/formExamples/panel.html" parent = "accordion_ajax", enable_ajax_form = 1, formtitle = 'method="GET" enctype="application/x-www-form-urlencoded"', method = "GET", formid = "ajax_form_get" %]
+[% INCLUDE "Pages/formExamples/panel.html" parent = "accordion_ajax", enable_ajax_form = 1, formtitle = 'method="GET" enctype="text/plain"', method = "GET", formid = "ajax_form_get_text", enctype="text/plain" %]
+</div>
+
+<h2 class="h4">HTML [% rb.h2 %]</h2>
+<div class="accordion mb-4" id="accordion_html">
+[% INCLUDE "Pages/formExamples/panel.html" parent = "accordion_html", formtitle = 'method="POST" enctype="multipart/form-data"', method = "POST", fileupload="1", formid = "html_form_post_multipart", enctype="multipart/form-data" %]
+[% INCLUDE "Pages/formExamples/panel.html" parent = "accordion_html", formtitle = 'method="POST" enctype="application/x-www-form-urlencoded"', method = "POST", formid = "html_form_post" %]
+[% INCLUDE "Pages/formExamples/panel.html" parent = "accordion_html", formtitle = 'method="GET" enctype="application/x-www-form-urlencoded"', method = "GET", formid = "html_form_get" %]
+[% INCLUDE "Pages/formExamples/panel.html" parent = "accordion_html", formtitle = 'method="GET" enctype="text/plain"', method = "GET", enctype="text/plain", formid = "html_form_get_text" %]
+</div>

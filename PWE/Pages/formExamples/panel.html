@@ -1,0 +1,14 @@
+[% # Jedna polozka akordeonu (Bootstrap 5) s formularem; parent = id akordeonu %]
+<div class="accordion-item">
+    <h2 class="accordion-header" id="heading_[% formid %]">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_[% formid %]" aria-expanded="false" aria-controls="collapse_[% formid %]">[% formtitle %]</button>
+    </h2>
+    <div id="collapse_[% formid %]" class="accordion-collapse collapse" aria-labelledby="heading_[% formid %]" data-bs-parent="#[% parent %]">
+        <div class="accordion-body">
+            [% IF enable_ajax_form %]
+            <script>$(function() { AjaxFormAppender($("#[% formid %]")); });</script>
+            [% END %]
+            [% INCLUDE "Pages/formExamples/form.html" %]
+        </div>
+    </div>
+</div>

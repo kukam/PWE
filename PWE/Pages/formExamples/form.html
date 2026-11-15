@@ -1,0 +1,56 @@
+<form [% IF formid %]id="[% formid %]" [% END %]action="[% script_name %]?page=[% script_page %]&func=form" method="[% method %]" [% IF enctype %]enctype="[% enctype %]"[% END %]>
+   <input type="hidden" name="page" value="[% script_page %]" />
+   <input type="hidden" name="func" value="form" />
+  <div class="row mb-3">
+    <label for="[% formid %]_email" class="col-sm-2 col-form-label">Email</label>
+    <div class="col-sm-10">
+      <input type="email" class="form-control" id="[% formid %]_email" name="email" placeholder="Email" />
+    </div>
+  </div>
+  <div class="row mb-3">
+    <label for="[% formid %]_fullname" class="col-sm-2 col-form-label">[% rb.form_fullname %]</label>
+    <div class="col-sm-10">
+      <input type="text" class="form-control" id="[% formid %]_fullname" name="fullname" placeholder="[% rb.form_fullname %]" />
+    </div>
+  </div>
+  <div class="row mb-3">
+    <label for="[% formid %]_selectbox" class="col-sm-2 col-form-label">[% rb.form_selectbox %]</label>
+    <div class="col-sm-10">
+        <select name="selectbox" id="[% formid %]_selectbox" class="form-select">
+            <option>select1</option>
+            <option>select2</option>
+            <option>select3</option>
+            <option>select4</option>
+            <option>select5</option>
+        </select>
+    </div>
+  </div>
+  [% IF fileupload %]
+  <div class="row mb-3">
+    <label for="[% formid %]_file" class="col-sm-2 col-form-label">Upload</label>
+    <div class="col-sm-10">
+      <input type="file" class="form-control" id="[% formid %]_file" name="file_single" />
+    </div>
+  </div>
+  <div class="row mb-3">
+    <label for="[% formid %]_files" class="col-sm-2 col-form-label">Multi upload</label>
+    <div class="col-sm-10">
+      <input type="file" class="form-control" id="[% formid %]_files" name="file_multiple" multiple />
+    </div>
+  </div>
+  [% END %]
+  <div class="row mb-3">
+    <div class="offset-sm-2 col-sm-10">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="[% formid %]_checkbox" name="checkbox" value="Y">
+        <label class="form-check-label" for="[% formid %]_checkbox">[% rb.form_checkbox %]</label>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="offset-sm-2 col-sm-10">
+      <input type="submit" class="btn btn-primary" name="button1" value="[% rb.form_button %]1" />
+      <input type="submit" class="btn btn-outline-secondary" name="button2" value="[% rb.form_button %]2" />
+    </div>
+  </div>
+</form>

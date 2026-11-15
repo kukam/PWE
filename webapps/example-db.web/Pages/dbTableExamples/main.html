@@ -1,0 +1,12 @@
+<h1 class="border-bottom pb-2 mb-4">[% rb.h1 %]</h1>
+<h2 class="h4">[% rb.h2_form %]</h2>
+<div class="card mb-4">
+  <div class="card-body">
+[% INCLUDE "Pages/dbTableExamples/accountForm.html" formid="accountForm" %]
+  </div>
+</div>
+
+<h2 class="h4">[% rb.h2_table %]</h2>
+<div [% IF table.name %]id="[% table.name %]"[% ELSIF table.id %]id="[% table.id %]"[% END %] class="table-responsive">
+[% INCLUDE "Pages/dbTableExamples/accountTable.html" %]
+</div>

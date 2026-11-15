@@ -1,5 +1,28 @@
-version: "3.7"
-
+# Vyvojovy stack PWE: databaze (dle profilu) + 3x FastCGI engine + nginx na http://127.0.0.1:7778/.
+#
+#   PWE/tools/run-webapp.sh <web> [profil]                           # bezny zpusob (make run WEB=... PROFILE=...): nastavi
+#                                                                    # PWE_WEBAPP, COMPOSE_PROFILES i image podle aktualni vetve
+#   COMPOSE_PROFILES=mariadb docker compose up                       # vzorovy web s DB (webapps/example-db.web)
+#   PWE_WEBAPP=example.web COMPOSE_PROFILES=static docker compose up  # vzorovy web bez DB
+#
+# Koren repozitare je namountovan do /PWE: engine (adresar PWE/ v koreni repozitare) bezi z /PWE/PWE
+# (pracovni kopie), web z /PWE/webapps/${PWE_WEBAPP}. PWE_CONF_pwe_core = koren enginu, tedy /PWE/PWE.
+# Promenne environment maji prednost pred env_file i pred ENV zapecenym v image.
+# Cesty mountu jsou relativni k tomuto souboru (ne k aktualnimu adresari), takze stack jde spustit
+# i z podadresare repozitare.
+#
+# Image (PWE/docker/Dockerfile, sestaveni: make images; publikuje je workflow .github/workflows/images.yml):
+#   sluzba fcgi      ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-${COMPOSE_PROFILES:-mariadb}:${PWE_IMAGE_TAG:-master}
+#                    behove prostredi profilu (pwe-static | pwe-mariadb | pwe-mysql | pwe-postgres)
+#   sluzba debugger  ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-debugger:${PWE_IMAGE_TAG:-master}
+#                    vsechny DB ovladace + ladici nastroje (Perl::LanguageServer pro VS Code, klienti DB, cpanm...)
+#   PWE_IMAGE_REGISTRY  registr a jmenny prostor image (vychozi ghcr.io/kukam)
+#   PWE_IMAGE_TAG       tag image = nazev vetve (vychozi master). PWE/tools/run-webapp.sh (make run) ho nastavuje
+#                       na aktualni vetev gitu; pri primem volani docker compose ho zadej sam (prostredi nebo .env).
+# Image kod enginu NEOBSAHUJI - bezi vzdy pracovni kopie z mountu. Entrypoint maji uz ze zakladu pwe-base
+# (/usr/local/bin/entrypoint.sh = PWE/docker/entrypoint.sh): v pracovnim adresari webu (working_dir) podle
+# PWE_PROFILE nasmeruje conf/database.conf -> <profil>.conf, zalozi ramdisk/templates, sessions, uploadfile
+# a log a spusti command sluzby. Sluzby proto entrypoint nenastavuji.
 name: pwe
 
 services:
@@ -9,10 +32,16 @@ services:
     profiles:
       - postgres
     volumes:
-      - postgres:/var/lib/postgresql/data
+      # PostgreSQL 18+: image uklada data do /var/lib/postgresql/<major>/docker (PGDATA) a ocekava JEDEN mount
+      # na /var/lib/postgresql. Mount na puvodni /var/lib/postgresql/data image 18+ odmitne ("unused mount/volume",
+      # docker-library/postgres#1259) a kontejner se restartuje. Po prechodu image na dalsi hlavni verzi
+      # (postgres:latest 18 -> 19) je treba data prevest (pg_upgrade), nebo vyvojovou databazi zalozit znovu:
+      # make down WEB=... PROFILE=postgres ARGS=-v. Starsi image (postgres:17 a nize) maji PGDATA
+      # /var/lib/postgresql/data - pri pripnuti na starsi verzi vrat mount na tuto cestu.
+      - postgres:/var/lib/postgresql
       - /etc/localtime:/etc/localtime:ro
     env_file:
-      - ./LXC/docker-compose_postgres.env
+      - ./docker-compose/docker-compose_postgres.env
     ports:
       - "${DATABASE_PUB_PORT:-7775}:5432"
 
@@ -25,7 +54,7 @@ services:
       - mariadb:/var/lib/mysql
       - /etc/localtime:/etc/localtime:ro
     env_file:
-      - ./LXC/docker-compose_mariadb.env
+      - ./docker-compose/docker-compose_mariadb.env
     ports:
       - "${DATABASE_PUB_PORT:-7776}:3306"
 
@@ -38,12 +67,13 @@ services:
       - mysql:/var/lib/mysql
       - /etc/localtime:/etc/localtime:ro
     env_file:
-      - ./LXC/docker-compose_mysql.env
+      - ./docker-compose/docker-compose_mysql.env
     ports:
       - "${DATABASE_PUB_PORT:-7777}:3306"
 
   fcgi:
-    image: kukam/pwe-${COMPOSE_PROFILES:-mariadb}:latest
+    # behove prostredi profilu (Perl + knihovny enginu + DB ovladac), bez kodu enginu - ten je v mountu /PWE
+    image: ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-${COMPOSE_PROFILES:-mariadb}:${PWE_IMAGE_TAG:-master}
     restart: unless-stopped
     deploy:
       replicas: 3
@@ -54,17 +84,24 @@ services:
       - postgres
     stdin_open: true
     tty: true
+    working_dir: /PWE/webapps/${PWE_WEBAPP:-example-db.web}
+    command: ["perl", "/PWE/PWE/pwe.fcgi"]
     environment:
       PWE_PROFILE: ${COMPOSE_PROFILES:-mariadb}
+      PWE_CONF_pwe_home: /PWE/webapps/${PWE_WEBAPP:-example-db.web}
+      PWE_CONF_pwe_core: /PWE/PWE
     env_file:
-      - ./LXC/docker-compose_common.env
-      - ./LXC/docker-compose_${COMPOSE_PROFILES:-mariadb}.env
+      - ./docker-compose/docker-compose_common.env
+      - ./docker-compose/docker-compose_${COMPOSE_PROFILES:-mariadb}.env
+      # volitelne lokalni promenne webu (SMTP ucet, hesla, PWE_CONF_*): webapps/<web>/conf/local.env, neni v gitu
+      - path: ./webapps/${PWE_WEBAPP:-example-db.web}/conf/local.env
+        required: false
     volumes:
-      - ${PWD}:/PWE # Devel PWE
-      - uploadfile:/PWE/webapps/static.example.web/uploadfile
-      - sessions:/PWE/webapps/static.example.web/sessions
-      - uploadfile:/PWE/webapps/generic.example.web/uploadfile
-      - sessions:/PWE/webapps/generic.example.web/sessions
+      - .:/PWE # Devel PWE (engine i weby z pracovni kopie)
+      - uploadfile:/PWE/webapps/${PWE_WEBAPP:-example-db.web}/uploadfile
+      - sessions:/PWE/webapps/${PWE_WEBAPP:-example-db.web}/sessions
+      # casove pasmo hostitele i pro requesty: FastCGI pri kazdem requestu nahradi %ENV promennymi
+      # od nginx, takze promenna TZ by platila jen pri startu enginu, ne pro casy v requestu
       - /etc/localtime:/etc/localtime:ro
 
   webproxy:
@@ -86,51 +123,77 @@ services:
     environment:
       MY_IP: ${MY_IP:-10.10.10.10}
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-mariadb}
+      PWE_WEBAPP: ${PWE_WEBAPP:-example-db.web}
     command: /bin/bash -c 'eval "cat <<< \"$(</etc/nginx/default.conf.template)\"" > /etc/nginx/conf.d/default.conf && sleep 2 && nginx -g "daemon off;"'
     ports:
       - "${WEBSERVER_PUB_PORT:-7778}:80"
     volumes:
+      - ./PWE/assets:/PWE/PWE/assets:ro        # statika enginu (PWE/assets) primo z nginx
+      - ./webapps:/PWE/webapps:ro              # static/ a assets/ webu primo z nginx
+      - uploadfile:/PWE/webapps/${PWE_WEBAPP:-example-db.web}/uploadfile:ro   # nahrane soubory (obrazky produktu) primo z nginx
       - /etc/localtime:/etc/localtime:ro
 
-  debugger:
-    image: kukam/pwe-${COMPOSE_PROFILES:-mariadb}:latest
+  mailpit:
+    # Vyvojovy SMTP server s webovym rozhranim (http://127.0.0.1:8025): zachyti e-maily z fronty Services::Email.
+    # Web ho pouzije pres conf smtp_primary => { host => "mailpit", port => 1025 }.
+    image: axllent/mailpit:latest
     restart: unless-stopped
-    stdin_open: true
-    tty: true
-    command: "sleep infinity"
-    # networks:
-    #   - default
-    #   - debug
     profiles:
       - static
       - mysql
       - mariadb
       - postgres
+    ports:
+      - "${MAILPIT_PUB_PORT:-8025}:8025"
+
+  debugger:
+    # ladici kontejner (VS Code se do nej pripojuje): vsechny DB ovladace + Perl::LanguageServer a nastroje
+    image: ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-debugger:${PWE_IMAGE_TAG:-master}
+    restart: unless-stopped
+    # init jako PID 1: sleep infinity sam na SIGTERM nereaguje a zastaveni by cekalo na timeout (SIGKILL)
+    init: true
+    stdin_open: true
+    tty: true
+    command: "sleep infinity"
+    profiles:
+      - static
+      - mysql
+      - mariadb
+      - postgres
+    working_dir: /PWE/webapps/${PWE_WEBAPP:-example-db.web}
     environment:
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-mariadb}
+      PWE_PROFILE: ${COMPOSE_PROFILES:-mariadb}
+      PWE_CONF_pwe_home: /PWE/webapps/${PWE_WEBAPP:-example-db.web}
+      PWE_CONF_pwe_core: /PWE/PWE
     env_file:
-      - ./LXC/docker-compose_common.env
-      - ./LXC/docker-compose_${COMPOSE_PROFILES:-mariadb}.env
+      - ./docker-compose/docker-compose_common.env
+      - ./docker-compose/docker-compose_${COMPOSE_PROFILES:-mariadb}.env
+      # stejne lokalni promenne webu jako sluzba fcgi, aby ladeny proces bezel se stejnou konfiguraci
+      - path: ./webapps/${PWE_WEBAPP:-example-db.web}/conf/local.env
+        required: false
     volumes:
-      - ${PWD}:/PWE # Devel PWE
-      - uploadfile:/PWE/webapps/static.example.web/uploadfile
-      - sessions:/PWE/webapps/static.example.web/sessions
-      - uploadfile:/PWE/webapps/generic.example.web/uploadfile
-      - sessions:/PWE/webapps/generic.example.web/sessions
+      - .:/PWE # Devel PWE
+      - uploadfile:/PWE/webapps/${PWE_WEBAPP:-example-db.web}/uploadfile
+      - sessions:/PWE/webapps/${PWE_WEBAPP:-example-db.web}/sessions
+      # casove pasmo hostitele i pro requesty: FastCGI pri kazdem requestu nahradi %ENV promennymi
+      # od nginx, takze promenna TZ by platila jen pri startu enginu, ne pro casy v requestu
       - /etc/localtime:/etc/localtime:ro
 
+# Volumes jsou pojmenovane podle webu (PWE_WEBAPP): kazdy web ma vlastni databazi i uploady,
+# prepnuti na jiny web (make run WEB=...) tedy nesdili data. Smazani: make down WEB=... ARGS=-v
 volumes:
-  uploadfile: # folder for uploadfile
-  sessions:   # folder for sessions
-  mysql:      # MySQL volume
-  mariadb:    # MariaDB volume
-  postgres:   # Postgres volume
+  uploadfile:
+    name: pwe_uploadfile_${PWE_WEBAPP:-example-db.web}
+  sessions:
+    name: pwe_sessions_${PWE_WEBAPP:-example-db.web}
+  mysql:
+    name: pwe_mysql_${PWE_WEBAPP:-example-db.web}
+  mariadb:
+    name: pwe_mariadb_${PWE_WEBAPP:-example-db.web}
+  postgres:
+    name: pwe_postgres_${PWE_WEBAPP:-example-db.web}
 
 configs:
   nginx_config:
-    file: ./LXC/docker-compose_nginx.conf
-
-# networks:
-#   debug:
-#     name: perl_language_server
-#     external: true
+    file: ./docker-compose/docker-compose_nginx.conf

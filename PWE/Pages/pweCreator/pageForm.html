@@ -1,0 +1,37 @@
+<form [% IF formid %]id="[% formid %]" [% END %]action="[% script_name %]?page=[% script_page %]&func=default" method="POST">
+   <input type="hidden" name="page" value="[% script_page %]" />
+   <input type="hidden" name="func" value="cpage" />
+  <div class="row mb-3">
+    <label for="[% formid %]_pagename" class="col-sm-2 col-form-label">[% rb.form_name_page %]</label>
+    <div class="col-sm-10">
+      <input type="text" class="form-control" id="[% formid %]_pagename" name="pagename" placeholder="[% rb.form_name_page_placeholder %]" />
+    </div>
+  </div>
+  <div class="row mb-3">
+    <div class="col-sm-2 col-form-label">[% rb.form_def_site %]</div>
+    <div class="col-sm-10 pt-2">
+      [% FOREACH site = sites_list %]
+         <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="default_site" id="[% formid %]_site_[% site %]" value="[% site %]">
+            <label class="form-check-label" for="[% formid %]_site_[% site %]">[% site %]</label>
+         </div>
+      [% END %]
+    </div>
+  </div>
+  <div class="row mb-3">
+    <div class="col-sm-2 col-form-label">[% rb.form_def_services %]</div>
+    <div class="col-sm-10 pt-2">
+      [% FOREACH service = services_list %]
+         <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="default_service" id="[% formid %]_service_[% service %]" value="[% service %]">
+            <label class="form-check-label" for="[% formid %]_service_[% service %]">[% service %]</label>
+         </div>
+      [% END %]
+    </div>
+  </div>
+  <div class="row">
+    <div class="offset-sm-2 col-sm-10">
+      <input type="submit" class="btn btn-primary" name="button" value="[% rb.form_button_page %]" />
+    </div>
+  </div>
+</form>

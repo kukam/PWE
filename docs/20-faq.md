@@ -1,0 +1,78 @@
+# 20 — Časté problémy a známá omezení
+
+## Diagnostika podle projevu
+
+| Projev | Příčina → řešení |
+| --- | --- |
+| stránka vrací **404** | název adresáře ≠ název `.pm` ≠ poslední část `package`; akce není v `$self->{'func'}`; modul přidán za běhu → `make restart`; stránka enginu není v `pwe.core_pages` |
+| **401** | akce/stránka má skupinu (`['admin']`) a uživatel ji nemá (není přihlášen; `pwe.development` ve vygenerované službě); `..` v cestě ke statice; cesta mimo `pwe.assets_dir` |
+| `pweCreator` založení stránky/služby vrací **401**, přestože jsem admin | generátor zapisuje soubory jen při `pwe.development => 1` (produkce = `make module` v kontejneru); **400** = název není identifikátor (písmeno, pak písmena/číslice/podtržítko, max. 64 znaků) |
+| po přihlášení zůstává stejná cookie / sid | služba účtu nevolá `$SESSION->regenerate()` (bez DB `$USER->regenerateSid()`) — engine sid po přihlášení sám nemění ([11](11-uzivatele-a-prava.md#session-cookie)) |
+| AJAX formulář po odeslání odroluje stránku nahoru | engine < 2.2.0 roloval po každém úspěchu; od 2.2.0 jen podle messengeru v odpovědi → `setMessenger(..., disable_scrolltomessenger => 1)` u akcí typu „do košíku“ |
+| tabulka `session` roste (řádky bez cookie: cron přes `curl`, roboti) | engine ≥ 2.2.0 maže expirované řádky při každé cca 20. nové session (`http.session_cleanup_every`); ve starší verzi `DELETE FROM session WHERE expire < <unix čas>` z cronu |
+| **500** | metoda spadla — `make logs` (`PAGE : x [ CRASHED ]` + chyba); `perl -c` přes `make check`; po pádu engine modul znovu načte, ale **nerekompiluje** → po opravě `make restart`; chybí metoda uvedená v `error` |
+| **400** z AJAXu | validační chyba — messenger říká která; prázdný text = chybí klíč v `rb*.tmpl` |
+| `[msg.klic]` v messengeru | chybí `rb.msg.klic` v `rb.tmpl`/`rb_<LANG>.tmpl` (zkontroluj i koncový prázdný řádek a `PROCESS templates/resource_bundle.tmpl` v šabloně) |
+| texty prázdné, menu bez popisků | rb soubor nekončí prázdným řádkem; šablona nemá `[% PROCESS templates/resource_bundle.tmpl %]`; fragment renderovaný AJAXem ho nemá sám |
+| `Registred service object X not exist!` | stránka/vzhled injektuje službu nebo vzhled, který není ve webu ani v `pwe.core_services`/`core_sites` → doplň seznam nebo modul |
+| `Unknown DAO MAP dbid:db1, table:x` | tabulka neexistuje → chybí migrace v `conf/<driver>.dbversion`, nebo zastaralý `conf/*_daomap.dump` (smaž) |
+| entita se nenačte, `loading entity: failed construction` | totéž; nebo web bez DB má entity v `core_entities` |
+| `Web vyzaduje engine PWE >=X` | `pwe.require_core` vyšší než `PWE/VERSION` → povyš engine nebo sniž požadavek |
+| POST formulář skončí na úvodní stránce | `page`/`func` nejsou ani v těle POST requestu, ani v query stringu → skrytá pole (engine ≥ 2.2.0 bere cíl i z URL) |
+| AJAX formulář nic nedělá | formulář nemá `id`; `AjaxFormAppender` volán před načtením DOM (použij `$(function(){…})`); chybí `pwe.js`/`ajaxprogress.js` v hlavičce |
+| AJAX odpověď se nezobrazí | element s daným `ajax_id` v HTML není; `printHttpHeader('type' => 'ajax')` chybí (klient čeká `text/xml`) |
+| messenger se nezobrazí po redirectu | web s DB bez vlastních `setMessenger/getMessenger` ve vzhledu (ukládá do opts, ale `save_opt_to = db`) → vzhled z generátoru je má |
+| v šabloně se objevují proměnné z jiné stránky nebo cizí data | šablona mění živý `$stash` v `[% PERL %]` bloku (engine od 2.2.0 stash po renderu obnoví, ale ve starší verzi to proměnné „prolévalo“ mezi requesty) → `$stash` jen číst |
+| změna šablony se neprojevila | `tmpl.cache` + stejný mtime; smaž `ramdisk/templates/` |
+| změna `.pm` se neprojevila | moduly se načítají při startu → `make restart` |
+| `static/...` vrací 401 | adresář není v `pwe.assets_dir`; compose ho přepisuje v `docker-compose/docker-compose_common.env` |
+| statika 404 přes nginx, přes engine funguje | nginx `root` míří jinam (`PWE_WEBAPP` v compose); soubor není ve `static/`/`assets/` |
+| engine načetl cizí web / čeká na socket | image vlastního webu má zapečené `PWE_CONF_pwe_home` svého webu, všechny image navíc `PWE_CONF_pwe_core=/PWE/PWE` (z `pwe-base`); `FCGI_SOCKET_PATH=:7779` mají až kontejnery compose stacku (`docker-compose/docker-compose_common.env`) → používej `make run`/`make cgi`, které proměnné přepisují nebo odstraňují; při ručním běhu v kontejneru stacku nejdřív `. vars` nebo `unset FCGI_SOCKET_PATH`, jinak engine místo jednoho CGI requestu začne poslouchat na socketu. (Historické image `kukam/pwe-<profil>` z Docker Hubu měly zapečený vzorový web; dnešní `pwe-<profil>` žádný web neobsahují) |
+| `pull access denied`, `manifest unknown`, u `ghcr.io` také `denied` (`error from registry: denied` při `docker run`/`pull`) nebo `403 Forbidden` (`failed to fetch anonymous token … 403 Forbidden` při `docker build`) pro `ghcr.io/kukam/pwe-*:<větev>` při `make run`, `make test`, `make check`, … | image mají tag podle větve gitu a pro tvou větev v registru nejsou (pipeline pro ni ještě neběžela), nebo jsou balíčky soukromé a Docker není přihlášen → sestav je lokálně `make images`, nebo použij image větve `master`, jsou-li publikované: `PWE_IMAGE_TAG=master make run …`; soukromé balíčky: `docker login ghcr.io` ([17 — Nasazení](17-nasazeni.md#výběr-image-v-nástrojích)). Při sestavení image webu (`docker build … -f webapps/<web>/Dockerfile .`) totéž znamená: (a) `FROM` míří na tag, který nemáš ani lokálně (výchozí `PWE_IMAGE_TAG` je `master`) → `--build-arg PWE_IMAGE_TAG=<větev>`; (b) nestavíš prostým `docker build`, ale přes `docker buildx build` (nebo s proměnnou `BUILDX_BUILDER` či po `docker buildx install`) builderem typu `docker-container`, který lokálně sestavené image nevidí → prostý `docker build`, nebo `docker buildx build --builder <builder s ovladačem docker> --load …` (název ukáže `docker buildx ls`; [17 — Nasazení](17-nasazeni.md#image-vlastního-webu)) |
+| po znovuvytvoření kontejnerů `fcgi`/`debugger` (např. `make run` po `make images`) končí requesty chybou spojení, nebo `/debug.cgi` obslouží běžný proces `fcgi` místo debuggeru | nginx si adresy kontejnerů přeložil jen při svém startu a posílá requesty na staré → aktuální `docker-compose/docker-compose_nginx.conf` má upstreamy s `resolve` a `resolver 127.0.0.11`, takže změnu zachytí sám (se starší konfigurací `docker compose restart webproxy`); vlastní konfiguraci nginx uprav stejně ([17 — Nasazení](17-nasazeni.md#nginx-docker-composedocker-compose_nginxconf)) |
+| `Can't locate DBD/mysql.pm` / `install_driver(mysql) failed` (obdobně `DBD/Pg.pm`) | DB ovladače jsou jen v profilových image: web s databází běží v `pwe-static` nebo v image jiného profilu → `make run WEB=<web> PROFILE=mariadb`, v `Dockerfile` webu správný `PWE_PROFILE` ([17 — Nasazení](17-nasazeni.md#image)) |
+| `Can't open perl script "/PWE/core/pwe.fcgi"`, nebo statika enginu (`/assets/…`) vrací 404 | web, image nebo nginx ještě počítá se starým názvem adresáře enginu `core/` (do verze 2.1.0); engine je v `PWE/`, v kontejneru `/PWE/PWE` → oprav cesty a znovu sestav image ([17 — Nasazení](17-nasazeni.md#přechod-z-rozložení-s-adresářem-core)) |
+| `Can't open perl script "/PWE/PWE/pwe.fcgi"` | v kontejneru není kód enginu: (a) image webu má starý `Dockerfile` postavený jen na základu — dnešní `pwe-base` ani `pwe-<profil>` engine neobsahují → použij aktuální šablonu, která engine kopíruje z image `pwe` ([17 — Nasazení](17-nasazeni.md#přechod-ze-starého-uspořádání-image)); (b) image `pwe-<profil>` nebo `pwe-debugger` běží bez repozitáře namountovaného do `/PWE`; (c) web s novými cestami běží nad historickým image z Docker Hubu (engine v `/PWE/core`) |
+| profil `mysql`: procesy `fcgi` se restartují, v logu `Connect to mysql dbid:db1 connect_status:0` (engine ≥ 2.2.0 navíc `error:2061 Authentication plugin 'caching_sha2_password' reported error: Authentication requires secure connection.`) | MySQL 8+ odmítá ověřit heslo po nešifrovaném spojení. Engine < 2.2.0 → povyš engine (od 2.2.0 se po této chybě připojí přes TLS sám). Engine ≥ 2.2.0 tu hlášku zapíše jen tehdy, když záložní pokus nesmí proběhnout: `dsn_options` obsahuje `mysql_ssl=0` → volbu odstraň nebo nastav `dsn_options => "mysql_ssl=1"`. Jiná chyba v logu (`error:<kód> …`, např. `error:1045 Access denied…` = špatné heslo) je už chyba šifrovaného pokusu ([09](09-databaze-a-entity.md#šifrované-spojení-a-volby-dsn-dsn_options)) |
+| kontejner `postgres` se restartuje, `docker logs pwe-postgres-1`: `Error: in 18+, these Docker images are configured to store database data in a format which is compatible with "pg_ctlcluster"…` | image PostgreSQL 18+ čeká volume na `/var/lib/postgresql`. `… PostgreSQL data in: /var/lib/postgresql/data (unused mount/volume)` = compose mountuje volume na starou cestu → aktuální `docker-compose.yml` (engine ≥ 2.2.0) má `postgres:/var/lib/postgresql`, ve vlastním compose mount oprav. `… PostgreSQL data in: /var/lib/postgresql` nebo `…/<starší verze>/docker` = ve volume jsou data starší hlavní verze → vývojovou DB založ znovu (`make down WEB=<web> PROFILE=postgres ARGS=-v`, pak `make run`; data se smažou, schéma vytvoří migrace), nebo data převeď (`pg_upgrade`, dump a obnova) |
+| při startu stacku je v logu `fcgi` několikrát `[E] … connect_status:0 error:… Can't connect to MySQL server` / `Connection refused` nebo `Dbversion is locked by lockid:…` | databáze ještě startuje, resp. migraci právě provádí jiný proces — engine to zkouší `trayconnect`-krát po 1 s; po vyčerpání pokusů proces skončí a Docker ho restartuje ([17 — Vývojový stack](17-nasazeni.md#vývojový-stack-docker-composeyml)) |
+| po přepnutí na jiný web stará databáze | volumes jsou pojmenované podle webu; starší verze compose je sdílela → `make down WEB=<web> ARGS=-v` |
+| migrace se neprovedla | číslo klíče ≤ uložené `dbversion` (upravený starý příkaz se znovu nespustí) → nové číslo; chyba SQL → log, engine nenastartuje |
+| `Couldn't load any row (CREATE NEW EMPTY ROW)` v logu | `[I]`, normální u vzoru „načti nebo založ“ (session, dbtable) |
+| `[E] Not-defined input parameter` / `Invalid rule` / `Invalid input parameter` | validační chyba vstupu uživatele, ne chyba enginu |
+| `Not-defined input parameter … ajax_request`? | ne — `ajax_request` nevaliduj; `defined` jen pro parametry formuláře |
+| `Can't locate Template.pm` na hostiteli | hostitelský Perl nemá závislosti → nástroje se spouštějí v kontejneru (`make …`) |
+| modul nebo program, který dřív v image byl, chybí (`lessc`, `IO::AIO`, `cpanm`, `gcc`, `Can't locate LWP/UserAgent.pm`, `Data/UUID.pm`, `Data/GUID.pm`, `Crypt/OpenSSL/X509.pm`, `curl: not found`; v `fcgi` kontejneru `Perl::LanguageServer`, `perlcritic`, klient databáze) | základ `pwe-base` nese jen běhové knihovny enginu a několik knihoven, které weby v repozitáři používají (od 15. 11. 2026 bez `libwww-perl`, `liblwp-protocol-https-perl`, `libdata-uuid-perl`, `libdata-guid-perl`, `libcrypt-openssl-x509-perl` a `curl`); ladicí a build nástroje včetně `curl` jsou v `pwe-debugger` → knihovnu pro web přidej do `Dockerfile` webu ([17 — Nasazení](17-nasazeni.md#přidání-knihovny)), HTTPS volání přepiš na `HTTP::Tiny`, nebo nainstaluj `libwww-perl` + `liblwp-protocol-https-perl`; ladicí příkazy spouštěj v kontejneru `pwe-debugger-1` |
+| čas v logu nebo ve webu je o hodinu či dvě posunutý (často jen během požadavků, řádky ze startu enginu sedí) | image běží v UTC a proměnná `TZ` kontejneru platí jen při startu — FastCGI při každém požadavku nahradí prostředí parametry od webserveru. Pásmo předej z webserveru (`fastcgi_param TZ Europe/Prague;`) nebo nastav `/etc/localtime` kontejneru ([17 — Časové pásmo](17-nasazeni.md#časové-pásmo)) |
+| při startu kontejneru `[entrypoint] VAROVANI: …` | `PWE_PROFILE` neodpovídá webu: neznámá hodnota (překlep, velká písmena), databázový profil u webu bez `conf/<profil>.conf` (např. `make run WEB=example.web PROFILE=mariadb`), `conf/` jen pro čtení, nebo profil `static` a v `conf/` zůstal symlink `database.conf`. Start pokračuje → spusť web se správným profilem (web bez databáze `PROFILE=static`) ([17 — Nasazení](17-nasazeni.md#co-je-v-pwe-base)) |
+| `make run`: `Neznamy profil nebo prikaz '…'` / `[run-webapp] POZOR: …` | překlep v `PROFILE` (platné jsou `static`, `mariadb`, `mysql`, `postgres`, malými písmeny), resp. profil neodpovídá `conf/` webu ([16 — Nástroje](16-nastroje.md#pwetoolsrun-webappsh--spuštění-přes-docker-compose)) |
+| `make cgi`: `[pwe-cgi] bezi stack webu X, ne Y …`, kód 2 | běží compose stack jiného webu; web s databází se k jeho databázi nepřipojí (zapsal by do ní své migrace) → `make run WEB=Y` (nebo stack zastav: `make down WEB=X`) |
+| `make test` čeká: `[run-tests] nad touto pracovni kopii bezi jiny beh testu … cekam` | nad stejnou pracovní kopií běží jiný `make test` (zámek `PWE/t/.run-tests.lock`); počkej, nebo `PWE_TEST_LOCK_WAIT=0` (hned kód 2). Opuštěný zámek se převezme sám; zbylou značku `takeover` smaž ručně ([18 — Testy](18-testy.md#souběžné-běhy-zámek-pracovní-kopie)) |
+| `PWE_IMAGE_TAG='feature/x' neni platny tag image` | `PWE_IMAGE_TAG` musí být už převedený tag → `bash PWE/tools/lib/images.sh pwe_image_tag_sanitize 'feature/x'` (dá `feature-x`) |
+| `make images ARGS=--push`: `Pracovni kopie ma necommitnute zmeny`, `Nelze urcit vetev gitu` nebo `Tag … ma tvar verze X.Y.Z` | pojistky publikace: commitni (nebo vědomě `--allow-dirty`), v odpojeném `HEAD` zadej `PWE_IMAGE_TAG=<tag>`, větev pojmenovanou jako verze přejmenuj (`release-2.1.0`) ([17 — Nasazení](17-nasazeni.md#lokální-sestavení)) |
+| `make new` / `make module`: `Zadej web vyslovne: make new WEB=<nazev>.web …` | `WEB` je u cílů, které zapisují do webu, povinný → `make new WEB=mujweb.web …` |
+| vzhled bez CSS, holé HTML | web nemá vlastní `Sites/Default` (použila se fasáda enginu) nebo stránka nemá `Site_Default` |
+| cookie se neukládá | `http.cookie_name` prázdné/kolidující; domain je `HTTP_HOST` bez portu (`127.0.0.1` funguje, `localhost` vs `127.0.0.1` jsou různé) |
+| e-mail report se neodesílá | `pwe.smtp_servers` prázdné nebo sekce `smtp_<nazev>` chybí; stejná chyba se hlásí nejvýše jednou za `log.error_report_interval` |
+| velký upload → 413 | `pwe.cgi_maxfilesize`; nginx `client_max_body_size` |
+
+## Známá omezení enginu
+
+- **Reload po pádu nerekompiluje kód** (`%INC`); oprava zdrojáku vyžaduje restart procesu.
+- Podporované DB drivery: `mysql`, `mariadb`, `postgres`. Driver `oracle` není k dispozici.
+- `Libs::Validate::is_zipcode($null, $value)` má obrácené pořadí argumentů — v `rules` nepoužitelná.
+- `is_date` z vendorované `Data::Validate::MySQL` přijímá i neexistující data (2023-02-29).
+- Moduly v `Libs/` nepoužívají `use warnings`.
+- `templates/messenger.html` používá klíče `messanger_*` (historický překlep, záměrně ponecháno).
+- Validační chyby vstupu se logují úrovní `[E]`.
+- Postgres: `getMetaData` může u sloupce PK s cizími klíči jiných tabulek ztratit příznak
+  `COLUMN_PRIMARY` (podle pořadí řádků `constraint_column_usage`); volba `encoding` se neaplikuje;
+  ENUM se nevaliduje.
+- `validate_decimal_vat` porovnává řetězcově (`1.10` neprojde).
+- Chybí testy nad skutečnou DB (DAO testováno nad mockem, zbytek integračně).
+- `Services::DBTable` a `Services::Email` jsou testovány jen nad mock entitami.
+- Cache `Template` objektů a `daomap_file` se obnoví až restartem procesu.
+- Služba `UserAccount` enginu je jen ukázka; skutečné přihlášení si web píše sám ([11](11-uzivatele-a-prava.md)).
+- Session fixation: engine ověří jen tvar cookie (`C0`/`C1` + 32 hex); výměnu sid po přihlášení
+  (`Services::Session::regenerate`) musí zavolat služba účtu webu, automaticky se neděje.
+- `pweCreator` je vývojový nástroj (401 mimo `pwe.development`); kostru pro produkci generuj `make module`.
