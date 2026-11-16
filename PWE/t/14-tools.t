@@ -307,12 +307,12 @@ sub dockerignore_excludes {
     is(PWE::ToolEnv::dockerfile_base($_), 'pwe-${PWE_PROFILE}', "dockerfile_base($_) = pwe-\${PWE_PROFILE}") foreach (qw(mariadb mysql postgres));
     ok(!defined(eval { PWE::ToolEnv::dockerfile_base('oracle') }), 'dockerfile_base(): neznamy profil -> die');
     # polozky korene enginu, ktere patri do image webu: vse krome t (testy), docker (sestaveni image) a skrytych
-    is_deeply([PWE::ToolEnv::engine_image_excludes()], [qw(t docker)], 'engine_image_excludes(): do image webu nepatri PWE/t a PWE/docker');
+    is_deeply([PWE::ToolEnv::engine_image_excludes()], [qw(t docker tools)], 'engine_image_excludes(): do image webu nepatri PWE/t, PWE/docker a PWE/tools');
     {
         my @entries = PWE::ToolEnv::engine_image_entries();
         my %entry   = map { $_ => 1 } @entries;
-        ok(!(grep { !$entry{$_} } qw(pwe.fcgi debug.cgi VERSION Libs Pages Sites Services Entities templates assets tools)), 'engine_image_entries(): obsahuje soubory a adresare enginu (pwe.fcgi, VERSION, Libs, Pages, tools, ...)') or diag("@entries");
-        ok(!$entry{'t'} && !$entry{'docker'} && !(grep { /^\./ } @entries), 'engine_image_entries(): bez t, docker a skrytych polozek');
+        ok(!(grep { !$entry{$_} } qw(pwe.fcgi debug.cgi VERSION Libs Pages Sites Services Entities templates assets)), 'engine_image_entries(): obsahuje soubory a adresare enginu (pwe.fcgi, VERSION, Libs, Pages, ...)') or diag("@entries");
+        ok(!$entry{'t'} && !$entry{'docker'} && !$entry{'tools'} && !(grep { /^\./ } @entries), 'engine_image_entries(): bez t, docker, tools (nastroje pro vyvojare v image nejsou) a skrytych polozek');
         is_deeply(\@entries, [sort @entries], 'engine_image_entries(): serazeny seznam');
         my $fake = "$base/engine-entries";
         make_path("$fake/Libs", "$fake/Nova", "$fake/t", "$fake/docker", "$fake/.git");

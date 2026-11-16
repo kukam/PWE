@@ -101,9 +101,10 @@ ALL_IMAGES="${ALL_IMAGES% }"
 STATIC_WEB="example.web"
 DB_WEB="example-db.web"
 
-# Polozky korene enginu (PWE/), ktere do image nepatri: testy a sestaveni zavislostnich image. Stejny seznam ma
+# Polozky korene enginu (PWE/), ktere do image nepatri: testy, sestaveni zavislostnich image a nastroje
+# pro vyvojare (bezi na hostiteli nebo nad namountovanym repozitarem, engine je za behu nepotrebuje). Stejny seznam ma
 # PWE::ToolEnv::engine_image_excludes (hlida PWE/t/21-image-tools.t); Dockerfile webu je nekopiruje.
-ENGINE_EXCLUDES="t docker"
+ENGINE_EXCLUDES="t docker tools"
 
 # Perl moduly, ktere musi jit nacist v pwe-base a tim i ve vsech ostatnich image (jadro enginu, e-maily,
 # knihovny slibene kodu webu). Seznam odpovida balickum stage base v PWE/docker/Dockerfile.
@@ -780,13 +781,13 @@ check_engine() {
     check "$name" "perl -c pwe.fcgi" perl -c /PWE/PWE/pwe.fcgi
     # (SC2086: seznam ENGINE_EXCLUDES se ma rozdelit na jednotlive argumenty)
     # shellcheck disable=SC2016,SC2086
-    check "$name" "obsah /PWE (LICENSE, PWE, webapps) a /PWE/PWE (soubory a adresare enginu, bez t/ a docker/)" sh -c '
+    check "$name" "obsah /PWE (LICENSE, PWE, webapps) a /PWE/PWE (soubory a adresare enginu, bez t/, docker/ a tools/)" sh -c '
         rc=0
         cd /PWE/PWE || { echo "chybi adresar /PWE/PWE"; exit 1; }
         for f in pwe.fcgi debug.cgi VERSION favicon.ico README.md CHANGELOG.md /PWE/LICENSE; do
             [ -f "$f" ] || { echo "chybi soubor $f"; rc=1; }
         done
-        for d in Libs Pages Sites Services Entities templates assets tools; do
+        for d in Libs Pages Sites Services Entities templates assets; do
             [ -d "$d" ] || { echo "chybi adresar $d"; rc=1; }
         done
         for x in "$@"; do

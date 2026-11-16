@@ -793,6 +793,22 @@ case "$CMD" in
         need_helm
         need_context
         set_dry_run "$@"
+        # helm uninstall bere kazdy argument bez pomlcky jako DALSI release: "delete static pwe-generic"
+        # by odinstaloval i release, jehoz soubor s hesly pojistka nize nekontroluje. Povolene jsou jen
+        # prepinace; hodnota oddelena mezerou se preskoci u prepinacu helm uninstall, ktere hodnotu maji.
+        skip_value=0
+        for arg in "$@"; do
+            if [ "$skip_value" = 1 ]; then
+                skip_value=0
+                continue
+            fi
+            case "$arg" in
+                --cascade | --description | --timeout | --burst-limit | --qps | --registry-config | --repository-cache | --repository-config)
+                    skip_value=1 ;;
+                -*) ;;
+                *) die "delete: argument '$arg' by helm vzal jako dalsi release k odinstalovani - odinstalovava se jen release $RELEASE; dalsi nasazeni odinstaluj zvlast (make k8s-delete K8S=<nazev>)" ;;
+            esac
+        done
         # Hesla databaze jsou jen v souboru secrets-<nazev>.yml a v releasu. Kdyz soubor na tomto stroji
         # chybi, odinstalovani by smazalo jejich posledni kopii, zatimco svazek databaze zustava - data by
         # pak byla bez zasahu primo do databaze nedostupna. (Deploy ma pro zrcadlovy pripad release_in_cluster.)

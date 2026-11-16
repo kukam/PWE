@@ -114,7 +114,7 @@ v `docs/03-struktura-webu.md`, „Zámek migrace“, a `docs/17-nasazeni.md`, �
   zrušených image v registru nic nemaže — smazat ručně.
 - **`Dockerfile` webu = závislostní image + engine z repozitáře + web.** Jediný `FROM` `pwe-<profil>:<tag>`
   (web bez databáze `pwe-base:<tag>`; výchozí `PWE_IMAGE_TAG=latest`), engine `COPY --link` z kontextu
-  sestavení (položky `PWE/` kromě `PWE/t` a `PWE/docker`) do `/PWE/PWE`, jediný `RUN` (pracovní adresáře
+  sestavení (položky `PWE/` kromě `PWE/t`, `PWE/docker` a `PWE/tools`) do `/PWE/PWE`, jediný `RUN` (pracovní adresáře
   a `conf/database.conf`); popisek `version` vyprazdňuje. Sestavuje se **vždy z kořene repozitáře**; verzi
   enginu v image určuje pracovní kopie, `PWE_IMAGE_TAG` vybírá jen závislostní image. Argument
   `PWE_ENGINE_TAG`, druhý `FROM` s image `pwe` a `COPY --from=engine` zanikly. Šablona je jen
@@ -192,6 +192,11 @@ v `docs/03-struktura-webu.md`, „Zámek migrace“, a `docs/17-nasazeni.md`, �
     `KUBE_CONTEXT` a `K8S_NAMESPACE`, skript před spuštěním ruší a oznámí to. Neznámá hodnota `--dry-run` se
     odmítne;
   - `make k8s-image` odmítne `Dockerfile` webu ze starší šablony ještě před sestavením.
+
+- Nástroje pro vývojáře (`PWE/tools`) už nejsou součástí image webu (engine je za běhu nepotřebuje) a spolu
+  s testy (`PWE/t`) přestaly být vstupem image: změna skriptu nebo testu spouští jen workflow Tests, image se
+  kvůli ní nesestavují ani nepublikují. `make k8s-delete` odmítne název dalšího releasu v `ARGS` (obešel by
+  pojistku hesel).
 
 **Testy:** nové `t/23-dbversion-lock.t` (zámek migrace nad falešnou databází), `t/24-shutdown.t` (ukončování
 a socket nad skutečným FastCGI serverem) a `t/25-pipeline.t` (pravidla workflow: devět image, kdo publikuje,

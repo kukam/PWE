@@ -230,15 +230,17 @@ Detaily: [`docs/05-validace.md`](docs/05-validace.md). Při POST musí být `pag
     `.github/workflows/images.yml` (testy v `pwe-base` a kouřové kontroly, pak publikace obou
     platforem). **Publikuje jen push a ruční spuštění nad výchozí větví repozitáře a nad větvemi
     z proměnné repozitáře `PUBLISH_BRANCHES`**; ostatní větve a pull requesty image jen sestaví
-    a otestují. Vstupy image jsou `PWE/**`, `docker-bake.hcl`, `.dockerignore`, `LICENSE` a vzorové
+    a otestují. Vstupy image jsou `PWE/**` kromě `PWE/t/**` a `PWE/tools/**` (testy a nástroje v image
+    nejsou), `docker-bake.hcl`, `.dockerignore`, `LICENSE` a vzorové
     weby `webapps/example*.web/**`; lehký `.github/workflows/tests.yml` pouští jen testy pro změny
-    compose, `kubernetes/` a `Makefile`. Kouřové kontroly místních image: `make images-check`
+    `PWE/t/**`, `PWE/tools/**`, compose, `kubernetes/` a `Makefile` — změna skriptu nebo testu tedy
+    image nesestaví ani nepublikuje. Kouřové kontroly místních image: `make images-check`
     (`PWE/tools/smoke-images.sh`). `make images ARGS=--push` odmítne necommitnuté změny
     (`--allow-dirty`).
   - Image webu (`webapps/<web>/Dockerfile`, šablona generátoru) = závislostní image + engine + web:
     **jediný `FROM`** `pwe-<profil>:<tag>`, u webu bez databáze `pwe-base:<tag>` (výchozí
     `PWE_IMAGE_TAG=latest`; žádný image `pwe`, `COPY --from` ani `PWE_ENGINE_TAG`), engine zkopírovaný
-    z kontextu sestavení (`COPY --link` položek `PWE/` kromě `PWE/t` a `PWE/docker` do `/PWE/PWE`), web
+    z kontextu sestavení (`COPY --link` položek `PWE/` kromě `PWE/t`, `PWE/docker` a `PWE/tools` do `/PWE/PWE`), web
     do `/PWE/webapps/<web>`, zapečené `PWE_CONF_pwe_home` a `PWE_PROFILE`, vlastní `LABEL`,
     pracovní adresáře a `conf/database.conf` založené při sestavení (jediný `RUN`). **Sestavuje se vždy
     z kořene repozitáře**; verzi enginu v image určuje pracovní kopie, `PWE_IMAGE_TAG` vybírá jen
@@ -313,7 +315,7 @@ Detaily: [`docs/05-validace.md`](docs/05-validace.md). Při POST musí být `pag
   a šablona `Dockerfile` webu je jen v `PWE/tools/new-webapp.pl` (funkce `gen_dockerfile`):
   `Dockerfile` vzorových webů (`webapps/example*.web/Dockerfile`) s výstupem generátoru musí zůstat
   shodný a web nesmí mít `entrypoint.sh` — hlídá to `PWE/t/14-tools.t`. Šablona vyjmenovává položky
-  adresáře `PWE/` (kromě `t` a `docker`): nová položka přímo v `PWE/` znamená doplnit `COPY` do
+  adresáře `PWE/` (kromě `t`, `docker` a `tools`): nová položka přímo v `PWE/` znamená doplnit `COPY` do
   šablony a `Dockerfile` vzorových webů vygenerovat znovu (i to hlídá `PWE/t/14-tools.t`). Změna
   balíčků stage `base`
   znamená upravit i přesný seznam v `PWE/t/14-tools.t` a kontroly v `PWE/tools/smoke-images.sh`.

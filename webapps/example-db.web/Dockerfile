@@ -43,7 +43,6 @@ ARG PWE_PROFILE
 COPY --link LICENSE /PWE/LICENSE
 COPY --link PWE/assets /PWE/PWE/assets
 COPY --link PWE/templates /PWE/PWE/templates
-COPY --link PWE/tools /PWE/PWE/tools
 COPY --link PWE/Entities /PWE/PWE/Entities
 COPY --link PWE/Services /PWE/PWE/Services
 COPY --link PWE/Sites /PWE/PWE/Sites

@@ -43,7 +43,10 @@ on:
     branches:
       - '**'
       - '!dependabot/**'
+    # PWE/t a PWE/tools: testy a nastroje pro vyvojare - v image nejsou, workflow Images je vynechava
     paths:
+      - 'PWE/t/**'
+      - 'PWE/tools/**'
       - 'docker-compose.yml'
       - 'docker-compose/**'
       - 'kubernetes/**'
@@ -52,6 +55,8 @@ on:
       - '.github/workflows/tests.yml'
   pull_request:
     paths:
+      - 'PWE/t/**'
+      - 'PWE/tools/**'
       - 'docker-compose.yml'
       - 'docker-compose/**'
       - 'kubernetes/**'

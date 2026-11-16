@@ -1468,6 +1468,10 @@ EOS
     make_path("$REPO/PWE/docker");
     copy("$ROOT/docker/entrypoint.sh", "$REPO/PWE/docker/entrypoint.sh") or die "Nelze zkopirovat docker/entrypoint.sh: $!";
     spit("$REPO/PWE/docker/Dockerfile", "FROM scratch\n");
+    # soubory enginu, ktere do image webu patri (nastroje PWE/tools v image nejsou - pro srovnani obsahu
+    # image s pracovni kopii jsou potreba aspon tri soubory enginu)
+    make_path("$REPO/PWE/Libs");
+    spit("$REPO/PWE/Libs/$_.pm", "package Libs::$_;\n1;\n") foreach (qw(Config Log Validate));
     spit("$REPO/.dockerignore", "webapps/*/ramdisk\nwebapps/*/log\nwebapps/*/conf/database.conf\nPWE/t\n");
     foreach my $web (qw(example.web example-db.web)) {
         spit("$REPO/webapps/$web/conf/web.conf",                  "{}\n");
@@ -1502,7 +1506,7 @@ EOS
         my ($dir, $rel) = @_;
         opendir(my $dh, $dir) or die "opendir $dir: $!";
         foreach my $e (sort grep { !/^\.\.?$/ } readdir($dh)) {
-            next if ($rel eq '' and ($e eq 't' or $e eq 'docker'));
+            next if ($rel eq '' and ($e eq 't' or $e eq 'docker' or $e eq 'tools'));
             my $path = length($rel) ? "$rel/$e" : $e;
             if (-d "$dir/$e" and !-l "$dir/$e") { $walk->("$dir/$e", $path); }
             else                                { push(@tree, $path); }
@@ -1511,15 +1515,15 @@ EOS
     };
     $walk->("$REPO/PWE", '');
     undef($walk);
-    ok((grep { $_ eq 'tools/smoke-images.sh' } @tree) && (grep { $_ eq 'VERSION' } @tree) && !(grep { m{^(?:t|docker)/} } @tree), 'falesny image: soubory enginu = kopie PWE/ bez t/ a docker/');
+    ok((grep { $_ eq 'Libs/Config.pm' } @tree) && (grep { $_ eq 'VERSION' } @tree) && !(grep { m{^(?:t|docker|tools)/} } @tree), 'falesny image: soubory enginu = kopie PWE/ bez t/, docker/ a tools/');
     my $same_engine = $cksum_of->("$REPO/PWE", @tree);
     spit("$T/smoke-same.lst", $same_engine);
-    # stary image: jeden soubor chybi (tools/run-webapp.sh), jeden je navic (Libs/JenVImage.pm) a jeden ma jiny obsah
-    # (tools/build-images.sh - stejna cesta, jiny soucet)
-    (my $other_engine = $cksum_of->("$REPO/PWE", (grep { $_ ne 'tools/run-webapp.sh' } @tree), 'Libs/JenVImage.pm')) =~ s{^\d+ \d+ (\./tools/build-images\.sh)$}{1 2 $1}m or die 'build-images.sh neni v seznamu';
+    # stary image: jeden soubor chybi (Libs/Log.pm), jeden je navic (Libs/JenVImage.pm) a jeden ma jiny obsah
+    # (Libs/Config.pm - stejna cesta, jiny soucet)
+    (my $other_engine = $cksum_of->("$REPO/PWE", (grep { $_ ne 'Libs/Log.pm' } @tree), 'Libs/JenVImage.pm')) =~ s{^\d+ \d+ (\./Libs/Config\.pm)$}{1 2 $1}m or die 'Libs/Config.pm neni v seznamu';
     spit("$T/smoke-other.lst", $other_engine);
     # jen jiny obsah jednoho souboru (image sestaveny pred posledni zmenou enginu; seznam souboru je stejny)
-    (my $changed_engine = $same_engine) =~ s{^\d+ \d+ (\./tools/lib/images\.sh)$}{1 2 $1}m or die 'lib/images.sh neni v seznamu';
+    (my $changed_engine = $same_engine) =~ s{^\d+ \d+ (\./Libs/Validate\.pm)$}{1 2 $1}m or die 'Libs/Validate.pm neni v seznamu';
     spit("$T/smoke-changed.lst", $changed_engine);
     # soubory vzorovych webu "v image": bez docasnych dat; symlink conf/database.conf zaklada az Dockerfile webu
     # (v kontextu sestaveni neni a do srovnani se nepocita)
@@ -1569,7 +1573,7 @@ EOS
     is($rc, 1, 'smoke-images.sh: mistni image, ktery se od pracovni kopie lisi -> kod 1 (stary image)');
     like($out, qr/^FAIL $E: VERSION = \Q$VERSION\E \(PWE\/VERSION pracovni kopie\)\n\s+v image je verze 1\.0\.0, v pracovni kopii \Q$VERSION\E$/m, 'smoke-images.sh: stary image -> FAIL verze');
     like($out, qr/^FAIL $E: popisky image: title=$E, version=\Q$VERSION\E\n\s+popisek org\.opencontainers\.image\.version je '1\.0\.0', ocekavano '\Q$VERSION\E' \(PWE\/VERSION\)$/m, 'smoke-images.sh: stary image -> FAIL popisku version');
-    like($out, qr/^FAIL $E: soubory enginu .*\n\s+v image chybi .*\n\s+tools\/run-webapp\.sh\n\s+v image navic .*\n\s+Libs\/JenVImage\.pm\n\s+v image maji jiny obsah nez v pracovni kopii \(image je starsi nez posledni zmena - sestav znovu: make images\):\n\s+tools\/build-images\.sh$/m,
+    like($out, qr/^FAIL $E: soubory enginu .*\n\s+v image chybi .*\n\s+Libs\/Log\.pm\n\s+v image navic .*\n\s+Libs\/JenVImage\.pm\n\s+v image maji jiny obsah nez v pracovni kopii \(image je starsi nez posledni zmena - sestav znovu: make images\):\n\s+Libs\/Config\.pm$/m,
         'smoke-images.sh: stary image -> FAIL souboru enginu (chybi, navic i jiny obsah)');
     like($out, qr/^FAIL $E: entrypoint v image .*\n\s+obsah se lisi \(cksum v image: 1 2, v pracovni kopii: \Q$entry_sum\E\) - image je starsi nez posledni zmena entrypointu; sestav znovu: make images$/m, 'smoke-images.sh: stary image -> FAIL entrypointu (obsah se lisi)');
     like($out, qr/^FAIL pwe-base: entrypoint v image /m, 'smoke-images.sh: stary zavislostni image -> FAIL entrypointu');
@@ -1577,7 +1581,7 @@ EOS
     # stejny seznam souboru, ale jiny OBSAH jednoho souboru enginu / vzoroveho webu (image sestaveny pred posledni zmenou)
     ($rc, $out, $err) = $run_smoke->({%same, FAKE_SMOKE_FILES => "$T/smoke-changed.lst"}, @one);
     is($rc, 1, 'smoke-images.sh: soubor enginu ma v image jiny obsah nez v pracovni kopii -> kod 1');
-    like($out, qr/^FAIL $E: soubory enginu .*\n\s+v image maji jiny obsah nez v pracovni kopii .*\n\s+tools\/lib\/images\.sh$/m, 'smoke-images.sh: jiny obsah souboru enginu -> FAIL jmenuje soubor');
+    like($out, qr/^FAIL $E: soubory enginu .*\n\s+v image maji jiny obsah nez v pracovni kopii .*\n\s+Libs\/Validate\.pm$/m, 'smoke-images.sh: jiny obsah souboru enginu -> FAIL jmenuje soubor');
     unlike($out, qr/v image chybi|v image navic/, 'smoke-images.sh: jiny obsah souboru enginu -> seznam souboru se nelisi (nic nechybi ani neni navic)');
     is(scalar(() = $out =~ /^FAIL /mg), 1, 'smoke-images.sh: jiny obsah jednoho souboru enginu -> prave jeden FAIL');
     ($rc, $out, $err) = $run_smoke->({%same, FAKE_SMOKE_DBWEB_FILES => "$T/smoke-dbweb-changed.lst"}, 'pwe-mariadb', 'pwe-example-mariadb');

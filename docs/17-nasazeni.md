@@ -633,7 +633,9 @@ a image existují jen v Dockeru runneru.
 | ruční spuštění (*Actions → Images → Run workflow*) nad výchozí větví nebo větví z `PUBLISH_BRANCHES` | jako `push` do ní, **publikace**; volba `no_cache` sestaví bez mezipaměti pipeline (stáhne aktuální balíčky Ubuntu; z CPAN se při sestavení nic neinstaluje). Tlačítko je k dispozici až poté, co je workflow ve výchozí větvi repozitáře (viz [První zprovoznění](#první-zprovoznění)) |
 | ruční spuštění nad jinou větví nebo nad gitovým tagem | jen sestavení a testy |
 
-**Vstupy image** (cesty, jejichž změna workflow Images spouští): `PWE/**`, `docker-bake.hcl`,
+**Vstupy image** (cesty, jejichž změna workflow Images spouští): `PWE/**` kromě testů `PWE/t/**` a nástrojů
+`PWE/tools/**` (v image nejsou — jejich změna image nemění, nic nesestaví ani nepublikuje a hlídá ji
+workflow Tests), `docker-bake.hcl`,
 `.dockerignore`, `LICENSE`, vzorové weby `webapps/example.web/**` a `webapps/example-db.web/**` (z nich
 a z jejich `Dockerfile` vznikají image vzorových webů) a samotný workflow. Změna jen v `docs/`, v `docker-compose.yml`,
 `kubernetes/` nebo `Makefile` workflow Images nespouští (soubory stacku, `kubernetes/` a `Makefile`
@@ -884,7 +886,6 @@ ARG PWE_PROFILE
 COPY --link LICENSE /PWE/LICENSE
 COPY --link PWE/assets /PWE/PWE/assets
 COPY --link PWE/templates /PWE/PWE/templates
-COPY --link PWE/tools /PWE/PWE/tools
 COPY --link PWE/Entities /PWE/PWE/Entities
 COPY --link PWE/Services /PWE/PWE/Services
 COPY --link PWE/Sites /PWE/PWE/Sites

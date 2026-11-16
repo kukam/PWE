@@ -1368,7 +1368,7 @@ PERL
 #   - jediny FROM = zavislostni image BEZ kodu enginu: pwe-base pro web bez databaze, pwe-${PWE_PROFILE} pro
 #     web s databazi (PWE::ToolEnv::dockerfile_base),
 #   - engine se kopiruje z kontextu sestaveni (koren repozitare): LICENSE a vsechny polozky adresare PWE/
-#     krome PWE::ToolEnv::engine_image_excludes() (t, docker). Vycet COPY je zamerne vyslovny (zadne mazani
+#     krome PWE::ToolEnv::engine_image_excludes() (t, docker, tools). Vycet COPY je zamerne vyslovny (zadne mazani
 #     v image, zadny COPY --from jineho image); PWE/t/14-tools.t hlida, ze pokryva kazdou polozku PWE/ - nova
 #     polozka enginu = doplnit ji sem a znovu vygenerovat Dockerfile vzorovych webu,
 #   - web z webapps/<web>.
@@ -1437,7 +1437,6 @@ ARG PWE_PROFILE
 COPY --link LICENSE /PWE/LICENSE
 COPY --link PWE/assets /PWE/PWE/assets
 COPY --link PWE/templates /PWE/PWE/templates
-COPY --link PWE/tools /PWE/PWE/tools
 COPY --link PWE/Entities /PWE/PWE/Entities
 COPY --link PWE/Services /PWE/PWE/Services
 COPY --link PWE/Sites /PWE/PWE/Sites

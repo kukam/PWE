@@ -663,7 +663,15 @@ is_deeply(\@pr, \@push, 'images.yml: on.pull_request.paths = on.push.paths');
 foreach my $p ('PWE/**', 'docker-bake.hcl', '.dockerignore', 'LICENSE', 'webapps/example.web/**', 'webapps/example-db.web/**', '.github/workflows/images.yml') {
     ok(scalar(grep { $_ eq $p } @push), "images.yml: vstupem image je $p");
 }
-is(join(' ', sort split(' ', $JOB_ENV{'IMAGE_PATHS'} // '')), join(' ', sort map { (my $x = $_) =~ s{/\*\*$}{}; $x } @push), 'images.yml: env IMAGE_PATHS = on.push.paths (krok Branch head srovnava tytez cesty)');
+# Testy (PWE/t) a nastroje pro vyvojare (PWE/tools) v image nejsou: jejich zmena image nemeni, nesmi spustit
+# sestaveni ani publikaci a hlida ji workflow Tests. V IMAGE_PATHS (cesty pro git diff) je vyjimka zapsana
+# jako :(exclude)<cesta>.
+foreach my $p ('!PWE/t/**', '!PWE/tools/**') {
+    my ($neg) = grep { $push[$_] eq $p } 0 .. $#push;
+    my ($pos) = grep { $push[$_] eq 'PWE/**' } 0 .. $#push;
+    ok(defined($neg) && defined($pos) && $neg > $pos, "images.yml: $p je vyjimka uvedena az za PWE/** (plati posledni odpovidajici vzor)");
+}
+is(join(' ', sort split(' ', $JOB_ENV{'IMAGE_PATHS'} // '')), join(' ', sort map { (my $x = $_) =~ s{/\*\*$}{}; ($x =~ s{^!}{}) ? ":(exclude)$x" : $x } @push), 'images.yml: env IMAGE_PATHS = on.push.paths vcetne vyjimek (krok Branch head srovnava tytez cesty)');
 like(step_run($WF, 'Branch head'), qr/git diff --quiet "\$GITHUB_SHA" "\$head" -- "\$\{paths\[\@\]\}"/, 'images.yml: Branch head srovnava cesty z IMAGE_PATHS');
 
 # Image vzorovych webu se stavi Dockerfilem vzoroveho webu z korene repozitare (engine i web jdou z kontextu
@@ -672,8 +680,17 @@ like(step_run($WF, 'Branch head'), qr/git diff --quiet "\$GITHUB_SHA" "\$head" -
 # covered($cesta) - lezi cesta pod nekterou cestou z on.push.paths?
 sub covered {
     my ($p) = @_;
-    return scalar(grep { my $x = $_; ($x =~ s{/\*\*$}{}) ? ($p eq $x || index($p, "$x/") == 0) : ($p eq $x) } @push);
+    my $hit = 0;    # jako GitHub: plati posledni vzor, ktery ceste odpovida (vzor s ! cestu vyrazuje)
+    foreach my $pat (@push) {
+        my $x   = $pat;
+        my $neg = ($x =~ s{^!}{}) ? 1 : 0;
+        next unless (($x =~ s{/\*\*$}{}) ? ($p eq $x || index($p, "$x/") == 0) : ($p eq $x));
+        $hit = $neg ? 0 : 1;
+    }
+    return $hit;
 }
+is(join(' ', map { covered($_) } 'PWE/tools/k8s.sh', 'PWE/tools/lib/images.sh', 'PWE/t/14-tools.t', 'PWE/t', 'PWE/tools', 'PWE/toolsx/a', 'PWE/docker/entrypoint.sh', 'PWE/pwe.fcgi'),
+    '0 0 0 0 0 1 1 1', 'covered: testy a nastroje enginu vstupem image nejsou, zbytek PWE/ ano');
 is(join(' ', map { covered($_) } 'PWE', 'PWE/Libs/Web.pm', 'LICENSE', 'webapps/example.web', 'webapps/example.web/conf/web.conf', 'webapps/example.webx', 'webapps', 'LICENSE.txt', '.', 'README.md'),
     '1 1 1 1 1 0 0 0 0 0', 'covered: cesta pod vstupem image (adresar/** vcetne adresare sameho, soubor presne)');
 is(join(' ', context_sources("FROM x\nCOPY --link a b/ /dst/\nCOPY --from=y c /c\nADD ./d /d\nRUN --mount=type=bind,source=e,target=/e --mount=type=cache,target=/f \\\n    true\nCOPY g \\\n    h /i/\n")),
@@ -690,7 +707,10 @@ is_deeply(\@tpr, \@tpush, 'tests.yml: on.pull_request.paths = on.push.paths');
 ok(scalar(@tpush) > 0, 'tests.yml: ma seznam cest');
 my %images_path = map { $_ => 1 } @push;
 is(join(' ', grep { $images_path{$_} } @tpush), '', 'tests.yml: zadna cesta spolecna s images.yml');
-is(join(' ', grep { m{^(?:webapps|PWE)/} || covered($_) } @tpush), '', 'tests.yml: vzorove weby, engine ani jiny vstup image nesleduje (patri images.yml)');
+is(join(' ', grep { covered($_) || (m{^(?:webapps|PWE)/} && !m{^PWE/(?:t|tools)/\*\*$}) } @tpush), '', 'tests.yml: vzorove weby, engine ani jiny vstup image nesleduje (patri images.yml)');
+foreach my $p ('PWE/t/**', 'PWE/tools/**') {
+    ok(scalar(grep { $_ eq $p } @tpush), "tests.yml: $p hlida workflow Tests (v image neni, images.yml ho vynechava)");
+}
 unlike($TESTS, qr/^\s+TAG: /m, 'tests.yml: zadna promenna TAG pro bake');
 like($TESTS, qr/^      PWE_TEST_IMAGE: localhost\/pwe-tests\/pwe-base:latest$/m, 'tests.yml: testy bezi v mistnim pwe-base:latest');
 my $tbuild = step_run($TESTS, 'Build pwe-base (linux/amd64)');

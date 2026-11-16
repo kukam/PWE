@@ -1251,6 +1251,21 @@ ok(!grep({ $_->[1] eq 'uninstall' } calls('helm')), 'delete --dry-run=false bez 
 ($rc, $out, $err) = k8s({%CTX}, 'delete', 'static');
 is($rc, 0, 'delete nasazeni bez hesel (static nema vzor secrets-static.example.yml): pojistka se neuplatni') or diag($err);
 ok(scalar(grep { $_->[1] eq 'uninstall' } calls('helm')), 'delete static: helm uninstall');
+
+# Regrese: helm uninstall bere argument bez pomlcky jako dalsi release - "delete static pwe-generic" odinstaloval
+# i release s hesly, jehoz mistni soubor s hesly pojistka nekontrolovala.
+($rc, $out, $err) = k8s({%CTX}, 'delete', 'static', 'pwe-generic');
+is($rc, 2, 'delete s dalsim jmenem releasu: kod 2 (obesel by pojistku hesel)');
+ok(!grep({ $_->[1] eq 'uninstall' } calls('helm')), 'delete s dalsim jmenem releasu: helm uninstall se nevola');
+like($err, qr/argument 'pwe-generic' by helm vzal jako dalsi release .* jen release pwe-static/, 'delete s dalsim jmenem releasu: hlaska jmenuje argument i odinstalovavany release');
+($rc, $out, $err) = k8s({%CTX}, 'delete', 'static', '--timeout', '5m', '--cascade=foreground');
+is($rc, 0, 'delete --timeout 5m: hodnota prepinace oddelena mezerou neni dalsi release') or diag($err);
+{
+    my ($un) = grep { $_->[1] eq 'uninstall' } calls('helm');
+    ok($un && has_pair($un, '--timeout', '5m') && has_arg($un, '--cascade=foreground'), 'delete --timeout 5m: prepinace se predaji helmu');
+}
+($rc, $out, $err) = k8s({%CTX}, 'delete', 'static', '--timeout', '5m', 'pwe-generic');
+is($rc, 2, 'delete: dalsi release za prepinacem s hodnotou se odmitne take');
 spit($SECRETS, "secrets:\n  db:\n    data:\n      MARIADB_PASSWORD: \"x\"\n", 0600);
 ($rc, $out, $err) = k8s({%CTX}, 'delete', 'generic');
 is($rc, 0, 'delete s mistnim souborem s hesly: kod 0 bez vyjimky') or diag($err);

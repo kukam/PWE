@@ -560,6 +560,10 @@ nebo soubor zkopíruj ze stroje, odkud se nasazovalo. Když data ani hesla nepot
 release výslovně: `make k8s-delete K8S=generic K8S_DELETE_WITHOUT_SECRETS=1`. Zkouška nasucho
 (`ARGS=--dry-run`) pojistku nepotřebuje — nic neodinstaluje.
 
+`make k8s-delete` odinstaluje vždy jen release daného nasazení. V `ARGS` smí být jen přepínače helmu
+(`ARGS='--timeout 5m'`); název dalšího releasu skript odmítne (`argument '…' by helm vzal jako dalsi
+release`), protože by obešel pojistku hesel — další nasazení odinstaluj samostatným příkazem.
+
 ## Řešení potíží
 
 | Projev | Příčina a řešení |

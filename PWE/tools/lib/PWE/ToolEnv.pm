@@ -274,7 +274,7 @@ sub dockerfile_base {
 =cut
 
 sub engine_image_excludes {
-    return qw(t docker);
+    return qw(t docker tools);
 }
 
 =head2 B<[Public] engine_image_entries($koren)>

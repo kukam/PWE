@@ -95,8 +95,12 @@ on:
       - '**'
       - '!dependabot/**'
     # vstupy image - stejny seznam ma pull_request.paths a env IMAGE_PATHS jobu
+    # Testy (PWE/t) a nastroje pro vyvojare (PWE/tools) v image nejsou: jejich zmena image nemeni, proto
+    # workflow nespousti (hlida ji workflow Tests); v IMAGE_PATHS je vyjimka zapsana jako :(exclude)<cesta>.
     paths:
       - 'PWE/**'
+      - '!PWE/t/**'
+      - '!PWE/tools/**'
       - 'docker-bake.hcl'
       - '.dockerignore'
       - 'LICENSE'
@@ -106,6 +110,8 @@ on:
   pull_request:
     paths:
       - 'PWE/**'
+      - '!PWE/t/**'
+      - '!PWE/tools/**'
       - 'docker-bake.hcl'
       - '.dockerignore'
       - 'LICENSE'
@@ -155,7 +161,7 @@ jobs:
       # (hlida PWE/t/25-pipeline.t).
       BAKE_TARGETS: base mariadb mysql postgres debugger example-static example-mariadb example-mysql example-postgres
       # vstupy image jako cesty pro "git diff" (krok Branch head) - musi odpovidat on.push.paths
-      IMAGE_PATHS: PWE docker-bake.hcl .dockerignore LICENSE webapps/example.web webapps/example-db.web .github/workflows/images.yml
+      IMAGE_PATHS: PWE :(exclude)PWE/t :(exclude)PWE/tools docker-bake.hcl .dockerignore LICENSE webapps/example.web webapps/example-db.web .github/workflows/images.yml
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
