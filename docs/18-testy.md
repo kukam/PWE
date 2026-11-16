@@ -218,11 +218,12 @@ BASE=http://127.0.0.1:7778/; JAR=$(mktemp)
 curl -s -c $JAR -b $JAR "$BASE?page=default&func=default" | grep -q '</html>'                 && echo OK uvodni stranka
 curl -s -o /dev/null -w '%{http_code}\n' -b $JAR -c $JAR "$BASE?page=dbTableExamples&func=default"   # 200: stránka nad databází
 curl -s -o /dev/null -w '%{http_code}\n' -b $JAR -c $JAR "$BASE?page=neexistuje"                     # 404
-docker compose logs --no-log-prefix fcgi | grep '\[E\]' | grep -v 'Not-defined input\|Invalid rule\|Invalid input'   # musí být prázdné
+docker compose -p pwe logs --no-log-prefix fcgi | grep '\[E\]' | grep -v 'Not-defined input\|Invalid rule\|Invalid input\|connect_status:0'   # musí být prázdné
 make down WEB=example-db.web PROFILE=mariadb ARGS=-v
 ```
 
-Poznámky: cookie domain je `127.0.0.1`; POST posílá `page`/`func` v těle; AJAX requesty mají
+Poznámky: řádky `[E] … connect_status:0 … Can't connect` hned po startu jsou čekání enginu na databázi,
+která se při prvním spuštění teprve zakládá (proto je výpis vynechává); cookie domain je `127.0.0.1`; POST posílá `page`/`func` v těle; AJAX requesty mají
 `ajax_request=1` a vrací JSON; validační chyby jsou v logu jako `[E]` z `Libs::Pages`, ostatní
 `[E]` znamenají problém.
 
