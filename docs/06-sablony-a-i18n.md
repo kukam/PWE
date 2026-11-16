@@ -208,7 +208,7 @@ Věci, které v TT fungují jinak, než by člověk čekal (všechny se projevil
 | `rb.klic` podle proměnné | tečková notace klíč nevyhodnotí | dynamický klíč: `[% SET k = "status_" _ order.status %][% rb.$k %]` (stejně `msg.$v` v messengeru) |
 | text z `rb` potřebný v Perlu (titulek, předmět e-mailu) | `rb` existuje jen v šabloně | `$WEB->genTmpl('[% PROCESS templates/resource_bundle.tmpl %][% rb.title_katalog %]')` — inline šablona dostane `rb_list` aktivní stránky |
 
-Formát ceny podle jazyka (vzor `Pages/katalog/price.html` e-shopu Syrmex): `[% USE f = format('%.2f') %][% SET s = f(price).replace('(\d)(?=(\d{3})+\.)', '$1 ') %][% IF use_language == 'EN' %][% s %] CZK[% ELSE %][% s.replace('\.', ',') %] Kč[% END %]` → `1 299,50 Kč` / `1 299.50 CZK`.
+Formát ceny podle jazyka (vzor `Pages/katalog/price.html` e-shopu): `[% USE f = format('%.2f') %][% SET s = f(price).replace('(\d)(?=(\d{3})+\.)', '$1 ') %][% IF use_language == 'EN' %][% s %] CZK[% ELSE %][% s.replace('\.', ',') %] Kč[% END %]` → `1 299,50 Kč` / `1 299.50 CZK`.
 
 ## Generování HTML mimo stránku
 

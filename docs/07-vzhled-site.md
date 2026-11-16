@@ -147,7 +147,7 @@ Co z toho plyne:
 - Proxy metody jsou vypsané explicitně kvůli čitelnosti a IDE; `AUTOLOAD` zajistí, že vzhled má
   celé API `Libs::Web` ([14 — API reference](14-api-reference.md)).
 - Vzhled může přijímat **vlastní volby** z `printHtmlLayout(%tmpl)` — jsou to obyčejné proměnné šablony. E-shop
-  Syrmex tak má `full_width => 1` (homepage bez `.container`): v `layout_body.html` stačí
+  E-shop tak může mít `full_width => 1` (homepage bez `.container`): v `layout_body.html` stačí
   `[% IF full_width %]…[% ELSE %]<div class="container">…[% END %]`.
 - `printAjaxLayout` přijme buď `ajax_tmpl`, nebo `ajax_html` (ne obojí); výchozí proměnné vzhledu se do
   fragmentů doplňují jen ve větvi `ajax_tmpl` — pro odznak košíku je proto lepší mini-šablona než `ajax_html`.
@@ -264,7 +264,7 @@ Engine obsahuje ukázkový druhý vzhled `Sites/Responsive` (vlastní layouty a
 obrázky `assets/images/*.svg`): stránka načte web do `<iframe>` a přepínač mění jen CSS třídu
 `#iframe-container`. Vlastní variantu stránky (výběr nahlížené stránky parametrem, přístup jen
 pro správce nebo při `pwe.development`) si web napíše do svého `Pages/responsive/` – stejnojmenný
-modul webu enginový přepíše, stačí pak jen `core_sites => ["Responsive"]`; vzor je v e-shopu Syrmex.
+modul webu enginový přepíše, stačí pak jen `core_sites => ["Responsive"]`; vzor je v e-shopu.
 
 ## Chybové stránky
 

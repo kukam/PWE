@@ -290,7 +290,7 @@ V každém image (tedy už v `pwe-base`), kromě modulů z jádra Perlu 5.40:
 
 Engine se k MariaDB i MySQL připojuje přes `DBD::mysql` (`dbdriver => "mariadb"` i `"mysql"`);
 `DBD::MariaDB` je v `pwe-mariadb` navíc pro kód webu. HTTPS API volá kód webu přes `HTTP::Tiny`
-(tak to dělá e-shop Syrmex); `LWP::UserAgent`, `Data::UUID`, `Data::GUID`, `Crypt::OpenSSL::X509`
+(tak to dělá e-shop); `LWP::UserAgent`, `Data::UUID`, `Data::GUID`, `Crypt::OpenSSL::X509`
 ani program `curl` v běhových image nejsou.
 
 ### Přidání knihovny
@@ -1056,7 +1056,7 @@ v registru.
   nedostane heslo z `conf/local.env`, privátní klíč (např. `conf/csob/private.pem` platební brány) ani
   profil, se kterým byl web naposledy spuštěn přes `make run`.
 - **Soukromé klíče dostane kontejner až za běhu** — mountem nebo secretem — a cestu k nim přes
-  `PWE_CONF_*`. Příklad e-shopu Syrmex (privátní klíč platební brány,
+  `PWE_CONF_*`. Příklad e-shopu (privátní klíč platební brány,
   [22 — Platební brána ČSOB](22-platebni-brana-csob.md#10-přechod-do-produkce)):
 
   ```bash
@@ -1183,7 +1183,7 @@ make run WEB=<web> PROFILE=static                 # web bez databáze: služba f
 | `fcgi` ×3 | závislostní image profilu: `pwe-<profil>`, u profilu `static` `pwe-base` (`PWE_FCGI_IMAGE`); engine `perl /PWE/PWE/pwe.fcgi` s `PWE_CONF_pwe_home=/PWE/webapps/<web>`, `PWE_CONF_pwe_core=/PWE/PWE`, `FCGI_SOCKET_PATH=:7779`; repozitář mountován do `/PWE` — image engine ani web neobsahuje, běží pracovní kopie |
 | `mariadb` / `mysql` / `postgres` | databáze podle profilu (porty 7776 / 7777 / 7775), přihlášení `pwe`/`pwe`, DB `pwe` (`docker-compose/docker-compose_<profil>.env`) |
 | `debugger` | image `pwe-debugger` (všechny DB ovladače + ladicí nástroje, bez enginu a bez webu), `sleep infinity` — pro VS Code debugger a ruční příkazy; repozitář mountován do `/PWE`. Má `init: true`: `sleep infinity` jako proces č. 1 by na `SIGTERM` nereagoval a `docker compose down` by na kontejner čekal až do vypršení limitu |
-| `webapps/<web>/conf/local.env` | volitelný soubor s proměnnými, který načítají služby `fcgi` i `debugger` (`env_file`, `required: false`): SMTP účet, hesla a další `PWE_CONF_*` přepisy mimo git (vzor `conf/local.env.example` v e-shopu Syrmex) |
+| `webapps/<web>/conf/local.env` | volitelný soubor s proměnnými, který načítají služby `fcgi` i `debugger` (`env_file`, `required: false`): SMTP účet, hesla a další `PWE_CONF_*` přepisy mimo git (vzor `conf/local.env.example` v e-shopu) |
 | `mailpit` | vývojový SMTP server (port `1025` uvnitř sítě, UI <http://127.0.0.1:8025>): zachytí e-maily z fronty `Services::Email`, když má web `smtp_primary => { host => "mailpit", port => 1025 }` |
 
 Image služeb skládá compose z proměnných prostředí:

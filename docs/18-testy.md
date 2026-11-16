@@ -208,19 +208,18 @@ Spuštění v kontejneru: `docker run --rm -v "$PWD":/PWE -e PWE_CONF_pwe_home= 
 
 ### Integrační test webu přes compose
 
-Web s databází se testuje proti běžícímu stacku. Vzor (zkrácený) z tutoriálu — celý průchod
-je skript s `curl`, cookie jar a kontrolami textu:
+Web s databází se testuje proti běžícímu stacku. Vzor nad vzorovým webem `example-db.web` — celý
+průchod vlastního webu je stejný skript s `curl`, cookie jar a kontrolami textu a návratových kódů
+(přihlášení, formuláře a AJAX se testují stejně: POST s `page`/`func` v těle, u AJAXu `ajax_request=1`):
 
 ```bash
-make run WEB=ukoly.web PROFILE=mariadb ARGS=-d
+make run WEB=example-db.web PROFILE=mariadb ARGS=-d
 BASE=http://127.0.0.1:7778/; JAR=$(mktemp)
-curl -s -c $JAR -b $JAR "$BASE?page=ukoly&func=default" | grep -q 'Seznam úkolů'            && echo OK seznam
-curl -s -o /dev/null -w '%{http_code}\n' -b $JAR -c $JAR -X POST "$BASE" --data 'page=ukoly&func=add&title=x'   # 401 jako host
-curl -s -b $JAR -c $JAR -X POST "$BASE" --data 'page=prihlaseni&func=login&login=admin&password=tajneheslo' -o /dev/null
-curl -s -b $JAR -c $JAR -X POST "$BASE" --data 'page=ukoly&func=add&ajax_request=1' --data-urlencode 'title=Koupit mléko' | grep -q '"REPLACE"' && echo OK ajax
-curl -s -o /dev/null -w '%{http_code}\n' -b $JAR -c $JAR -X POST "$BASE" --data 'page=ukoly&func=add&ajax_request=1&title='   # 400 validace
+curl -s -c $JAR -b $JAR "$BASE?page=default&func=default" | grep -q '</html>'                 && echo OK uvodni stranka
+curl -s -o /dev/null -w '%{http_code}\n' -b $JAR -c $JAR "$BASE?page=dbTableExamples&func=default"   # 200: stránka nad databází
+curl -s -o /dev/null -w '%{http_code}\n' -b $JAR -c $JAR "$BASE?page=neexistuje"                     # 404
 docker compose logs --no-log-prefix fcgi | grep '\[E\]' | grep -v 'Not-defined input\|Invalid rule\|Invalid input'   # musí být prázdné
-make down WEB=ukoly.web PROFILE=mariadb ARGS=-v
+make down WEB=example-db.web PROFILE=mariadb ARGS=-v
 ```
 
 Poznámky: cookie domain je `127.0.0.1`; POST posílá `page`/`func` v těle; AJAX requesty mají

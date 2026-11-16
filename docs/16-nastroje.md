@@ -289,10 +289,10 @@ Každá volba vyžaduje hodnotu (i prázdnou: `--post ''`); volba bez hodnoty sk
 (`Volba --post vyzaduje hodnotu …`). Příklady:
 
 ```bash
-PWE/tools/pwe-cgi.sh ukoly.web 'page=ukoly&func=default' --loglevel 4
-PWE/tools/pwe-cgi.sh ukoly.web --post 'page=prihlaseni&func=login&login=admin&password=x'   # POST: page/func v těle
-PWE/tools/pwe-cgi.sh ukoly.web --script /assets/javascript/pwe.js                            # statický soubor
-PWE/tools/pwe-cgi.sh ukoly.web 'page=ukoly' --cookie 'PWE-UKOLY-WEB=C0...'                    # s existující session
+PWE/tools/pwe-cgi.sh example-db.web 'page=default&func=default' --loglevel 4
+PWE/tools/pwe-cgi.sh example-db.web --post 'page=dbTableExamples&func=form'                    # POST: page/func v těle
+PWE/tools/pwe-cgi.sh example.web --script /assets/javascript/pwe.js                          # statický soubor
+PWE/tools/pwe-cgi.sh example-db.web 'page=default' --cookie 'PWE-EXAMPLE-GENERIC-PAGE=C0...'   # s existující session
 ```
 
 Ručně uvnitř kontejneru (např. `docker compose exec fcgi bash`):

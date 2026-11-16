@@ -269,14 +269,14 @@ neměnná data, nebo s invalidací podle času.
 
 ## 19. CSRF token pro změnové akce
 
-Engine CSRF token nemá; vzor z e-shopu Syrmex: služba účtu drží token v DB session (sloupec `csrf`, při
+Engine CSRF token nemá; vzor z e-shopu: služba účtu drží token v DB session (sloupec `csrf`, při
 chybějícím vygeneruje 32 hex) a nabízí validátor.
 
 ```perl
 # Services/UserAccount/UserAccount.pm
 sub csrfToken { my $self = shift; return $SESSION->getValue('csrf', ''); }
 sub is_csrf   { my ($self, $token) = @_; my $t = $self->csrfToken(); return (defined($token) and length($t) and $self->constEq($token, $t)) ? $token : undef; }
-# constEq = porovnání v konstantním čase (XOR po znacích, délka se porovná předem), ne `eq` – viz Syrmex UserAccount
+# constEq = porovnání v konstantním čase (XOR po znacích, délka se porovná předem), ne `eq`
 
 # Sites/Default/Default.pm — token do každé šablony
 sub getDefaultTemplateValues { ...; 'csrf' => $ACCOUNT->csrfToken(), ... }
@@ -344,15 +344,15 @@ $EMAIL->addEmailToQueue(from => $from, to => $order->{'email'}, subject => $subj
 ```
 
 Absolutní odkazy v e-mailu neskládejte z `HTTP_HOST` (hlavičku určuje klient a e-mail může vzniknout
-i mimo request, např. v cronu) — čtěte veřejnou URL enginu z konfigurace webu (v Syrmexu klíč
-`web.shop_url`, např. `https://www.syrmex.cz/pwe.fcgi`, přepsatelný `PWE_CONF_web_shop_url`)
+i mimo request, např. v cronu) — čtěte veřejnou URL enginu z konfigurace webu (v e-shopu klíč
+`web.shop_url`, např. `https://www.example.com/pwe.fcgi`, přepsatelný `PWE_CONF_web_shop_url`)
 s fallbackem na `http.base_url` + `/pwe.fcgi`.
 
 ## 23. Externí HTTPS API a RSA podpis (platební brána)
 
 Image enginu má `HTTP::Tiny` + `IO::Socket::SSL` (HTTPS), `JSON`, `Crypt::OpenSSL::RSA` a CLI `openssl`.
-Vzor klienta brány (ČSOB eAPI) včetně podpisů, ověření odpovědi a vestavěného simulátoru je v e-shopu
-Syrmex (`Services/Payment`) a popsaný v [22 — Platební brána ČSOB](22-platebni-brana-csob.md).
+Vzor klienta brány (ČSOB eAPI) včetně podpisů, ověření odpovědi a vestavěného simulátoru (služba
+`Services/Payment`) popisuje [22 — Platební brána ČSOB](22-platebni-brana-csob.md).
 
 ```perl
 my $res = HTTP::Tiny->new(timeout => 30)->post("$api/payment/init", {content => to_json(\%req), headers => {'Content-Type' => 'application/json'}});
@@ -365,7 +365,7 @@ podpisu a serverového dotazu na stav.
 
 ## 24. Společné přihlášení zákazníka i správce (jeden formulář, jedno odhlášení)
 
-Vzor z e-shopu Syrmex: správce (jméno a heslo z `web.admin_login`/`web.admin_password`) i zákazník
+Vzor z e-shopu: správce (jméno a heslo z `web.admin_login`/`web.admin_password`) i zákazník
 (e-mail + heslo z tabulky `customers`) se přihlašují **jedním formulářem** `?page=ucet&func=default`;
 po přihlášení správce přibudou v menu položky administrace a jediné tlačítko „Odhlásit se“ odhlásí
 obě role.

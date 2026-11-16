@@ -2,10 +2,11 @@
 
 Kapitola popisuje, jak je v e-shopu nad PWE napojena **ČSOB platební brána** (eAPI v1.9) a jak se
 s ní pracuje ve třech režimech: vestavěný **simulátor** (funguje hned, bez registrace a bez klíčů),
-**integrační prostředí** ČSOB (iBrána, testovací karty) a **produkce**. Referenční implementace je
-web Syrmex (`webapps/syrmex.web`): služba `Services/Payment`, stránka `Pages/brana` (simulátor),
-stránka `Pages/cron` (dořešení plateb) a akce `navrat` stránky `objednavka`. Stejný vzor lze
-použít v libovolném webu nad PWE.
+**integrační prostředí** ČSOB (iBrána, testovací karty) a **produkce**. Popis vychází z e-shopu
+provozovaného nad PWE (web má vlastní repozitář, součástí tohoto repozitáře není): služba
+`Services/Payment`, stránka `Pages/brana` (simulátor), stránka `Pages/cron` (dořešení plateb) a akce
+`navrat` stránky `objednavka`. Stejný vzor lze použít v libovolném webu nad PWE; `<web>` v příkazech
+níže je název adresáře webu.
 
 Oficiální dokumentace ČSOB: <https://github.com/csob/platebnibrana/wiki> (eAPI v1.9), generátor
 klíčů <https://iplatebnibrana.csob.cz/keygen/>, veřejné klíče bran
@@ -106,7 +107,7 @@ pwe => {
 },
 web => {
     cron_key   => "zmente-tento-klic",                                # tajný klíč stránky cron (min. 8 znaků)
-    shop_name  => "Syrmex",                                           # název v položce košíku na bráně (max 20 znaků i s číslem objednávky)
+    shop_name  => "Muj e-shop",                                        # název v položce košíku na bráně (max 20 znaků i s číslem objednávky)
     currency   => "CZK",
 },
 ```
@@ -295,8 +296,8 @@ Příklad crontabu (každou minutu e-maily, každých 10 minut platby):
 Bez webserveru (CGI režim enginu v kontejneru webu, [13 — Cookbook §9](13-cookbook.md)):
 
 ```bash
-cd /PWE/webapps/syrmex.web && . vars && QUERY_STRING='page=cron&func=platby&key=TAJNY_KLIC' perl /PWE/PWE/pwe.fcgi
-make cgi WEB=syrmex.web Q='page=cron&func=mail&key=TAJNY_KLIC'        # z hostitele ve vývoji
+cd /PWE/webapps/<web> && . vars && QUERY_STRING='page=cron&func=platby&key=TAJNY_KLIC' perl /PWE/PWE/pwe.fcgi
+make cgi WEB=<web> Q='page=cron&func=mail&key=TAJNY_KLIC'        # z hostitele ve vývoji
 ```
 
 V simulátoru `platby` jen znovu vyhodnotí `pay_status` z DB (nic nevolá) — hodí se pro test cronu.
@@ -372,7 +373,7 @@ Závislosti služby: `Service_Orders` (`setPayment`, `setPaid`, `markPaidAfterCa
 - [ ] projít jeden nákup v režimu `test` s testovací kartou ČSOB (čísla karet jsou ve wiki ČSOB) včetně zamítnutí a zrušení
 - [ ] zkontrolovat, že e-mail „platba přijata“ a faktura vznikají jen po `setPaid` (stav 7/8)
 
-**Privátní klíč v kontejneru.** Image webu (`webapps/syrmex.web/Dockerfile`) privátní klíč neobsahuje:
+**Privátní klíč v kontejneru.** Image webu (`webapps/<web>/Dockerfile`) privátní klíč neobsahuje:
 kořenový `.dockerignore` vynechává z `conf/` webu soubory `*.pem`, `*.key`, `*.p12` a `*.pfx`, aby se
 klíč nedostal do registru. Kontejneru ho dodejte až při spuštění a službě řekněte, kde je —
 absolutní cestu `csob.private_key` použije tak, jak je:
@@ -382,11 +383,11 @@ docker run … \
     -v /srv/secrets/csob/private.pem:/run/secrets/csob_private.pem:ro \
     -e PWE_CONF_csob_private_key=/run/secrets/csob_private.pem \
     -e PWE_CONF_csob_mode=production -e PWE_CONF_csob_merchant_id=… \
-    registry.example.com/syrmex-web:1.0
+    registry.example.com/<web>:1.0
 ```
 
 V Kubernetes je to Secret namountovaný jako soubor a stejná proměnná v `env`. Jde i namountovat klíč
-přímo na výchozí cestu `/PWE/webapps/syrmex.web/conf/csob/private.pem` — pak se `csob.private_key`
+přímo na výchozí cestu `/PWE/webapps/<web>/conf/csob/private.pem` — pak se `csob.private_key`
 nemění. Veřejný klíč brány (`*.pub`) v image je. Obecně o tajných údajích a image webu:
 [17 — Nasazení](17-nasazeni.md#image-vlastního-webu).
 
