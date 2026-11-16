@@ -231,7 +231,8 @@ Detaily: [`docs/05-validace.md`](docs/05-validace.md). Při POST musí být `pag
     platforem). **Publikuje jen push a ruční spuštění nad výchozí větví repozitáře a nad větvemi
     z proměnné repozitáře `PUBLISH_BRANCHES`**; ostatní větve a pull requesty image jen sestaví
     a otestují. Vstupy image jsou `PWE/**` kromě `PWE/t/**` a `PWE/tools/**` (testy a nástroje v image
-    nejsou), `docker-bake.hcl`, `.dockerignore`, `LICENSE` a vzorové
+    nejsou; vstupem zůstávají jen kouřové kontroly `PWE/tools/smoke-images.sh` a `PWE/tools/lib/images.sh`,
+    brána před publikací), `docker-bake.hcl`, `.dockerignore`, `LICENSE` a vzorové
     weby `webapps/example*.web/**`; lehký `.github/workflows/tests.yml` pouští jen testy pro změny
     `PWE/t/**`, `PWE/tools/**`, compose, `kubernetes/` a `Makefile` — změna skriptu nebo testu tedy
     image nesestaví ani nepublikuje. Kouřové kontroly místních image: `make images-check`

@@ -543,7 +543,7 @@ printf '%s\n' "$*" >> "$FAKE_LOG"
 case "$1" in
     ls-remote) printf '%b' "${FAKE_HEADS:-}"; exit "${FAKE_LS_RC:-0}" ;;
     fetch)     exit "${FAKE_FETCH_RC:-0}" ;;
-    diff)      exit "${FAKE_DIFF_RC:-0}" ;;
+    diff)      case "$*" in *smoke-images.sh*) exit "${FAKE_DIFF_EXTRA_RC:-${FAKE_DIFF_RC:-0}}" ;; esac; exit "${FAKE_DIFF_RC:-0}" ;;
 esac
 exit 99
 FAKE
@@ -671,7 +671,27 @@ foreach my $p ('!PWE/t/**', '!PWE/tools/**') {
     my ($pos) = grep { $push[$_] eq 'PWE/**' } 0 .. $#push;
     ok(defined($neg) && defined($pos) && $neg > $pos, "images.yml: $p je vyjimka uvedena az za PWE/** (plati posledni odpovidajici vzor)");
 }
-is(join(' ', sort split(' ', $JOB_ENV{'IMAGE_PATHS'} // '')), join(' ', sort map { (my $x = $_) =~ s{/\*\*$}{}; ($x =~ s{^!}{}) ? ":(exclude)$x" : $x } @push), 'images.yml: env IMAGE_PATHS = on.push.paths vcetne vyjimek (krok Branch head srovnava tytez cesty)');
+# Kourove kontroly (brana pred publikaci) vstupem image zustavaji, i kdyz lezi ve vyrazenem PWE/tools: v paths
+# jsou uvedene az za vyjimkou a pro git diff (ktery je v jednom volani s :(exclude) vratit neumi) v IMAGE_EXTRA_PATHS.
+my @extra = grep { my $i = $_; $push[$i] !~ /^!/ && grep { my $n = $push[$_]; ($n =~ s{^!(.*)/\*\*$}{$1}) && index($push[$i], "$n/") == 0 } 0 .. $i - 1 } 0 .. $#push;
+is(join(' ', map { $push[$_] } @extra), 'PWE/tools/smoke-images.sh PWE/tools/lib/images.sh', 'images.yml: kourove kontroly (smoke-images.sh, lib/images.sh) jsou vstupem image uvedenym za vyjimkou PWE/tools');
+is($JOB_ENV{'IMAGE_EXTRA_PATHS'} // '', join(' ', map { $push[$_] } @extra), 'images.yml: env IMAGE_EXTRA_PATHS = cesty z on.push.paths uvedene za vyjimkou');
+{
+    my %is_extra = map { $_ => 1 } @extra;
+    is(join(' ', sort split(' ', $JOB_ENV{'IMAGE_PATHS'} // '')), join(' ', sort map { (my $x = $push[$_]) =~ s{/\*\*$}{}; ($x =~ s{^!}{}) ? ":(exclude)$x" : $x } grep { !$is_extra{$_} } 0 .. $#push), 'images.yml: env IMAGE_PATHS = on.push.paths vcetne vyjimek (krok Branch head srovnava tytez cesty)');
+}
+like(step_run($WF, 'Branch head'), qr/git diff --quiet "\$GITHUB_SHA" "\$head" -- "\$\{extra\[\@\]\}"/, 'images.yml: Branch head srovnava i cesty z IMAGE_EXTRA_PATHS (druhe volani git diff)');
+{
+    my $NEW = 'b' x 40;
+    my @h   = ('FAKE_HEADS' => "$NEW\\trefs/heads/pwe.ai\\n", 'IMAGE_EXTRA_PATHS' => 'PWE/tools/smoke-images.sh PWE/tools/lib/images.sh');
+    my ($rc, $publish, $log, $calls) = branch_head(@h, 'FAKE_DIFF_RC' => 0, 'FAKE_DIFF_EXTRA_RC' => 1);
+    is("$rc $publish", '0 false', 'Branch head: hlava meni jen kourove kontroly -> meni vstupy image, tento beh nepublikuje') or diag($log);
+    like($calls, qr/^diff --quiet \S+ $NEW -- PWE\/tools\/smoke-images\.sh PWE\/tools\/lib\/images\.sh$/m, 'Branch head: druhe volani git diff jen nad IMAGE_EXTRA_PATHS');
+    ($rc, $publish, $log, $calls) = branch_head(@h, 'FAKE_DIFF_RC' => 0, 'FAKE_DIFF_EXTRA_RC' => 0);
+    is("$rc $publish", '0 true', 'Branch head: hlava se nelisi ve vstupech ani v kourovych kontrolach -> publikuje se') or diag($log);
+    ($rc, $publish, $log, $calls) = branch_head('FAKE_HEADS' => "$NEW\\trefs/heads/pwe.ai\\n", 'FAKE_DIFF_RC' => 0, 'IMAGE_EXTRA_PATHS' => '');
+    is(scalar(() = $calls =~ /^diff /mg), 1, 'Branch head: prazdny IMAGE_EXTRA_PATHS = jedine volani git diff');
+}
 like(step_run($WF, 'Branch head'), qr/git diff --quiet "\$GITHUB_SHA" "\$head" -- "\$\{paths\[\@\]\}"/, 'images.yml: Branch head srovnava cesty z IMAGE_PATHS');
 
 # Image vzorovych webu se stavi Dockerfilem vzoroveho webu z korene repozitare (engine i web jdou z kontextu
@@ -689,8 +709,11 @@ sub covered {
     }
     return $hit;
 }
-is(join(' ', map { covered($_) } 'PWE/tools/k8s.sh', 'PWE/tools/lib/images.sh', 'PWE/t/14-tools.t', 'PWE/t', 'PWE/tools', 'PWE/toolsx/a', 'PWE/docker/entrypoint.sh', 'PWE/pwe.fcgi'),
-    '0 0 0 0 0 1 1 1', 'covered: testy a nastroje enginu vstupem image nejsou, zbytek PWE/ ano');
+is(join(' ', map { covered($_) } 'PWE/tools/k8s.sh', 'PWE/tools/lib/PWE/ToolEnv.pm', 'PWE/t/14-tools.t', 'PWE/t', 'PWE/tools', 'PWE/toolsx/a', 'PWE/docker/entrypoint.sh', 'PWE/pwe.fcgi', 'PWE/tools/smoke-images.sh', 'PWE/tools/lib/images.sh'),
+    '0 0 0 0 0 1 1 1 1 1', 'covered: testy a nastroje enginu vstupem image nejsou (krome kourovych kontrol), zbytek PWE/ ano');
+# Skutecne vstupy image nesmi vyradit zadna dalsi vyjimka (ani kdyby byla ve vsech trech seznamech shodne).
+is(join(' ', grep { !covered($_) } 'docker-bake.hcl', '.dockerignore', 'LICENSE', '.github/workflows/images.yml', 'PWE/VERSION', 'PWE/docker/Dockerfile', context_sources(slurp("$REPO/PWE/docker/Dockerfile")), map { "webapps/$_/Dockerfile" } 'example.web', 'example-db.web'),
+    '', 'images.yml: Dockerfile zavislostnich image, jeho zdroje z kontextu, bake, .dockerignore, VERSION a Dockerfile vzorovych webu jsou vstupem image');
 is(join(' ', map { covered($_) } 'PWE', 'PWE/Libs/Web.pm', 'LICENSE', 'webapps/example.web', 'webapps/example.web/conf/web.conf', 'webapps/example.webx', 'webapps', 'LICENSE.txt', '.', 'README.md'),
     '1 1 1 1 1 0 0 0 0 0', 'covered: cesta pod vstupem image (adresar/** vcetne adresare sameho, soubor presne)');
 is(join(' ', context_sources("FROM x\nCOPY --link a b/ /dst/\nCOPY --from=y c /c\nADD ./d /d\nRUN --mount=type=bind,source=e,target=/e --mount=type=cache,target=/f \\\n    true\nCOPY g \\\n    h /i/\n")),
@@ -710,6 +733,11 @@ is(join(' ', grep { $images_path{$_} } @tpush), '', 'tests.yml: zadna cesta spol
 is(join(' ', grep { covered($_) || (m{^(?:webapps|PWE)/} && !m{^PWE/(?:t|tools)/\*\*$}) } @tpush), '', 'tests.yml: vzorove weby, engine ani jiny vstup image nesleduje (patri images.yml)');
 foreach my $p ('PWE/t/**', 'PWE/tools/**') {
     ok(scalar(grep { $_ eq $p } @tpush), "tests.yml: $p hlida workflow Tests (v image neni, images.yml ho vynechava)");
+}
+foreach my $p (map { $push[$_] } @extra) {
+    my ($neg) = grep { $tpush[$_] eq "!$p" } 0 .. $#tpush;
+    my ($pos) = grep { $tpush[$_] eq 'PWE/tools/**' } 0 .. $#tpush;
+    ok(defined($neg) && defined($pos) && $neg > $pos, "tests.yml: $p vynechava (patri images.yml) - seznamy se neprekryvaji");
 }
 unlike($TESTS, qr/^\s+TAG: /m, 'tests.yml: zadna promenna TAG pro bake');
 like($TESTS, qr/^      PWE_TEST_IMAGE: localhost\/pwe-tests\/pwe-base:latest$/m, 'tests.yml: testy bezi v mistnim pwe-base:latest');

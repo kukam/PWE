@@ -1499,7 +1499,7 @@ EOS
         }
         return join('', @lines);
     };
-    # soubory enginu "v image": stejne jako v kopii repozitare (PWE/ bez t/ a docker/), nebo jine
+    # soubory enginu "v image": stejne jako v kopii repozitare (PWE/ bez t/, docker/ a tools/), nebo jine
     my @tree;
     my $walk;
     $walk = sub {
@@ -1670,7 +1670,7 @@ EOS
     like($out, qr/--read-only a tmpfs pres pracovni adresare webu/, 'smoke-images.sh --help: beh s --read-only popisuje vcetne tmpfs pres pracovni adresare');
     like($out, qr/Jen s --read-only, bez zapisovatelnych pracovnich adresaru,\s+engine request neobslouzi/, 'smoke-images.sh --help: netvrdi, ze image bezi jen s --read-only');
     unlike($out, qr/pwe-static|\bimage pwe(?![\w.-])|vsech 7|COPY --from=pwe/, 'smoke-images.sh --help: zadna zminka o zrusenych image pwe a pwe-static');
-    # vyjimky z enginu v image (t, docker): skript = PWE::ToolEnv::engine_image_excludes
+    # vyjimky z enginu v image (t, docker, tools): skript = PWE::ToolEnv::engine_image_excludes
     like(slurp($smoke), qr/^ENGINE_EXCLUDES="@{[join(' ', PWE::ToolEnv::engine_image_excludes())]}"$/m, 'smoke-images.sh: polozky enginu mimo image (ENGINE_EXCLUDES) = PWE::ToolEnv::engine_image_excludes()');
 
     # --- vsech 9 image: zavislostni image bez enginu a bez webu, image vzorovych webu s enginem a vzorovym webem ---
@@ -2040,7 +2040,7 @@ SKIP: {
     is(scalar(() = $code =~ /"latest"/g), 1, 'docker-bake.hcl: tag latest je jen ve funkci image_tags (zadny cil si tagy nesklada sam)');
     # zaklad image vzorovych webu: <prvni registr>/<image>:<VERSION> = to, co stoji ve FROM Dockerfile webu
     like($function{'base_registry'} || '', qr/^\s*result\s*=\s*\[for registry in split\(",",\s*REGISTRIES\)\s*:\s*trimspace\(registry\) if trimspace\(registry\) != ""\]\[0\]\s*$/m, 'docker-bake.hcl: base_registry() = prvni neprazdny registr ze seznamu REGISTRIES');
-    like($function{'base_ref'} || '', qr/^\s*result\s*=\s*"\$\{base_registry\(\)\}\/\$\{image\}:\$\{VERSION\}"\s*$/m, 'docker-bake.hcl: base_ref(image) = <prvni registr>/<image>:<VERSION> (zaklad se stejnou verzi jako image vzoroveho webu)');
+    like($function{'base_ref'} || '', qr/^\s*result\s*=\s*regex_replace\("\$\{base_registry\(\)\}\/\$\{image\}:\$\{VERSION\}", "\^\(index\[\.\]\)\?docker\[\.\]io\/\(library\/\)\?", ""\)\s*$/m, 'docker-bake.hcl: base_ref(image) = <prvni registr>/<image>:<VERSION> (zaklad se stejnou verzi jako image vzoroveho webu)');
 
     # --- zavislostni image: stage v PWE/docker/Dockerfile, bez verze enginu, bez popisku commitu a casu ---
     my $common = $target{'_common'} || '';
@@ -2076,6 +2076,7 @@ SKIP: {
         unlike($body, qr/^\s*target\s*=/m,                      "docker-bake.hcl: cil $name nestavi zadny stage PWE/docker/Dockerfile");
         like($body, qr/^\s*PWE_PROFILE\s*=\s*"\Q$profile\E"\s*$/m, "docker-bake.hcl: cil $name - argument PWE_PROFILE=$profile");
         like($body, qr/^\s*contexts\s*=\s*\{\s*\n\s*"\$\{base_ref\("\Q$base_image\E"\)\}"\s*=\s*"target:\Q$base_target\E"\s*\n\s*\}/m, "docker-bake.hcl: cil $name - FROM <registr>/$base_image:<verze> se nahradi prave sestavenym cilem $base_target (contexts)");
+        is_deeply([sort($body =~ /^\s*(PWE_\w+)\s*=/mg)], ['PWE_PROFILE'], "docker-bake.hcl: cil $name nastavuje jen argument PWE_PROFILE (PWE_IMAGE_REGISTRY a PWE_IMAGE_TAG jen ve spolecnem _example - jinak by FROM neodpovidal klici contexts)");
         is(scalar(() = $body =~ /"target:/g), 1,                "docker-bake.hcl: cil $name zavisi prave na jednom cili (svem zakladu)");
         like($body, qr/"org\.opencontainers\.image\.title"\s*=\s*"pwe-\Q$name\E"/, "docker-bake.hcl: cil $name - popisek title = jmeno image pwe-$name (ne nazev webu)");
         like($body, qr/^\s*tags\s*=\s*image_tags\("pwe-\Q$name\E"\)\s*$/m, "docker-bake.hcl: cil $name oznacuje image pwe-$name tagy <verze> a latest (image_tags)");

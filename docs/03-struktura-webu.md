@@ -305,8 +305,8 @@ ARG PWE_IMAGE_REGISTRY
 ARG PWE_IMAGE_TAG
 ARG PWE_PROFILE
 
-# Engine z kontextu sestaveni do /PWE/PWE: vsechny polozky adresare PWE/ krome testu (PWE/t) a sestaveni
-# zavislostnich image (PWE/docker). Vycet musi byt uplny - make check (PWE/tools/check-webapp.pl) upozorni,
+# Engine z kontextu sestaveni do /PWE/PWE: vsechny polozky adresare PWE/ krome testu (PWE/t), sestaveni
+# zavislostnich image (PWE/docker) a nastroju pro vyvojare (PWE/tools). Vycet musi byt uplny - make check (PWE/tools/check-webapp.pl) upozorni,
 # kdyz v nem nektera polozka enginu chybi (napr. po aktualizaci enginu: pak Dockerfile vygeneruj znovu).
 # Poradi od nejmene po nejcasteji menene. COPY --link: vrstva nezavisi na vrstvach pod sebou - zmena zakladu
 # ji nezneplatni a image webu nad stejnym enginem ji sdili.

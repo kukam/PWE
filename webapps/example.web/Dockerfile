@@ -1,7 +1,7 @@
 # Image webu example.web = zavislostni image PWE + engine + tento web:
 #   - zaklad pwe-base: Perl, knihovny enginu a entrypoint (bez DB ovladacu - web bez databaze);
 #     kod enginu ani zadny web v nem neni,
-#   - engine z kontextu sestaveni (adresar PWE/ repozitare enginu bez PWE/t a PWE/docker) do /PWE/PWE,
+#   - engine z kontextu sestaveni (adresar PWE/ repozitare enginu bez PWE/t, PWE/docker a PWE/tools) do /PWE/PWE,
 #   - tento web z webapps/example.web do /PWE/webapps/example.web.
 #
 # Sestaveni VZDY z korene repozitare enginu (kontext "."): engine i web se berou z pracovni kopie, verze enginu
@@ -35,8 +35,8 @@ ARG PWE_IMAGE_REGISTRY
 ARG PWE_IMAGE_TAG
 ARG PWE_PROFILE
 
-# Engine z kontextu sestaveni do /PWE/PWE: vsechny polozky adresare PWE/ krome testu (PWE/t) a sestaveni
-# zavislostnich image (PWE/docker). Vycet musi byt uplny - make check (PWE/tools/check-webapp.pl) upozorni,
+# Engine z kontextu sestaveni do /PWE/PWE: vsechny polozky adresare PWE/ krome testu (PWE/t), sestaveni
+# zavislostnich image (PWE/docker) a nastroju pro vyvojare (PWE/tools). Vycet musi byt uplny - make check (PWE/tools/check-webapp.pl) upozorni,
 # kdyz v nem nektera polozka enginu chybi (napr. po aktualizaci enginu: pak Dockerfile vygeneruj znovu).
 # Poradi od nejmene po nejcasteji menene. COPY --link: vrstva nezavisi na vrstvach pod sebou - zmena zakladu
 # ji nezneplatni a image webu nad stejnym enginem ji sdili.

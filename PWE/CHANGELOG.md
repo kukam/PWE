@@ -195,7 +195,8 @@ v `docs/03-struktura-webu.md`, „Zámek migrace“, a `docs/17-nasazeni.md`, �
 
 - Nástroje pro vývojáře (`PWE/tools`) už nejsou součástí image webu (engine je za běhu nepotřebuje) a spolu
   s testy (`PWE/t`) přestaly být vstupem image: změna skriptu nebo testu spouští jen workflow Tests, image se
-  kvůli ní nesestavují ani nepublikují. `make k8s-delete` odmítne název dalšího releasu v `ARGS` (obešel by
+  kvůli ní nesestavují ani nepublikují (výjimkou jsou kouřové kontroly `smoke-images.sh` a `lib/images.sh`,
+  brána před publikací). `make k8s-delete` odmítne název dalšího releasu v `ARGS` (obešel by
   pojistku hesel).
 
 **Testy:** nové `t/23-dbversion-lock.t` (zámek migrace nad falešnou databází), `t/24-shutdown.t` (ukončování

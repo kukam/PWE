@@ -1,7 +1,7 @@
 # Kontext pro docker build. Z korene repozitare se stavi
 #   - zavislostni image (PWE/docker/Dockerfile): z kontextu berou jen PWE/docker/entrypoint.sh,
 #   - image webu (webapps/<web>/Dockerfile, i image vzorovych webu pwe-example-*): z kontextu berou engine
-#     (LICENSE a adresar PWE/ bez PWE/t a PWE/docker) a adresar webu webapps/<web>.
+#     (LICENSE a adresar PWE/ bez PWE/t, PWE/docker a PWE/tools) a adresar webu webapps/<web>.
 # Co je tady vyjmenovane, se do zadneho image nedostane, ani kdyby na to Dockerfile ukazoval.
 
 # **/.git: weby ve webapps/<web> maji vlastni git repozitar - jeho historie do image webu nepatri

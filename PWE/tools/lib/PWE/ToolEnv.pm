@@ -266,8 +266,9 @@ sub dockerfile_base {
 
 =head2 B<[Public] engine_image_excludes()>
 
-    Vraci polozky korene enginu (PWE/), ktere do image webu NEPATRI: t (testy) a docker (sestaveni
-    zavislostnich image). Vse ostatni v koreni enginu sablona Dockerfile webu kopiruje do
+    Vraci polozky korene enginu (PWE/), ktere do image webu NEPATRI: t (testy), docker (sestaveni
+    zavislostnich image) a tools (nastroje pro vyvojare - bezi na hostiteli nebo nad namountovanym
+    repozitarem, engine je za behu nepotrebuje). Vse ostatni v koreni enginu sablona Dockerfile webu kopiruje do
     /PWE/PWE - hlida to PWE/t/14-tools.t; stejny seznam maji kourove kontroly
     PWE/tools/smoke-images.sh.
 

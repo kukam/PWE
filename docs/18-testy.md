@@ -234,7 +234,8 @@ Testy enginu běží ve dvou workflow GitHub Actions
 
 - **`.github/workflows/images.yml`** staví a publikuje image. Spouští se při `push` do libovolné
   větve (kromě `dependabot/**`) a u pull requestů, pokud mění vstupy image — `PWE/**` kromě `PWE/t/**`
-  a `PWE/tools/**` (testy a nástroje v image nejsou; jejich změna spouští jen workflow Tests),
+  a `PWE/tools/**` (testy a nástroje v image nejsou; jejich změna spouští jen workflow Tests — kromě kouřových kontrol
+  `PWE/tools/smoke-images.sh` a `PWE/tools/lib/images.sh`, které workflow Images spouštějí dál),
   `docker-bake.hcl`, `.dockerignore`, `LICENSE`, vzorové weby `webapps/example.web/**`
   a `webapps/example-db.web/**` (vznikají z nich image vzorových webů) nebo samotný workflow —, a ručně
   (*Run workflow*). Sestaví všech devět image pro `linux/amd64`, v čerstvém **`pwe-base`** (engine

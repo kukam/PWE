@@ -97,10 +97,14 @@ on:
     # vstupy image - stejny seznam ma pull_request.paths a env IMAGE_PATHS jobu
     # Testy (PWE/t) a nastroje pro vyvojare (PWE/tools) v image nejsou: jejich zmena image nemeni, proto
     # workflow nespousti (hlida ji workflow Tests); v IMAGE_PATHS je vyjimka zapsana jako :(exclude)<cesta>.
+    # Vyjimkou z vyjimky jsou kourove kontroly (smoke-images.sh a lib/images.sh, ktery nacitaji): jsou branou
+    # pred publikaci, jejich zmena se proto musi projit nad skutecnymi image (env IMAGE_EXTRA_PATHS).
     paths:
       - 'PWE/**'
       - '!PWE/t/**'
       - '!PWE/tools/**'
+      - 'PWE/tools/smoke-images.sh'
+      - 'PWE/tools/lib/images.sh'
       - 'docker-bake.hcl'
       - '.dockerignore'
       - 'LICENSE'
@@ -112,6 +116,8 @@ on:
       - 'PWE/**'
       - '!PWE/t/**'
       - '!PWE/tools/**'
+      - 'PWE/tools/smoke-images.sh'
+      - 'PWE/tools/lib/images.sh'
       - 'docker-bake.hcl'
       - '.dockerignore'
       - 'LICENSE'
@@ -162,6 +168,8 @@ jobs:
       BAKE_TARGETS: base mariadb mysql postgres debugger example-static example-mariadb example-mysql example-postgres
       # vstupy image jako cesty pro "git diff" (krok Branch head) - musi odpovidat on.push.paths
       IMAGE_PATHS: PWE :(exclude)PWE/t :(exclude)PWE/tools docker-bake.hcl .dockerignore LICENSE webapps/example.web webapps/example-db.web .github/workflows/images.yml
+      # soubory uvnitr vyrazeneho adresare, ktere vstupem image jsou (v on.push.paths uvedene za vyjimkou)
+      IMAGE_EXTRA_PATHS: PWE/tools/smoke-images.sh PWE/tools/lib/images.sh
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -486,10 +494,16 @@ jobs:
               # Lisi se hlava od tohoto commitu ve vstupech image? Cesty jsou v env IMAGE_PATHS jobu
               # (musi odpovidat on.push.paths); prazdny seznam by srovnaval cely strom - radeji chyba.
               read -r -a paths <<< "${IMAGE_PATHS:?chybi seznam vstupu image (env IMAGE_PATHS jobu)}"
+              # Soubory uvnitr vyrazeneho adresare, ktere vstupem image jsou (env IMAGE_EXTRA_PATHS): jedno
+              # volani git diff s :(exclude) je vratit neumi, proto druhe srovnani.
+              read -r -a extra <<< "${IMAGE_EXTRA_PATHS:-}"
               rc=0
               git_fetch --quiet --no-tags --depth=1 origin "$head" 2> "$RUNNER_TEMP/fetch.err" || rc=$?
               if [ "$rc" -eq 0 ]; then
                 git diff --quiet "$GITHUB_SHA" "$head" -- "${paths[@]}" 2>> "$RUNNER_TEMP/fetch.err" || rc=$?
+              fi
+              if [ "$rc" -eq 0 ] && [ "${#extra[@]}" -gt 0 ]; then
+                git diff --quiet "$GITHUB_SHA" "$head" -- "${extra[@]}" 2>> "$RUNNER_TEMP/fetch.err" || rc=$?
               fi
               if [ "$rc" -eq 0 ]; then
                 echo "Hlava vetve $head se od $GITHUB_SHA lisi jen mimo vstupy image (beh Images pro ni nevznikne) - image se publikuji"

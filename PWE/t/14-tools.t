@@ -4,7 +4,7 @@
 # shell funkcim tools/lib/images.sh; tag = verze enginu z VERSION, bez gitu; profil static -> pwe-base),
 # Dockerfile webu (jediny FROM = zavislostni image bez enginu - pwe-base pro web bez databaze, pwe-<profil>
 # pro web s databazi; engine se kopiruje z kontextu sestaveni a sablona pokryva kazdou polozku korene enginu
-# krome t a docker; zadny mazaci RUN; zadny vlastni entrypoint), check-webapp.pl nad Dockerfile webu (varovani
+# krome t, docker a tools; zadny mazaci RUN; zadny vlastni entrypoint), check-webapp.pl nad Dockerfile webu (varovani
 # na starsi sablony, na chybejici polozku enginu a na jiny radek FROM), Dockerfile zavislostnich image (stage
 # base, mariadb, mysql, postgres, debugger - bez enginu a bez webu; balicky), docker-compose.yml,
 # .dockerignore (soukrome klice webu, docasna data, testy enginu) a entrypoint image docker/entrypoint.sh
@@ -113,7 +113,7 @@ sub dockerfile_engine_sources {
 #   - jediny FROM = zavislostni image BEZ enginu: pwe-base pro web bez databaze (profil static), pwe-${PWE_PROFILE}
 #     pro web s databazi,
 #   - engine z kontextu sestaveni: COPY LICENSE a COPY PWE/<polozka> pro kazdou polozku korene enginu krome
-#     t a docker (PWE::ToolEnv::engine_image_entries) - nova polozka enginu, kterou sablona nekopiruje, test shodi,
+#     t, docker a tools (PWE::ToolEnv::engine_image_entries) - nova polozka enginu, kterou sablona nekopiruje, test shodi,
 #   - web z webapps/<web>; entrypoint zdedeny ze zakladniho image; jedina instrukce RUN (pracovni adresare a
 #     symlink conf/database.conf) - sablona nic nemaze.
 # Vraci seznam [nazev, kontrola]; kontrola dostane instrukce (dockerfile_instructions) a vraci pravdu.
@@ -160,7 +160,7 @@ sub dockerfile_checks {
             return (defined($head) and !(grep { $head !~ /^ARG \Q$_\E$/m } qw(PWE_PROFILE PWE_IMAGE_REGISTRY PWE_IMAGE_TAG)));
         }],
         ['engine z kontextu sestaveni: COPY LICENSE do /PWE/LICENSE',                  $has->(qr{^COPY (?:--link )?LICENSE /PWE/LICENSE$}m)],
-        ['engine z kontextu sestaveni: COPY PWE/<polozka> pro KAZDOU polozku korene enginu krome t a docker (nova polozka enginu nesmi v image tise chybet)', sub {
+        ['engine z kontextu sestaveni: COPY PWE/<polozka> pro KAZDOU polozku korene enginu krome t, docker a tools (nova polozka enginu nesmi v image tise chybet)', sub {
             my $src = dockerfile_engine_sources($_[0]);
             my @missing = grep { !exists($src->{$_}) } @entries;
             diag("sablona nekopiruje polozky enginu: @missing - dopln COPY do gen_dockerfile (PWE/tools/new-webapp.pl) a vygeneruj znovu Dockerfile vzorovych webu") if (@missing);
@@ -170,6 +170,12 @@ sub dockerfile_checks {
             my $src = dockerfile_engine_sources($_[0]);
             my %known = map { $_ => 1 } @entries;
             return (!(grep { !$known{$_} } keys %{$src}) and $_[0] !~ m{^COPY (?:--\S+ )*(?:\S+ )*PWE/? }m);
+        }],
+        ['z kontextu se kopiruje jen LICENSE, polozky korene enginu a tento web (zadna vnorena cesta PWE/<x>/<y>, zadny cely kontext)', sub {
+            my %known = map { ("PWE/$_" => 1) } @entries;
+            my @src;
+            foreach my $copy ($_[0] =~ /^COPY ([^\n]+)$/mg) { my @w = grep { !/^--/ } split(' ', $copy); pop(@w); push(@src, @w); }
+            return !(grep { my $s = $_; $s =~ s{/+$}{}; !($s eq 'LICENSE' or $s eq "webapps/$web" or $known{$s}) } @src);
         }],
         ['engine: cil kazde polozky je /PWE/PWE (adresar do /PWE/PWE/<adresar>, soubory do /PWE/PWE/)', sub {
             my $src = dockerfile_engine_sources($_[0]);
@@ -1362,6 +1368,11 @@ SKIP: {
     my @copies = map { my $st = $_; map { "$st: $_" } ($body{$st} =~ /^(COPY [^\n]*)$/mg) } @stages;
     is_deeply(\@copies, ['base: COPY --chmod=0755 PWE/docker/entrypoint.sh /usr/local/bin/entrypoint.sh'], 'Dockerfile zavislostnich image: jedina instrukce COPY v celem souboru je entrypoint (zadny kod enginu, zadny web, zadne COPY --from)');
     unlike($engine_df =~ s/^\s*#.*\n//mgr, qr{^ADD\b}m, 'Dockerfile zavislostnich image: zadna instrukce ADD');
+    foreach my $st (@stages) {
+        my @run = $body{$st} =~ /^(RUN [^\n]*)$/mg;
+        ok(@run == 1 && $run[0] =~ /^RUN set -eux; export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install / && $run[0] !~ /--mount\b/,
+            "Dockerfile zavislostnich image: stage $st ma jediny RUN (instalace balicku) bez --mount - z kontextu sestaveni se krome entrypointu nic nebere") or diag(join("\n", @run));
+    }
     foreach my $st (@stages) {
         unlike($body{$st}, qr{\bwebapps/example|PWE_CONF_pwe_home|PWE_PROFILE|pwe-sample-web|PWE_VERSION}, "Dockerfile zavislostnich image: stage $st je bez vzoroveho webu, bez ENV webu (PWE_CONF_pwe_home, PWE_PROFILE), bez znacky vzoroveho webu a bez verze enginu");
         like($body{$st}, qr{^LABEL .*\borg\.opencontainers\.image\.title="pwe-\Q$st\E"(?: |$)}m, "Dockerfile zavislostnich image: stage $st - popisek title pwe-$st");

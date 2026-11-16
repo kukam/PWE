@@ -44,9 +44,12 @@ on:
       - '**'
       - '!dependabot/**'
     # PWE/t a PWE/tools: testy a nastroje pro vyvojare - v image nejsou, workflow Images je vynechava
+    # (krome kourovych kontrol smoke-images.sh a lib/images.sh - ty hlida workflow Images, tady se vynechavaji)
     paths:
       - 'PWE/t/**'
       - 'PWE/tools/**'
+      - '!PWE/tools/smoke-images.sh'
+      - '!PWE/tools/lib/images.sh'
       - 'docker-compose.yml'
       - 'docker-compose/**'
       - 'kubernetes/**'
@@ -57,6 +60,8 @@ on:
     paths:
       - 'PWE/t/**'
       - 'PWE/tools/**'
+      - '!PWE/tools/smoke-images.sh'
+      - '!PWE/tools/lib/images.sh'
       - 'docker-compose.yml'
       - 'docker-compose/**'
       - 'kubernetes/**'

@@ -1224,6 +1224,19 @@ ok(scalar(calls('kubectl')) && !grep({ !has_pair($_, '--context', 'ctx-test') } 
 ($rc, $out, $err) = k8s({%CTX}, 'logs', 'static', '-c', 'fcgi');
 my ($lg) = calls('kubectl');
 ok(has_pair($lg, '-c', 'fcgi') && !has_arg($lg, '--all-containers'), 'logs -c: bez --all-containers');
+# Regrese: slepene tvary -c (-cfcgi, -c=fcgi, -fc fcgi) a --container=fcgi nechaly --all-containers, ktery kubectl
+# s vybranym kontejnerem odmita.
+foreach my $form (['-cfcgi'], ['-c=fcgi'], ['-fc', 'fcgi'], ['--container=fcgi'], ['--container', 'fcgi']) {
+    ($rc, $out, $err) = k8s({%CTX}, 'logs', 'static', @{$form});
+    my ($l) = calls('kubectl');
+    ok($l && has_arg($l, $form->[0]) && !has_arg($l, '--all-containers'), "logs @{$form}: bez --all-containers");
+}
+# prepinac s hodnotou, ktera jen obsahuje pismeno c, vyber kontejneru neni
+($rc, $out, $err) = k8s({%CTX}, 'logs', 'static', '--since=1h', '-f');
+{
+    my ($l) = calls('kubectl');
+    ok($l && has_arg($l, '--all-containers'), 'logs --since=1h -f: --all-containers zustava');
+}
 ($rc, $out, $err) = k8s({%CTX}, 'logs', 'static');
 ($lg) = calls('kubectl');
 ok(has_arg($lg, '--all-containers') && has_pair($lg, '--context', 'ctx-test'), 'logs: --all-containers a --context');
@@ -1266,6 +1279,9 @@ is($rc, 0, 'delete --timeout 5m: hodnota prepinace oddelena mezerou neni dalsi r
 }
 ($rc, $out, $err) = k8s({%CTX}, 'delete', 'static', '--timeout', '5m', 'pwe-generic');
 is($rc, 2, 'delete: dalsi release za prepinacem s hodnotou se odmitne take');
+($rc, $out, $err) = k8s({%CTX}, 'delete', 'static', '--', 'pwe-generic');
+is($rc, 2, 'delete: dalsi release za oddelovacem -- se odmitne take');
+ok(!grep({ $_->[1] eq 'uninstall' } calls('helm')), 'delete -- <dalsi release>: helm uninstall se nevola');
 spit($SECRETS, "secrets:\n  db:\n    data:\n      MARIADB_PASSWORD: \"x\"\n", 0600);
 ($rc, $out, $err) = k8s({%CTX}, 'delete', 'generic');
 is($rc, 0, 'delete s mistnim souborem s hesly: kod 0 bez vyjimky') or diag($err);

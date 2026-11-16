@@ -635,7 +635,8 @@ a image existují jen v Dockeru runneru.
 
 **Vstupy image** (cesty, jejichž změna workflow Images spouští): `PWE/**` kromě testů `PWE/t/**` a nástrojů
 `PWE/tools/**` (v image nejsou — jejich změna image nemění, nic nesestaví ani nepublikuje a hlídá ji
-workflow Tests), `docker-bake.hcl`,
+workflow Tests; výjimkou jsou kouřové kontroly `PWE/tools/smoke-images.sh` a `PWE/tools/lib/images.sh`,
+které jsou branou před publikací a vstupem image zůstávají), `docker-bake.hcl`,
 `.dockerignore`, `LICENSE`, vzorové weby `webapps/example.web/**` a `webapps/example-db.web/**` (z nich
 a z jejich `Dockerfile` vznikají image vzorových webů) a samotný workflow. Změna jen v `docs/`, v `docker-compose.yml`,
 `kubernetes/` nebo `Makefile` workflow Images nespouští (soubory stacku, `kubernetes/` a `Makefile`
@@ -878,8 +879,8 @@ ARG PWE_IMAGE_REGISTRY
 ARG PWE_IMAGE_TAG
 ARG PWE_PROFILE
 
-# Engine z kontextu sestaveni do /PWE/PWE: vsechny polozky adresare PWE/ krome testu (PWE/t) a sestaveni
-# zavislostnich image (PWE/docker). Vycet musi byt uplny - make check (PWE/tools/check-webapp.pl) upozorni,
+# Engine z kontextu sestaveni do /PWE/PWE: vsechny polozky adresare PWE/ krome testu (PWE/t), sestaveni
+# zavislostnich image (PWE/docker) a nastroju pro vyvojare (PWE/tools). Vycet musi byt uplny - make check (PWE/tools/check-webapp.pl) upozorni,
 # kdyz v nem nektera polozka enginu chybi (napr. po aktualizaci enginu: pak Dockerfile vygeneruj znovu).
 # Poradi od nejmene po nejcasteji menene. COPY --link: vrstva nezavisi na vrstvach pod sebou - zmena zakladu
 # ji nezneplatni a image webu nad stejnym enginem ji sdili.
@@ -1553,7 +1554,11 @@ a chrání se jen sloupcem `lockid`:
 - krok migrace, který staršímu enginu trvá déle než tato doba, se od opuštěného zámku rozlišit nedá
   — nová verze by ho převzala a kroky by proběhly dvakrát. Má-li web takto dlouhé kroky, nastav
   dobu delší než nejdelší krok (nebo `0`), případně nenasazuj novou verzi ve chvíli, kdy proces
-  starší verze právě migruje. Běžící starší procesy, které nemigrují, nevadí.
+  starší verze právě migruje. Běžící starší procesy, které nemigrují, nevadí;
+- první start nad **prázdnou** databází současně se starším enginem může v tabulce `dbversion`
+  výjimečně nechat dva shodné řádky (na MySQL 1 z 1 288 zkušebních startů, na MariaDB a PostgreSQL
+  žádný; když starší engine zakládá tabulku déle než sekundu, i častěji). Kroky migrace přitom proběhnou
+  jednou a další starty i migrace fungují — oba řádky se mění společně. Náprava: jeden řádek smazat.
 
 Kontrola zámku přímo v databázi: MySQL/MariaDB `SELECT IS_USED_LOCK('pwe.dbversion.<databáze>')`
 (jméno delší než 64 znaků se nahrazuje `pwe.<md5>`), PostgreSQL
@@ -1572,7 +1577,7 @@ Hlášky v logu:
 | `[E] Dbversion: zamek spojeni neni k dispozici (dbid:<dbid>, …) - soubezne migraci brani jen sloupec dbversion.lockid` | ovladač zámek spojení nedal (chyba dotazu, pooler v režimu transaction pooling); proces pokračuje ve starém režimu |
 | `[E] Dbversion: tabulka dbversion (dbid:<dbid>) nema zadny radek …` | pád mezi založením tabulky a prvním řádkem; se zámkem spojení engine řádek doplní sám (až když je tabulka bez řádku i po dalším čtení za cca 1 s — může ji právě zakládat starší verze enginu), bez něj čeká a radí ruční `INSERT INTO dbversion (dbversion,lockid) VALUES (0,0)` |
 | `[E] Dbversion: tabulka dbversion (dbid:<dbid>) existuje, ale ne tam, kde ji hleda kontrola existence … - pouzivam ji; CREATE TABLE selhal: …` | PostgreSQL: tabulka leží v jiném schématu, než je klíč `schema` v konfiguraci (rozhoduje `search_path` účtu); engine ji použije. Srovnej `schema` s `search_path` |
-| `[I] Dbversion: tabulku dbversion (dbid:<dbid>) mezitim zalozil jiny proces … - pouzivam ji; CREATE TABLE selhal: …` | souběžný první start nad čistou databází se starší verzí enginu: tabulku založila ona. V pořádku (chybu samotného `CREATE TABLE` engine i tak zapíše jako `[E]`) |
+| `[I] Dbversion: tabulku dbversion (dbid:<dbid>) mezitim zalozil jiny proces … - pouzivam ji; CREATE TABLE selhal: …` | souběžný první start nad čistou databází se starší verzí enginu: tabulku založila ona. V pořádku (chybu samotného `CREATE TABLE` engine i tak zapíše jako `[E]`; MySQL ji v tomto souběhu hlásí i jako `DB ERROR:1213, Deadlock found` — o uváznutí migrace nejde) |
 | `[E] Dbversion: zamek spojeni (dbid:<dbid>) se nepodarilo uvolnit dotazem - spojeni pool 0 se zavira, zamek uvolni server` | úklid po migraci; engine spojení otevře znovu. U PostgreSQL hláška dodává, že za poolerem v režimu transaction pooling zámek zůstane na serverovém spojení poolu, dokud ho pooler nezavře (výchozí `server_idle_timeout` PgBounceru je 600 s), a další starty na něj čekají — zámek spojení tam vypni |
 
 Start končí chybou (proces skončí a orchestrátor ho spustí znovu), když migrace selže:

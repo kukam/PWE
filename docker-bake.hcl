@@ -90,7 +90,7 @@ function "base_registry" {
 # argumentu PWE_IMAGE_REGISTRY, PWE_IMAGE_TAG a PWE_PROFILE stoji v radku FROM Dockerfile webu.
 function "base_ref" {
   params = [image]
-  result = "${base_registry()}/${image}:${VERSION}"
+  result = regex_replace("${base_registry()}/${image}:${VERSION}", "^(index[.])?docker[.]io/(library/)?", "")
 }
 
 group "default" {

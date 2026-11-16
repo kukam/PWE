@@ -749,7 +749,9 @@ case "$CMD" in
         need_context
         ALL_CONTAINERS=(--all-containers)
         for a in "$@"; do
-            case "$a" in -c | --container | --container=*) ALL_CONTAINERS=() ;; esac
+            # (-c fcgi, -cfcgi, -c=fcgi, -fc fcgi i --container[=]: s vybranym kontejnerem kubectl --all-containers odmita)
+            case "$a" in --container | --container=*) ALL_CONTAINERS=() ;; esac
+            if has_short_flag "$a" c lnsv; then ALL_CONTAINERS=(); fi
         done
         kc logs -l "$SELECTOR" ${ALL_CONTAINERS[@]+"${ALL_CONTAINERS[@]}"} --prefix \
             --max-log-requests "${K8S_MAX_LOG_REQUESTS:-20}" --tail="${K8S_TAIL:-100}" "$@"

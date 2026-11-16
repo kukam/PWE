@@ -51,7 +51,7 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 use Getopt::Long qw(GetOptions);
 use File::Basename qw(basename);
-use PWE::ToolEnv qw(core_root resolve_webapp webapp_name ensure_modules read_conf conf_languages run_cgi parse_response dockerfile_base engine_image_entries);
+use PWE::ToolEnv qw(core_root resolve_webapp webapp_name ensure_modules read_conf conf_languages run_cgi parse_response dockerfile_base engine_image_entries engine_image_excludes);
 
 my %opt;
 GetOptions(\%opt, 'static', 'request=s', 'verbose|v', 'help|h') or usage(1);
@@ -411,12 +411,24 @@ sub check_dockerfile {
     push(@old, 'RUN test -f /PWE/PWE/pwe.fcgi - kontrola enginu v zakladnim image') if ($ins =~ m{^RUN[ \t]+test[ \t]+-f[ \t]+/PWE/PWE/pwe\.fcgi\b}mi);
     push(@old, 'RUN rm vzoroveho webu ze zakladniho image') if ($ins =~ m{^RUN[ \t][^\n]*\brm[ \t][^\n]*/PWE/webapps/example(?:-db)?\.web\b}mi);
 
-    # engine z kontextu sestaveni: kazda polozka korene enginu (krome t a docker) musi mit svuj COPY
+    # engine z kontextu sestaveni: kazda polozka korene enginu (krome t, docker a tools) musi mit svuj COPY
     my @entries = eval { engine_image_entries($ROOT) };
     my $copied  = dockerfile_engine_copies($ins, @entries);
     my @missing = grep { !$copied->{$_} } @entries;
     if (@entries and @missing == @entries) { push(@old, 'engine se nekopiruje z kontextu sestaveni (zadne COPY PWE/...)'); }
     elsif (@missing)                       { push(@old, 'chybi COPY polozek enginu: ' . join(', ', map { "PWE/$_" } @missing)); }
+
+    # polozky enginu, ktere do image webu nepatri (t, docker, tools) - sablona z prvniho vydani 2.2.1 kopirovala PWE/tools
+    my %not_in_image = map { $_ => 1 } engine_image_excludes();
+    my %extra;
+    foreach my $copy ($ins =~ /^COPY[ \t]+([^\n]+)$/mig) {
+        my @words = split(' ', $copy);
+        next if (grep { /^--from=/i } @words);
+        @words = grep { !/^--/ } @words;
+        pop(@words);
+        foreach my $source (@words) { $source =~ s{^\./}{}; $extra{"PWE/$1"} = 1 if ($source =~ m{^PWE/([^/]+)(?:/|$)} and $not_in_image{$1}); }
+    }
+    push(@old, 'COPY polozek enginu, ktere do image webu nepatri: ' . join(', ', sort keys %extra)) if (%extra);
 
     my ($default_tag) = $ins =~ /^ARG[ \t]+PWE_IMAGE_TAG=["']?([^"'\s]+)/mi;
     if (defined($default_tag) and $default_tag !~ /^(?:latest|\d+\.\d+\.\d+)$/) { push(@old, "vychozi PWE_IMAGE_TAG=$default_tag"); }
