@@ -30,7 +30,8 @@ Generátor vytvoří `webapps/ukoly.web/` s úvodní stránkou (`Pages/default`)
 (`Sites/Default`), službou účtu (`Services/UserAccount`), konfigurací (`conf/web.conf`,
 `conf/{mariadb,mysql,postgres}.conf`, migrace s tabulkami `dbtable` a `session`), `static/css/site.css`,
 `Dockerfile`, `.htaccess`, `robots.txt`, `vars`, `README.md` (vstupní skript `entrypoint.sh` web nemá —
-image webu ho dědí z běhového image). Co si web bere
+image webu ho dědí ze závislostního image `pwe-<profil>`, ze kterého vychází; engine do image webu
+kopíruje `Dockerfile` z repozitáře). Co si web bere
 z enginu, je v `conf/web.conf`:
 
 ```perl

@@ -22,7 +22,7 @@ PWE/tools/smtp-test.pl - odesle jeden testovaci e-mail pres SMTP server z konfig
 
     Navratovy kod 0 = odeslano (nebo dry-run), 1 = chyba (konfigurace, pripojeni, odmitnuti).
     Mimo kontejner se skript sam spusti v kontejneru s image nastroju (chybejici moduly; vychozi
-    ghcr.io/kukam/pwe-debugger:<aktualni vetev>, zmena pres PWE_IMAGE_TAG / PWE_IMAGE_REGISTRY /
+    ghcr.io/kukam/pwe-debugger:<verze enginu>, zmena pres PWE_IMAGE_TAG / PWE_IMAGE_REGISTRY /
     PWE_TEST_IMAGE, viz PWE::ToolEnv::docker_image()), takze SMTP server musi byt dosazitelny
     z kontejneru - vyvojovy "mailpit" z compose site odtud dosazitelny neni, pro nej spustte skript
     uvnitr: docker compose exec fcgi perl /PWE/PWE/tools/smtp-test.pl /PWE/webapps/<web>

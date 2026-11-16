@@ -4,12 +4,12 @@
 # engine v /PWE/PWE). Vypisuje OK/WARN/FAIL.
 #
 #   PWE/tools/perl-compile.sh                   # (make compile)
-#   PWE_TEST_IMAGE=ghcr.io/kukam/pwe-base:master PWE/tools/perl-compile.sh   # jiny image (cele jmeno vcetne tagu)
-#   PWE_IMAGE_TAG=master PWE/tools/perl-compile.sh                           # image nastroju jine vetve
+#   PWE_TEST_IMAGE=ghcr.io/kukam/pwe-base:latest PWE/tools/perl-compile.sh   # jiny image (cele jmeno vcetne tagu)
+#   PWE_IMAGE_TAG=latest PWE/tools/perl-compile.sh                           # image nastroju s jinym tagem nez verze pracovni kopie
 #
-# Image: vychozi je image nastroju ghcr.io/kukam/pwe-debugger:<aktualni vetev gitu> (pwe_tool_image
-# z PWE/tools/lib/images.sh). Zmena: PWE_IMAGE_REGISTRY, PWE_IMAGE_TAG, nebo PWE_TEST_IMAGE = uplne
-# prepsani. Image sestavi make images (PWE/tools/build-images.sh).
+# Image: vychozi je image nastroju ghcr.io/kukam/pwe-debugger:<verze enginu z PWE/VERSION> (pwe_tool_image
+# z PWE/tools/lib/images.sh). Zmena: PWE_IMAGE_REGISTRY, PWE_IMAGE_TAG (napr. latest), nebo PWE_TEST_IMAGE
+# = uplne prepsani. Image sestavi make images (PWE/tools/build-images.sh).
 set -e
 # shellcheck disable=SC1007   # "CDPATH= cd": prazdny CDPATH jen pro tento prikaz (jinak cd vypisuje cil na stdout)
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"

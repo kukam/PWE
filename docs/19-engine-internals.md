@@ -19,11 +19,38 @@ jsou kontrakt a s názvem adresáře nesouvisejí.
   (odstranění a `unshift`).
 - `Libs::Config::checkCoreVersion` ověří `pwe.require_core` proti `PWE/VERSION`; při nesplnění
   skript skončí s chybou.
-- `CGI::Fast` se socketem z `FCGI_SOCKET_PATH` (`socket_perm 0770`), limity uploadu z conf
-  (`cgi_disableupload`, `cgi_maxfilesize`, `cgi_maxopentries`, `cgi_tmpdirectory`).
-  Bez socketu obslouží jeden request z prostředí a skončí (CGI režim).
-- `FCGI_DAEMONIZE` → `daemonize()` (fork + `setsid`); `SIGTERM` → `end()` → `disconnect` všech DB.
-- Smyčka `while (my $CGI = CGI::Fast->new()) { … }`; po každém průchodu `undef @CGI::QUERY_PARAM`.
+- Limity uploadu z conf (`cgi_disableupload`, `cgi_maxfilesize`, `cgi_maxopentries`,
+  `cgi_tmpdirectory`); `FCGI_DAEMONIZE` → `daemonize()` (fork + `setsid`).
+- **Socket** otevírá engine sám, až po startu všech singletonů (`listen_socket`): `FCGI::OpenSocket`
+  nad hodnotou `FCGI_SOCKET_PATH`, `chmod` jen unix socketu (`FCGI_SOCKET_PERM` čtená osmičkově,
+  výchozí 0770; socket vzniká s maskou 0177) a request FastCGI předá do `$CGI::Fast::Ext_Request`.
+  `CGI::Fast` to sám dělat nesmí: svůj parametr `socket_perm` i `FCGI_SOCKET_PERM` čte desítkově
+  (`'0770'` = práva 1402) a `chmod` zkouší i u adresy `host:port`. Zda jde o adresu TCP, určuje
+  `socket_is_tcp` stejným pravidlem jako knihovna FastCGI (za první dvojtečkou nenulové číslo portu).
+  Bez `FCGI_SOCKET_PATH` engine převezme socket zděděný po webserveru (deskriptor 0), jinak obslouží
+  jeden request z prostředí a skončí (CGI režim).
+- **Smyčka** `while (my $CGI = next_request()) { … }`; po každém průchodu `undef @CGI::QUERY_PARAM`.
+  `next_request` volá `CGI::Fast->new()` a rozlišuje, proč se vrátil bez requestu — výsledek `Accept`
+  si pamatuje třída `PWE::Request` (potomek `FCGI`; `CGI::Fast` ho zahazuje): `EINTR` = jiný signál,
+  zkusit znovu; `EAGAIN` = žádné spojení nečeká, počkat (`wait_connection`: `select` nejdéle 1 s);
+  cokoli jiného = konec smyčky. Na Linuxu je naslouchající socket **neblokující**, takže knihovna
+  v `accept()` nikdy nezůstane viset a příznak ukončení se zkontroluje nejpozději za sekundu — samotné
+  přerušení `accept()` signálem nestačí (signál těsně před vstupem do `accept()` čekání nepřeruší
+  a knihovna se po prázdném spojení vrací do `accept()` sama). Jinde zůstává socket blokující.
+- **Ukončení** (`SIGTERM`, `SIGUSR1` → `terminate`): handler jen nastaví příznak `$STOP`, během startu
+  zavolá `Libs::MyDBI::requestStop()`, zakáže knihovně další accept (`LastCall`) a zavře naslouchající
+  socket. Rozpracovaný request doběhne (po dobu requestu mají handlery příznak `SA_RESTART`, aby signál
+  nepřerušil čtení těla ani odesílání odpovědi — `signal_restart`), po smyčce se výslovně dokončí
+  (`Ext_Request->Finish()`), pak `end()` (odpojení databází, lze volat opakovaně i před vznikem `$DBI`)
+  a kód 0. Start `Libs::MyDBI->new` běží v `eval`: výjimka `Startup interrupted by termination request`
+  po signálu = kód 0 (`startup_failed`), jiná chyba se vyhodí znovu beze změny. Handlery se nastavují
+  už v bloku `BEGIN` před načtením `FCGI` — knihovna by si jinak na `TERM` a `USR1` pověsila vlastní.
+  Chyba čekání na request = `[E]` a kód 1. Popis pro provozovatele:
+  [17 — Běh procesu enginu](17-nasazeni.md#běh-procesu-enginu); testy `PWE/t/24-shutdown.t`.
+
+Engine tím závisí na vnitřnostech `CGI::Fast` (`$CGI::Fast::Ext_Request`) a `FCGI` (dědění z třídy
+`FCGI`, `FAIL_ACCEPT_ON_INTR`, `LastCall`); změnu jejich chování po aktualizaci balíčků odhalí
+`24-shutdown.t`.
 
 Vedle něj leží [`PWE/debug.cgi`](../PWE/debug.cgi): přes `require` načte tentýž `pwe.fcgi`, jen pod
 jménem `debug.cgi` — slouží k ladění ve VS Code přes nginx location `/debug.cgi`
@@ -130,8 +157,67 @@ počítají do dalšího reportu.
   `log.loglevel >= 3` (jinak by každé místo volání rozbilo cache dotazů).
 - `getDaoMetaData` čte `information_schema` (MySQL + `SHOW TABLE STATUS`/`DESCRIBE`, Postgres
   `information_schema.columns/constraint_column_usage`) → DAO mapa; `daomap_file` ji cachuje.
-- `checkDbversion`: tabulka `dbversion(dbversion, lockid)`, zámek `lockid` (náhodné číslo),
-  příkazy s číslem > uložená verze vzestupně, commit po každém, při chybě rollback + die.
+- `checkDbversion`: tabulka `dbversion(dbversion, lockid)`, příkazy s číslem > uložená verze
+  vzestupně, commit po každém, při chybě rollback + die. Proti souběžné migraci chrání dva zámky —
+  viz [Zámek migrace](#zámek-migrace-checkdbversion) níže.
+- `requestStop()` / `stopRequested()` (funkce paketu, jdou volat i jako metody třídy): příznak
+  „engine má při startu skončit“, který nastavuje handler `SIGTERM` v `pwe.fcgi`. Konstruktor ho
+  kontroluje před každým pokusem o připojení (i opakovaným, mezi pokusy pak už nečeká),
+  `checkDbversion` při čekání na zámek, před zápisem `lockid` a před každým krokem migrace — nikdy
+  uprostřed kroku a ne po posledním kroku. Po úklidu zámků končí start přes
+  `die "Startup interrupted by termination request\n"`; ten text je kontrakt s `pwe.fcgi`
+  (`$Libs::MyDBI::STOP_MESSAGE`).
+
+### Zámek migrace (`checkDbversion`)
+
+Metoda je rozdělená na `dbversionSessionLock` (zámek spojení), `dbversionMigrate` (tabulka, `lockid`,
+kroky) a pomocné `dbversionPending`, `dbversionDaoFromDb`, `dbversionLegacyWait`,
+`dbversionLegacyLimit`, `dbversionNow`, `dbversionTableExists`, `dbversionRead`, `dbversionCountTry`.
+
+1. **Zámek spojení** — `sessionLock($name, $timeout)` ovladače nad spojením pool 0, logické jméno
+   `dbversion`. Vrací 1 (získán), 0 (drží ho jiné spojení) nebo `undef` (chyba, zámek není
+   k dispozici); `sessionUnlock($name)` vrací 1/0. Server zámek uvolní sám, když spojení zanikne.
+   - MySQL/MariaDB: `GET_LOCK('pwe.<jméno>.<databáze>', <čas>)` nad zapisovacím spojením `DBI_W`
+     (tím, které provádí kroky migrace); jméno delší než 64 znaků se nahradí `pwe.<md5 hex>`. Po
+     dobu držení zámku je vypnutý tichý reconnect ovladače (`mysql_auto_reconnect`), aby se ztracené
+     spojení neobnovilo bez zámku.
+   - PostgreSQL: poradní zámek úrovně session `pg_try_advisory_lock(k1, k2)` v cyklu po 0,2 s; klíč
+     jsou dvě čísla z prvních 8 bajtů MD5 řetězce `pwe.<jméno>.<schema>`. `sessionUnlock` ve zrušené
+     transakci (SQLSTATE 25P02) udělá rollback a zkusí to znovu. Před prvním získáním ověřuje
+     v `pg_locks`, že serverové spojení zámek ještě nemá (pooler v režimu transaction pooling) —
+     pak vrací `undef`.
+   - Zámek není součástí transakce: commit ani rollback ho neuvolní, funguje s autocommitem
+     zapnutým i vypnutým. Vlastní ovladač bez těchto metod, vypnutí klíčem
+     `dbi.<dbid>.dbversion_session_lock => 0` a `undef` z ovladače = **režim bez zámku spojení**
+     (chování starších verzí).
+2. **Sloupec `dbversion.lockid`** se zapisuje a uvolňuje dál kvůli starším verzím enginu, které zámek
+   spojení neznají — ale jen tehdy, když je co migrovat nebo uklidit. Znaménko říká, jak je majitel
+   chráněn: proces se zámkem spojení zapisuje **záporné** číslo, proces bez něj **kladné** (starší
+   verze porovnávají jen „nenulový a není můj“). Vlastní číslo není nikdy 0.
+
+Po získání zámku spojení se při vypnutém autocommitu vždy ukončí transakce, ve které se o zámek
+žádalo (rollback zámek úrovně session neuvolní) — čtení pod zámkem tak vidí aktuální stav i při
+izolaci REPEATABLE READ. Pod zámkem spojení `dbversionMigrate` ověří a případně založí tabulku. Řádek do
+tabulky bez řádku (právě založené i nalezené) doplní až po druhém prázdném čtení o `$DBVERSION_POLL`
+později — řádek může současně vkládat starší verze enginu, která chybu svého `CREATE TABLE` ignoruje.
+Cizí záporný `lockid` (a `NULL`) převezme hned — jeho majitel by musel držet zámek spojení,
+který teď drží tento proces — a na cizí kladný čeká přes `dbversionLegacyWait`: sleduje dvojici
+(`dbversion`, `lockid`) a převezme ji podmíněným `UPDATE … WHERE lockid = ? AND dbversion = ?` až po
+`dbversion_legacy_lock_wait` sekundách beze změny (monotonní hodiny, výchozí 300, `0` = nikdy).
+Dokud zámek spojení drží jiný proces, čeká se jen tehdy, když má tento proces co migrovat
+(`dbversionPending`, jen čtení) nebo si po migraci čte mapu DAO z databáze (`dbversionDaoFromDb`);
+stejné pravidlo platí pro čekání na cizí kladný `lockid`.
+Bez zámku spojení se na cizí `lockid` čeká v cyklu po 1 s jako dřív. Oba zámky se uvolní na všech
+cestách ven (`eval` + rollback + uvolnění); když zámek spojení nejde uvolnit dotazem, spojení pool 0
+se zavře a při úspěšném startu znovu otevře. Selhání zápisu verze po provedeném kroku, nečitelná
+tabulka `dbversion`, selhání `CREATE TABLE` pod zámkem spojení (není-li tabulka čitelná jinde),
+20 neúspěšných zápisů `lockid` (`$DBVERSION_MAX_TRIES`) a rozbitý soubor migrací končí přes `die`
+místo tichého pokračování nebo nekonečné smyčky.
+
+Proměnné paketu pro testy: `$STOP_REQUESTED`, `$DBVERSION_POLL` (1 s), `$DBVERSION_LOG_INTERVAL`
+(30 s), `$DBVERSION_MAX_TRIES` (20), `$DBVERSION_LEGACY_WAIT` (300 s), `$DBVERSION_CLOCK`. Hlášky
+a provozní důsledky: [17 — Migrace schématu při startu](17-nasazeni.md#migrace-schématu-při-startu);
+testy `PWE/t/23-dbversion-lock.t` (falešná databáze) a `PWE/t/10-drivers.t` (ovladače).
 
 ## `Libs::MyDBI::DAO` a `Entities::Entity`
 
@@ -190,8 +276,10 @@ mazala expirovaný řádek jen při návratu stejného sid.
 - Sdílená služba účtů v enginu (tabulka uživatelů, hash hesla), aby ji weby jen linkovaly.
 - Logovat validační chyby vstupu úrovní `warning` místo `error`.
 
-Hotovo z dřívějších námětů: základní image je připnutý na `ubuntu:26.04` (dřív plovoucí tag) a image
-se publikují automaticky do `ghcr.io/kukam` s tagem podle větve — uspořádání sedmi image popisuje
-[17 — Nasazení](17-nasazeni.md#image).
+Hotovo z dřívějších námětů: základní image je připnutý na `ubuntu:26.04` (dřív plovoucí tag; pipeline
+ho navíc připíná na digest) a image se publikují automaticky do `ghcr.io/kukam` s tagy `<verze>`
+a `latest` — z výchozí větve repozitáře a z větví v proměnné `PUBLISH_BRANCHES`; uspořádání devíti
+image (pět závislostních a čtyři image vzorových webů) popisuje [17 — Nasazení](17-nasazeni.md#image). Od 2.2.1 je vyřešené i ukončování na `SIGTERM`
+a zámek migrace, který přežil pád procesu (dřívější známá omezení).
 
 Historie oprav a změn enginu je v [`PWE/CHANGELOG.md`](../PWE/CHANGELOG.md).

@@ -94,7 +94,7 @@ třetích stran se neupravují; verze a zdroje jsou v [`PWE/README.md`](../PWE/R
 | `Send` | SMTP e-mail (používá `Services::Email` a reporty) |
 | `Pics` | ImageMagick (`identify`, `convert`) |
 
-CPAN moduly dostupné webům ve všech image enginu (`JSON`, `HTTP::Tiny` + `IO::Socket::SSL`, `Crypt::OpenSSL::RSA`, `Image::Magick`, `Digest::SHA`, `URI`, …; DB ovladače jen v image profilu; `LWP::UserAgent`, `Data::UUID` ani `curl` v nich nejsou — web si je přidá ve svém `Dockerfile`): [17 — Nasazení](17-nasazeni.md#moduly-dostupné-kódu-webu).
+CPAN moduly dostupné webům ve všech image PWE (`JSON`, `HTTP::Tiny` + `IO::Socket::SSL`, `Crypt::OpenSSL::RSA`, `Image::Magick`, `Digest::SHA`, `URI`, …; DB ovladače jen v image profilu; `LWP::UserAgent`, `Data::UUID` ani `curl` v nich nejsou — web si je přidá ve svém `Dockerfile`): [17 — Nasazení](17-nasazeni.md#moduly-dostupné-kódu-webu).
 
 Do `PWE/Libs` web nesahá ani je ne-`require`-uje; vše dostane konstruktorem a injektáží.
 

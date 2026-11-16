@@ -26,11 +26,12 @@
 #   - web bez conf/database.conf: request probehne bez site stacku, s upozornenim [pwe-cgi].
 # Kdyz sit existuje, ale sluzba fcgi ani debugger nebezi, web stacku urcit nejde a request bezi take bez site.
 #
-# Image: vychozi je image nastroju ghcr.io/kukam/pwe-debugger:<aktualni vetev gitu> (pwe_tool_image
-# z PWE/tools/lib/images.sh; ma ovladace vsech tri databazi). Zmena: PWE_IMAGE_REGISTRY, PWE_IMAGE_TAG,
-# nebo PWE_TEST_IMAGE = uplne prepsani (cele jmeno vcetne tagu). Image sestavi make images.
+# Image: vychozi je image nastroju ghcr.io/kukam/pwe-debugger:<verze enginu z PWE/VERSION> (pwe_tool_image
+# z PWE/tools/lib/images.sh; ma ovladace vsech tri databazi). Zmena: PWE_IMAGE_REGISTRY, PWE_IMAGE_TAG
+# (napr. latest), nebo PWE_TEST_IMAGE = uplne prepsani (cele jmeno vcetne tagu). Image sestavi make images.
 # Entrypoint image se obchazi (--entrypoint bash): pracovni adresare webu zaklada tento skript a
-# conf/database.conf se nemeni (plati ten z pracovni kopie).
+# conf/database.conf se nemeni (plati ten z pracovni kopie). Prostredi z image se zahazuje (env -i), takze
+# zapecene PWE_CONF_pwe_home a PWE_PROFILE image webu (PWE_TEST_IMAGE=.../pwe-example-mariadb:...) request neovlivni.
 set -e
 # shellcheck disable=SC1007   # "CDPATH= cd": prazdny CDPATH jen pro tento prikaz (jinak cd vypisuje cil na stdout)
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"

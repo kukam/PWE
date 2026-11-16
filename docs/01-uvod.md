@@ -73,7 +73,16 @@ Libs::Pages     načte Pages/*,    injektuje Site_*/Service_*, registruje rb sou
 
 Požadavek `pwe.require_core` ověří proti `PWE/VERSION` hned po načtení konfigurace a logu
 (`Libs::Config`, `Libs::Log`) — ještě před připojením k databázi a sestavením ostatních singletonů;
-při nesplnění zapíše chybu do logu a skončí. Po sestavení všech singletonů vstoupí do smyčky `CGI::Fast`.
+při nesplnění zapíše chybu do logu a skončí. Teprve po sestavení všech singletonů — tedy až po
+připojení k databázi a migracích schématu — otevře FastCGI socket (`FCGI_SOCKET_PATH`) a vstoupí do
+smyčky requestů.
+
+### Ukončení procesu
+
+Signál `SIGTERM` ukončí proces pořádaně: rozpracovaný request doběhne s funkční databází a klient
+dostane celou odpověď, nová spojení už engine nepřijímá, pak odpojí databáze a skončí s kódem 0.
+Během startu se přeruší na bezpečném místě (mezi pokusy o připojení k databázi, mezi kroky migrace).
+Podrobně [17 — Běh procesu enginu](17-nasazeni.md#běh-procesu-enginu).
 
 ### Jeden request
 
@@ -135,7 +144,7 @@ testovací fixture).
 
 ```text
 PWE/                          KOŘEN REPOZITÁŘE (pracovní kopie; v kontejnerech namountovaný do /PWE)
-├── PWE/                      ENGINE = kořen pwe.core (v kontejnerech /PWE/PWE; tamtéž v image pwe a v image webu)
+├── PWE/                      ENGINE = kořen pwe.core (v kontejnerech /PWE/PWE; tamtéž v image webu, kam se kopíruje při sestavení)
 │   ├── pwe.fcgi              vstupní bod
 │   ├── debug.cgi             tentýž engine pod jménem debug.cgi: ladění ve VS Code přes nginx /debug.cgi
 │   ├── Libs/                 jádro: Config, Log, Validate, User, Web, Pages, Sites, Services, Entities,
@@ -150,10 +159,11 @@ PWE/                          KOŘEN REPOZITÁŘE (pracovní kopie; v kontejnere
 │   │                         run-tests.sh, perl-compile.sh, build-images.sh (make images), smoke-images.sh
 │   │                         (make images-check), k8s.sh (make k8s-*), lib/images.sh (název image)
 │   ├── t/                    testy enginu
-│   ├── docker/               Dockerfile (jeden vícestupňový: base, pwe, static, mariadb, mysql, postgres, debugger)
+│   ├── docker/               Dockerfile závislostních image (jeden vícestupňový: base, mariadb, mysql, postgres, debugger)
 │   │                         a entrypoint.sh (vstupní skript všech image včetně image webu)
-│   ├── VERSION  CHANGELOG.md
+│   ├── VERSION  CHANGELOG.md   verze enginu = tag image (vedle latest)
 ├── webapps/                  WEBY: každý ve vlastním adresáři, vlastní git (gitignore webapps/*)
+│   ├── example.web/  example-db.web/   vzorové weby (v gitu enginu; vznikají z nich image pwe-example-*)
 │   └── <nazev>/              conf/ Pages/ Sites/ Services/ Entities/ static/ Dockerfile README.md
 ├── docs/                     tato dokumentace
 ├── Makefile                  jednotný vstup pro vývoj (make new/module/check/cgi/run/test/images/k8s-*)
@@ -161,16 +171,22 @@ PWE/                          KOŘEN REPOZITÁŘE (pracovní kopie; v kontejnere
 ├── docker-compose/           soubory stacku: docker-compose_nginx.conf (nginx) a docker-compose_*.env (proměnné služeb)
 ├── kubernetes/               nasazení do Kubernetes (make k8s-*, chart nxs-universal-chart): values-static.yml,
 │                             values-generic.yml, vzory secrets-generic.example.yml a local.env.example, README.md
-├── docker-bake.hcl           sestavení 7 image enginu (cíle a tagy pro docker buildx bake)
+├── docker-bake.hcl           sestavení 9 image PWE (cíle a tagy pro docker buildx bake)
 ├── .github/                  GitHub Actions: workflows/images.yml (testy, sestavení, kouřové kontroly a publikace
-│                             image do ghcr.io/kukam), workflows/tests.yml (jen testy), dependabot.yml
+│                             image do ghcr.io/kukam z výchozí větve a z větví v proměnné PUBLISH_BRANCHES),
+│                             workflows/tests.yml (jen testy), dependabot.yml
 └── AGENTS.md                 závazná pravidla pro AI asistenty
 ```
 
-Engine se dodává jako sedm image z registru `ghcr.io/kukam` s tagem podle větve gitu: základ
-`pwe-base` (jen běhové knihovny), z něj `pwe` (nosič kódu enginu, navíc tag verze), běhové profily
-`pwe-static`, `pwe-mariadb`, `pwe-mysql`, `pwe-postgres` a ladicí `pwe-debugger`. Podrobně
-[17 — Nasazení](17-nasazeni.md#image).
+PWE se dodává jako devět image z registru `ghcr.io/kukam`; každý má právě dva tagy — verzi enginu
+(obsah `PWE/VERSION`) a `latest`. Pět **závislostních image** nese jen závislosti, bez kódu enginu
+a bez webu: základ `pwe-base` (běhové knihovny; nad ním běží web bez databáze), `pwe-mariadb`,
+`pwe-mysql` a `pwe-postgres` (základ + DB ovladač) a `pwe-debugger` (všechny ovladače + ladicí
+nástroje). **Image webu** = závislostní image + engine zkopírovaný z repozitáře + web; staví ho
+`Dockerfile` webu z kořene repozitáře. Stejně vznikají čtyři **image vzorových webů**
+`pwe-example-static`, `pwe-example-mariadb`, `pwe-example-mysql` a `pwe-example-postgres` — samy
+spustitelné ukázky, které nejsou určené pro veřejný provoz (každý návštěvník je v nich ve skupině
+`admin`). Podrobně [17 — Nasazení](17-nasazeni.md#image).
 
 Cesty v dokumentaci jsou relativní ke kořeni repozitáře: `PWE/pwe.fcgi` je tedy soubor enginu,
 `webapps/<nazev>/conf/web.conf` konfigurace webu.

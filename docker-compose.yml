@@ -1,25 +1,33 @@
 # Vyvojovy stack PWE: databaze (dle profilu) + 3x FastCGI engine + nginx na http://127.0.0.1:7778/.
 #
 #   PWE/tools/run-webapp.sh <web> [profil]                           # bezny zpusob (make run WEB=... PROFILE=...): nastavi
-#                                                                    # PWE_WEBAPP, COMPOSE_PROFILES i image podle aktualni vetve
+#                                                                    # PWE_WEBAPP, COMPOSE_PROFILES, image sluzby fcgi i tag (verze z PWE/VERSION)
 #   COMPOSE_PROFILES=mariadb docker compose up                       # vzorovy web s DB (webapps/example-db.web)
-#   PWE_WEBAPP=example.web COMPOSE_PROFILES=static docker compose up  # vzorovy web bez DB
+#   PWE_WEBAPP=example.web COMPOSE_PROFILES=static PWE_FCGI_IMAGE=pwe-base docker compose up   # vzorovy web bez DB
 #
 # Koren repozitare je namountovan do /PWE: engine (adresar PWE/ v koreni repozitare) bezi z /PWE/PWE
 # (pracovni kopie), web z /PWE/webapps/${PWE_WEBAPP}. PWE_CONF_pwe_core = koren enginu, tedy /PWE/PWE.
+# Image dodavaji jen zavislosti (Perl, knihovny, ovladac databaze, entrypoint) - kod enginu ani zadny web
+# v nich neni; ktery web bezi, urcuje working_dir a PWE_CONF_pwe_home sluzby.
 # Promenne environment maji prednost pred env_file i pred ENV zapecenym v image.
 # Cesty mountu jsou relativni k tomuto souboru (ne k aktualnimu adresari), takze stack jde spustit
 # i z podadresare repozitare.
 #
 # Image (PWE/docker/Dockerfile, sestaveni: make images; publikuje je workflow .github/workflows/images.yml):
-#   sluzba fcgi      ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-${COMPOSE_PROFILES:-mariadb}:${PWE_IMAGE_TAG:-master}
-#                    behove prostredi profilu (pwe-static | pwe-mariadb | pwe-mysql | pwe-postgres)
-#   sluzba debugger  ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-debugger:${PWE_IMAGE_TAG:-master}
+#   sluzba fcgi      ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/${PWE_FCGI_IMAGE:-pwe-${COMPOSE_PROFILES:-mariadb}}:${PWE_IMAGE_TAG:-latest}
+#                    zavislostni image profilu: pwe-mariadb | pwe-mysql | pwe-postgres (knihovny enginu + DB ovladac
+#                    profilu), pro profil static pwe-base (jen knihovny enginu, bez DB ovladacu)
+#   sluzba debugger  ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-debugger:${PWE_IMAGE_TAG:-latest}
 #                    vsechny DB ovladace + ladici nastroje (Perl::LanguageServer pro VS Code, klienti DB, cpanm...)
 #   PWE_IMAGE_REGISTRY  registr a jmenny prostor image (vychozi ghcr.io/kukam)
-#   PWE_IMAGE_TAG       tag image = nazev vetve (vychozi master). PWE/tools/run-webapp.sh (make run) ho nastavuje
-#                       na aktualni vetev gitu; pri primem volani docker compose ho zadej sam (prostredi nebo .env).
-# Image kod enginu NEOBSAHUJI - bezi vzdy pracovni kopie z mountu. Entrypoint maji uz ze zakladu pwe-base
+#   PWE_IMAGE_TAG       tag image: verze enginu (napr. 2.2.1) nebo latest (vychozi). PWE/tools/run-webapp.sh
+#                       (make run) ho nastavuje na verzi pracovni kopie (obsah PWE/VERSION); pri primem volani
+#                       docker compose plati latest, jinou hodnotu zadej sam (prostredi nebo .env).
+#   PWE_FCGI_IMAGE      jmeno zavislostniho image sluzby fcgi (bez registru a tagu). Vychozi pwe-<COMPOSE_PROFILES>
+#                       plati pro databazove profily; profil static nema vlastni image a bezi nad pwe-base -
+#                       PWE/tools/run-webapp.sh (make run) to nastavi sam, pri primem volani docker compose
+#                       s profilem static zadej PWE_FCGI_IMAGE=pwe-base.
+# Ve stacku bezi vzdy pracovni kopie z mountu. Entrypoint maji image uz ze zakladu pwe-base
 # (/usr/local/bin/entrypoint.sh = PWE/docker/entrypoint.sh): v pracovnim adresari webu (working_dir) podle
 # PWE_PROFILE nasmeruje conf/database.conf -> <profil>.conf, zalozi ramdisk/templates, sessions, uploadfile
 # a log a spusti command sluzby. Sluzby proto entrypoint nenastavuji.
@@ -72,8 +80,9 @@ services:
       - "${DATABASE_PUB_PORT:-7777}:3306"
 
   fcgi:
-    # behove prostredi profilu (Perl + knihovny enginu + DB ovladac), bez kodu enginu - ten je v mountu /PWE
-    image: ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-${COMPOSE_PROFILES:-mariadb}:${PWE_IMAGE_TAG:-master}
+    # zavislostni image profilu (Perl + knihovny enginu + DB ovladac; profil static = pwe-base, viz PWE_FCGI_IMAGE
+    # v zahlavi); engine i weby dodava mount /PWE
+    image: ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/${PWE_FCGI_IMAGE:-pwe-${COMPOSE_PROFILES:-mariadb}}:${PWE_IMAGE_TAG:-latest}
     restart: unless-stopped
     deploy:
       replicas: 3
@@ -148,7 +157,7 @@ services:
 
   debugger:
     # ladici kontejner (VS Code se do nej pripojuje): vsechny DB ovladace + Perl::LanguageServer a nastroje
-    image: ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-debugger:${PWE_IMAGE_TAG:-master}
+    image: ${PWE_IMAGE_REGISTRY:-ghcr.io/kukam}/pwe-debugger:${PWE_IMAGE_TAG:-latest}
     restart: unless-stopped
     # init jako PID 1: sleep infinity sam na SIGTERM nereaguje a zastaveni by cekalo na timeout (SIGKILL)
     init: true

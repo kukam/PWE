@@ -7,9 +7,10 @@ enginu se na hostitele neinstalují) se jen spouštějí skripty `PWE/tools/*.pl
 ## Požadavky
 
 - Docker s `docker compose` (v2) a `docker buildx`.
-- Image enginu `ghcr.io/kukam/pwe-<profil>` (`pwe-static`, `pwe-mariadb`, `pwe-mysql`, `pwe-postgres`)
-  a `ghcr.io/kukam/pwe-debugger` s tagem **podle větve gitu**, na které pracuješ (`master`, `pwe.ai`, …).
-  Docker si je stáhne sám z GitHub Container Registry; když pro tvou větev publikované nejsou
+- Závislostní image `ghcr.io/kukam/pwe-<profil>` (`pwe-mariadb`, `pwe-mysql`, `pwe-postgres`; web bez
+  databáze běží v `pwe-base`) a `ghcr.io/kukam/pwe-debugger` s tagem **verze enginu** — obsah souboru `PWE/VERSION` v pracovní
+  kopii (např. `2.2.1`; každý image má ještě tag `latest`, tagy podle větve gitu neexistují).
+  Docker si je stáhne sám z GitHub Container Registry; když image této verze publikované nejsou
   (nebo jsou balíčky soukromé a nejsi přihlášen), sestavíš si je lokálně jedním příkazem
   `make images` — [krok 1](#1-repozitář) to ověří a zařídí. Přehled image, tagů a přihlášení
   k registru: [17 — Nasazení](17-nasazeni.md#image).
@@ -27,17 +28,18 @@ git clone <url-repozitare> PWE
 cd PWE             # kořen repozitáře; odtud se spouští všechny příkazy této kapitoly
 make help          # přehled cílů (test, compile, new, module, check, cgi, smtp-test, run, restart, logs, down, images, images-check) a používaných image
 
-# image enginu pro tvou větev: jsou v místním Dockeru? jinak je stáhni; když to nejde, sestav je lokálně
-IMAGE="$(bash PWE/tools/lib/images.sh pwe_image pwe-debugger)"     # ghcr.io/kukam/pwe-debugger:<větev>
+# image PWE této verze: jsou v místním Dockeru? jinak je stáhni; když to nejde, sestav je lokálně
+IMAGE="$(bash PWE/tools/lib/images.sh pwe_image pwe-debugger)"     # ghcr.io/kukam/pwe-debugger:<verze z PWE/VERSION>
 docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull "$IMAGE" || make images
 ```
 
-Poslední řádek lze spustit kdykoli znovu. Když image `pwe-debugger` tvé větve v místním Dockeru je,
-neudělá nic. Jinak ho zkusí stáhnout z registru, a teprve když to nejde — větev tam image nemá, nebo
-jsou balíčky soukromé a Docker není přihlášen (hlásí `pull access denied`, `manifest unknown`,
-u `ghcr.io` také `denied` nebo `403 Forbidden`) — sestaví `make images` všech sedm image lokálně.
-Běhový image profilu (`pwe-mariadb`, …) si pak Docker při `make run` stáhne sám; po `make images`
-už je v místním Dockeru také.
+Poslední řádek lze spustit kdykoli znovu. Když image `pwe-debugger` této verze v místním Dockeru je,
+neudělá nic. Jinak ho zkusí stáhnout z registru, a teprve když to nejde — verze tam publikovaná
+není, nebo jsou balíčky soukromé a Docker není přihlášen (hlásí `pull access denied`,
+`manifest unknown`, u `ghcr.io` také `denied` nebo `403 Forbidden`) — sestaví `make images` všech
+devět image lokálně (s tagy `<verze>` a `latest`). Image profilu (`pwe-mariadb`, …) si pak Docker při
+`make run` stáhne sám; po `make images` už je v místním Dockeru také. Po každém zvýšení
+`PWE/VERSION` (třeba po `git pull`) řádek spusť znovu — nástroje pak berou image s tagem nové verze.
 
 V kořeni repozitáře je adresář enginu `PWE/` (`PWE/pwe.fcgi`, `PWE/Libs/`, `PWE/tools/`),
 adresář webů `webapps/` a tato dokumentace `docs/`. Nenech se zmást shodou jmen: po `git clone … PWE`
@@ -76,12 +78,13 @@ make run WEB=mujweb.web PROFILE=mariadb      # PROFILE=static pro web bez DB; AR
 Otevři <http://127.0.0.1:7778/>. Stack tvoří nginx (statika + FastCGI), tři procesy enginu
 a databáze. Repozitář je namountovaný do kontejnerů (do `/PWE`, engine je tam `/PWE/PWE`, web
 `/PWE/webapps/mujweb.web`), takže běží aktuální pracovní kopie enginu i webu — image
-`pwe-<profil>` dodává jen Perl a knihovny, kód enginu v něm není. `make run` na začátku vypíše,
-s jakým registrem a tagem stack spouští (`[run-webapp] web=… profil=… registr=… tag=…`), a upozorní,
+`pwe-<profil>` (u profilu `static` `pwe-base`) dodává jen Perl, knihovny a DB ovladač; kód enginu ani
+žádný web v něm není. `make run` na začátku vypíše,
+s jakým registrem, tagem a image stack spouští (`[run-webapp] web=… profil=… registr=… tag=… image=…`), a upozorní,
 když image v místním Dockeru nejsou. Chyba stažení image při startu (`pull access denied`,
-`manifest unknown`, u `ghcr.io` také `denied` nebo `403 Forbidden`) znamená, že image pro tvou větev
-nejsou ani v registru: vrať se ke [kroku 1](#1-repozitář) (`make images`), případně použij image
-větve `master`, jsou-li publikované (`PWE_IMAGE_TAG=master make run …`). Profil musí odpovídat webu:
+`manifest unknown`, u `ghcr.io` také `denied` nebo `403 Forbidden`) znamená, že image této verze
+nejsou ani v registru: vrať se ke [kroku 1](#1-repozitář) (`make images`), případně použij naposledy
+publikované image (`PWE_IMAGE_TAG=latest make run …`). Profil musí odpovídat webu:
 překlep (`PROFILE=Mariadb`) `make run` odmítne, web bez databáze s databázovým profilem (nebo naopak)
 poběží, ale s varováním `[run-webapp] POZOR` — web bez databáze spouštěj s `PROFILE=static`.
 
@@ -194,5 +197,5 @@ PWE/tools/pwe-cgi.sh mujweb.web 'page=kontakt&func=default'
 ```
 
 Skripty, které potřebují Perl závislosti enginu (`Template`, `CGI::Fast`), se mimo kontejner
-samy spustí znovu v kontejneru z image `ghcr.io/kukam/pwe-debugger:<větev>`
+samy spustí znovu v kontejneru z image `ghcr.io/kukam/pwe-debugger:<verze>`
 ([16 — Nástroje](16-nastroje.md#výběr-image)).

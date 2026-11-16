@@ -1,20 +1,36 @@
 # Tests - testy enginu pro zmeny, ktere testy ctou, ale image z nich nevznikaji.
 #
-# Sestaveni a publikaci image hlida .github/workflows/images.yml; ten sleduje jen vstupy image
-# (PWE/**, docker-bake.hcl, .dockerignore, LICENSE) a testy enginu pousti pred publikaci sam.
-# Sada PWE/t ale cte i soubory mimo tyto cesty:
-#   webapps/example.web, webapps/example-db.web   PWE/t/11-smoke-example.t (requesty na vzorovy web),
-#                                                 PWE/t/14-tools.t (Dockerfile vzorovych webu = vystup generatoru)
-#   docker-compose.yml                            PWE/t/14-tools.t (image, entrypoint a profil sluzeb)
+# Sestaveni a publikaci image hlida .github/workflows/images.yml; ten sleduje vstupy image (PWE/**,
+# docker-bake.hcl, .dockerignore, LICENSE a vzorove weby webapps/example.web/** a webapps/example-db.web/**,
+# ze kterych se stavi image vzorovych webu pwe-example-*) a testy enginu pousti sam - po kazde takove zmene,
+# i v behu, ktery nic nepublikuje. Sada PWE/t ale cte i soubory mimo tyto cesty:
+#   docker-compose.yml       PWE/t/14-tools.t (image, entrypoint a profil sluzeb)
+#   docker-compose/**        soubory stacku, ktery spousti PWE/tools/run-webapp.sh
+#   kubernetes/**            PWE/tools/k8s.sh; PWE/t/22-k8s-tool.t cte values a vzor hesel
+#   .gitignore               PWE/t/22-k8s-tool.t hlida, ze hesla a mistni nastaveni nejdou do gitu
+#   Makefile                 vstup do nastroju (PWE/t/21-image-tools.t)
 # Zmena jen v nich by se bez tohoto workflow projevila az cervenym behem Images u dalsi, nesouvisejici
-# zmeny enginu. Stejne se hlida zbytek toho, s cim pracuji nastroje v PWE/tools: docker-compose/**
-# (soubory stacku, ktery spousti run-webapp.sh), kubernetes/** (k8s.sh; PWE/t/22-k8s-tool.t cte values
-# a vzor hesel), .gitignore (PWE/t/22-k8s-tool.t hlida, ze hesla a mistni nastaveni nejdou do gitu)
-# a Makefile (vstup do nastroju).
+# zmeny enginu.
 #
-# Workflow je zamerne lehky: sestavi jen cil base (image pwe-base, stejny, v jakem testy pousti
-# Images), pusti PWE/tools/run-tests.sh a PWE/tools/perl-compile.sh a nic nepublikuje - zadne prihlaseni
-# do registru, opravneni jen contents: read, jedina cizi akce je checkout.
+# Seznamy cest obou workflow se neprekryvaji (kazdy ma navic jen svuj vlastni soubor): zmena vzorovych
+# webu patri Images, tento workflow ji uz nesleduje. Push, ktery meni cesty z obou seznamu, spusti oba
+# workflow a sada testu pobezi dvakrat. Je to zamer: filtr paths neumi "nespoustet, kdyz bezi Images"
+# a podminka jobu seznam zmenenych souboru nezna. Zjistovat ho v kroku (git diff proti predchozi hlave)
+# by znamenalo napodobit pravidla, podle kterych GitHub vyhodnocuje paths (nova vetev, force-push, limit
+# poctu souboru) - pri neshode by testy nepustil ani jeden workflow. Testy navic stoji jen par minut.
+#
+# Pull request z vetve tehoz repozitare: stejne pravidlo jako ve workflow Images (podrobne v jeho
+# hlavicce, Zdvojene behy). Push do takove vetve vyvola udalost push i pull_request (synchronize) a testy
+# pobezi dvakrat - nad hlavou vetve a nad jejim sloucenim s cilovou vetvi. Zamerne se nededuplikuji a job
+# nema podminku "if": neumi overit, ze beh push vubec vznikl, a preskoceny job se v kontrolach pull
+# requestu pocita jako uspesny. Rozbehnuty beh novy push zrusi (concurrency).
+#
+# Workflow je zamerne lehky: sestavi jen cil base (image pwe-base - behove knihovny enginu bez kodu enginu,
+# stejny image, v jakem testy pousti Images; engine a vzorove weby dostava mountem checkoutu do /PWE),
+# pusti PWE/tools/run-tests.sh a PWE/tools/perl-compile.sh a nic nepublikuje - zadne prihlaseni do registru,
+# opravneni jen contents: read, jedina cizi akce je checkout. Ostatni image (pwe-mariadb, pwe-mysql,
+# pwe-postgres, pwe-debugger a image vzorovych webu pwe-example-*) se tu nestavi. Na vetvi nezalezi:
+# promenna repozitare PUBLISH_BRANCHES (kdo publikuje image) se tohoto workflow netyka.
 #
 # Cache type=gha se necte. Vyzadovala by builder docker-container a akci, ktera krokum zpristupni
 # ACTIONS_RUNTIME_TOKEN (tedy i skriptum z pull requestu); usetrila by asi minutu sestaveni jednoho
@@ -28,8 +44,6 @@ on:
       - '**'
       - '!dependabot/**'
     paths:
-      - 'webapps/example.web/**'
-      - 'webapps/example-db.web/**'
       - 'docker-compose.yml'
       - 'docker-compose/**'
       - 'kubernetes/**'
@@ -38,8 +52,6 @@ on:
       - '.github/workflows/tests.yml'
   pull_request:
     paths:
-      - 'webapps/example.web/**'
-      - 'webapps/example-db.web/**'
       - 'docker-compose.yml'
       - 'docker-compose/**'
       - 'kubernetes/**'
@@ -59,6 +71,7 @@ concurrency:
 jobs:
   tests:
     name: Engine tests
+    # zadna podminka "if": beh pull_request se nepreskakuje (viz hlavicka)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -66,22 +79,32 @@ jobs:
         shell: bash
     env:
       # Image jen pro tento beh: jmeno existuje jen na runneru (localhost/...), z registru se nic
-      # nestahuje a nic se do nej nenahrava. REGISTRIES a TAG cte docker-bake.hcl.
+      # nestahuje a nic se do nej nenahrava. REGISTRIES cte docker-bake.hcl (VERSION mu preda krok
+      # sestaveni z PWE/VERSION); kazdy cil dostava tagy <verze> a latest - testy berou latest, aby
+      # jmeno image nezaviselo na verzi.
       REGISTRIES: localhost/pwe-tests
-      TAG: ci
-      PWE_TEST_IMAGE: localhost/pwe-tests/pwe-base:ci
+      PWE_TEST_IMAGE: localhost/pwe-tests/pwe-base:latest
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # vychozi builder runneru (ovladac docker) - vysledek je rovnou v lokalnim Dockeru
+      # vychozi builder runneru (ovladac docker) - vysledek je rovnou v lokalnim Dockeru.
+      # VERSION je pro docker-bake.hcl povinna; bere se z PWE/VERSION stejne jako ve workflow Images.
       - name: Build pwe-base (linux/amd64)
         run: |
           set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < PWE/VERSION)"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=PWE/VERSION::PWE/VERSION nema tvar X.Y.Z"
+            printf 'version: %s\n' "$VERSION"
+            exit 1
+          fi
+          export VERSION
           docker buildx bake -f docker-bake.hcl --provenance=false --sbom=false \
             --set '*.platform=linux/amd64' --load base
+          # image musi byt v lokalnim Dockeru pod jmenem, ktere pouziji testy (jinak by ho docker run zkousel stahnout)
           docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' "$PWE_TEST_IMAGE"
 
       - name: Engine tests (pwe-base)

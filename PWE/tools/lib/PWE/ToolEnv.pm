@@ -9,14 +9,21 @@ PWE::ToolEnv - spolecne pomocne funkce pro vyvojove skripty v PWE/tools/ (new-we
     Modul pouziva jen moduly z jadra Perlu, aby sel spustit i na hostiteli bez zavislosti
     enginu. Skripty, ktere potrebuji Template / Class::Inspector, zavolaji ensure_modules()
     a ta je v pripade potreby znovu spusti v kontejneru s image nastroju (docker_image(),
-    vychozi ghcr.io/kukam/pwe-debugger:<vetev>) s repozitarem namountovanym do /PWE.
+    vychozi ghcr.io/kukam/pwe-debugger:<verze enginu>) s repozitarem namountovanym do /PWE.
 
     Jmena image (stejna pravidla jako shell funkce v PWE/tools/lib/images.sh, ktere pouzivaji
     skripty *.sh - obe implementace musi davat stejny vysledek, hlidaji to PWE/t/14-tools.t
-    a PWE/t/21-image-tools.t):
+    a PWE/t/21-image-tools.t). Kazdy image PWE ma prave dva tagy: <verze> (obsah PWE/VERSION)
+    a latest; tagy podle vetve gitu neexistuji a na gitu vyber image nezavisi.
+
+    Image PWE (image_names()): zavislostni image pwe-base, pwe-mariadb, pwe-mysql, pwe-postgres
+    a pwe-debugger (jen knihovny - zadny kod enginu, zadny web) a image vzorovych webu
+    pwe-example-static, pwe-example-mariadb, pwe-example-mysql a pwe-example-postgres (zavislostni
+    image + engine + vzorovy web). Profil static (web bez databaze) bezi nad pwe-base, databazove
+    profily nad pwe-<profil> (profile_image()).
 
       PWE_IMAGE_REGISTRY   registr a jmenny prostor image (vychozi ghcr.io/kukam)   -> image_registry()
-      PWE_IMAGE_TAG        tag image (vychozi = aktualni vetev gitu repozitare)     -> image_tag()
+      PWE_IMAGE_TAG        tag image (vychozi = verze enginu z PWE/VERSION)         -> image_tag()
                            musi to byt platny tag image (image_tag_valid()), jinak image_tag() konci chybou
       PWE_TEST_IMAGE       cele jmeno image nastroju vcetne tagu, ma prednost       -> docker_image()
 
@@ -47,8 +54,17 @@ BEGIN { @ORIG_ARGV = @ARGV; }
 
 our @EXPORT_OK = qw(
     repo_root core_root engine_root resolve_webapp webapp_name in_container docker_image has_docker ensure_modules
-    image_registry image_tag image_tag_sanitize image_tag_valid
+    image_registry image_tag image_tag_valid image_version image_names profile_image dockerfile_base
+    engine_image_excludes engine_image_entries
     write_file symlink_rel read_conf conf_languages run_cgi parse_response shell_quote
+);
+
+# Image PWE (bez registru a tagu) a zrusene image starsich usporadani (jen pro rady v hlaskach).
+my @IMAGES_DEPS     = qw(pwe-base pwe-mariadb pwe-mysql pwe-postgres pwe-debugger);
+my @IMAGES_EXAMPLES = qw(pwe-example-static pwe-example-mariadb pwe-example-mysql pwe-example-postgres);
+my %IMAGES_REMOVED  = (
+    'pwe'        => 'image pwe byl zrusen: engine se do image webu kopiruje z repozitare (webapps/<web>/Dockerfile), nastroje a vyvojovy stack ho berou z mountu repozitare',
+    'pwe-static' => 'image pwe-static byl zrusen: web bez databaze bezi nad pwe-base, vzorovy web bez databaze je image pwe-example-static',
 );
 
 =head2 B<[Public] core_root()>
@@ -139,26 +155,6 @@ sub image_registry {
     return $registry;
 }
 
-=head2 B<[Public] image_tag_sanitize($vetev)>
-
-    Prevede nazev vetve na platny tag image: znaky mimo [A-Za-z0-9_.-] nahradi pomlckou, odstrani
-    uvodni tecky a pomlcky a zkrati na 128 znaku (feature/kosik -> feature-kosik). Prazdny
-    vysledek (i undef) = master. Pracuje po bajtech jako shell (znak s diakritikou v UTF-8 =
-    dve pomlcky). Cista funkce bez vedlejsich ucinku. (Shell: pwe_image_tag_sanitize.)
-
-=cut
-
-sub image_tag_sanitize {
-    my ($branch) = @_;
-    my $tag = defined($branch) ? $branch : '';
-    utf8::encode($tag) if (utf8::is_utf8($tag));
-    $tag =~ s/\n+\z//;
-    $tag =~ s/[^A-Za-z0-9_.-]/-/g;
-    $tag =~ s/^[.-]+//;
-    $tag = substr($tag, 0, 128);
-    return length($tag) ? $tag : 'master';
-}
-
 =head2 B<[Public] image_tag_valid($tag)>
 
     Vraci 1, kdyz je $tag platny tag image, tj. odpovida ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$
@@ -172,48 +168,132 @@ sub image_tag_valid {
     return ($tag =~ /\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z/) ? 1 : 0;
 }
 
+=head2 B<[Public] image_version()>
+
+    Vraci verzi enginu = obsah souboru VERSION v koreni enginu (core_root(), v repozitari
+    PWE/VERSION) bez bilych znaku, napr. 2.2.1. Je to tag, pod kterym image stavi
+    PWE/tools/build-images.sh, a vychozi tag nastroju (image_tag()). Verze musi mit tvar X.Y.Z
+    (tri cisla oddelena teckami); kdyz soubor chybi, nejde precist nebo ma jiny obsah, funkce
+    skonci pres die. Git ani vetev se nepouzivaji. (Shell: pwe_image_version, tam navratovy kod 2.)
+
+=cut
+
+sub image_version {
+    my $file    = core_root() . '/VERSION';
+    my $version = '';
+    if (-f $file and open(my $fh, '<', $file)) {
+        local $/;
+        $version = <$fh>;
+        close($fh);
+        $version = '' unless (defined($version));
+        $version =~ s/\s+//g;
+    }
+    die "Soubor $file neobsahuje verzi enginu tvaru X.Y.Z (obsah: '$version') - verzi image nelze urcit. Oprav PWE/VERSION, nebo zadej tag vyslovne: PWE_IMAGE_TAG=<tag> (napr. latest)\n" unless ($version =~ /\A[0-9]+\.[0-9]+\.[0-9]+\z/);
+    return $version;
+}
+
 =head2 B<[Public] image_tag()>
 
-    Vraci tag image PWE: $ENV{PWE_IMAGE_TAG} (beze zmeny), jinak aktualni vetev gitu repozitare
-    (repo_root()) prevedenou pres image_tag_sanitize(). Bez gitu, mimo gitovy repozitar a
-    v detached HEAD vraci master. V kontejneru (in_container()) se git nevola - neni tam a
-    repozitar je jen namountovany do /PWE: plati $ENV{PWE_IMAGE_TAG} (ensure_modules() ho do
-    kontejneru predava), jinak master. $ENV{PWE_IMAGE_TAG}, ktery neni platny tag image
-    (image_tag_valid(), napr. neprevedeny nazev vetve s lomitkem), se nepouzije: funkce skonci
-    pres die s hlaskou, jak nazev vetve prevest. (Shell: pwe_image_tag, tam navratovy kod 2.)
+    Vraci tag image PWE: $ENV{PWE_IMAGE_TAG} (beze zmeny), jinak verzi enginu z PWE/VERSION
+    (image_version()) - stejne na hostiteli i v kontejneru, bez gitu. $ENV{PWE_IMAGE_TAG}, ktery
+    neni platny tag image (image_tag_valid(), napr. nazev vetve s lomitkem), se nepouzije: funkce
+    skonci pres die; stejne skonci, kdyz PWE_IMAGE_TAG zadan neni a PWE/VERSION verzi neobsahuje.
+    (Shell: pwe_image_tag, tam navratovy kod 2.)
 
 =cut
 
 sub image_tag {
     my $tag = _env('PWE_IMAGE_TAG');
     if (length($tag)) {
-        die "PWE_IMAGE_TAG='$tag' neni platny tag image (povolene znaky A-Z a-z 0-9 _ . -, nezacina teckou ani pomlckou, nejvys 128 znaku). Nazev vetve preved: bash PWE/tools/lib/images.sh pwe_image_tag_sanitize '$tag'\n" unless (image_tag_valid($tag));
+        die "PWE_IMAGE_TAG='$tag' neni platny tag image (povolene znaky A-Z a-z 0-9 _ . -, nezacina teckou ani pomlckou, nejvys 128 znaku). Image PWE maji tagy <verze> (obsah PWE/VERSION) a latest.\n" unless (image_tag_valid($tag));
         return $tag;
     }
-    return image_tag_sanitize(_git_branch());
+    return image_version();
 }
 
-=head2 B<[Private] _git_branch()>
+=head2 B<[Public] image_names($skupina)>
 
-    Vraci nazev aktualni vetve gitu repozitare, nebo prazdny retezec (v kontejneru, bez prikazu
-    git, mimo repozitar, v detached HEAD). Vetev se bere jen tehdy, kdyz je repo_root() korenem
-    pracovni kopie (rev-parse --show-prefix je prazdny): repozitar rozbaleny uvnitr ciziho
-    gitoveho repozitare jeho vetev nepouzije.
+    Vraci seznam jmen image PWE (bez registru a tagu) v poradi, v jakem se stavi a kontroluji:
+    bez argumentu vsech 9, 'deps' jen zavislostni image (pwe-base, pwe-mariadb, pwe-mysql,
+    pwe-postgres, pwe-debugger), 'examples' jen image vzorovych webu (pwe-example-static,
+    pwe-example-mariadb, pwe-example-mysql, pwe-example-postgres). Cil sestaveni
+    (PWE/tools/build-images.sh, docker-bake.hcl) = jmeno bez predpony "pwe-". Neznama skupina
+    konci pres die. (Shell: pwe_image_names.)
 
 =cut
 
-sub _git_branch {
-    return '' if (in_container());
-    return '' unless (_in_path('git'));
-    my $repo = shell_quote(repo_root());
-    my $prefix = `git -C $repo rev-parse --show-prefix 2>/dev/null`;
-    return '' if ($? != 0 or !defined($prefix));
-    $prefix =~ s/\n+\z//;
-    return '' if (length($prefix));
-    my $branch = `git -C $repo symbolic-ref --quiet --short HEAD 2>/dev/null`;
-    return '' if ($? != 0 or !defined($branch));
-    $branch =~ s/\n+\z//;
-    return $branch;
+sub image_names {
+    my ($group) = @_;
+    $group = 'all' unless (defined($group) and length($group));
+    return @IMAGES_DEPS                     if ($group eq 'deps');
+    return @IMAGES_EXAMPLES                 if ($group eq 'examples');
+    return (@IMAGES_DEPS, @IMAGES_EXAMPLES) if ($group eq 'all');
+    die "Neznama skupina image '$group' (deps | examples | all)\n";
+}
+
+=head2 B<[Public] profile_image($profil)>
+
+    Vraci jmeno zavislostniho image profilu (bez registru a tagu): static (web bez databaze)
+    -> pwe-base, mariadb | mysql | postgres -> pwe-<profil>. V tomto image bezi sluzba fcgi
+    vyvojoveho stacku a vychazi z nej image webu. Neznamy profil konci pres die.
+    (Shell: pwe_profile_image, tam navratovy kod 2.)
+
+=cut
+
+sub profile_image {
+    my ($profile) = @_;
+    $profile = '' unless (defined($profile));
+    return 'pwe-base'     if ($profile eq 'static');
+    return "pwe-$profile" if ($profile =~ /\A(?:mariadb|mysql|postgres)\z/);
+    die "Neznamy profil '$profile' (static | mariadb | mysql | postgres)\n";
+}
+
+=head2 B<[Public] dockerfile_base($profil)>
+
+    Vraci jmeno zakladniho image tak, jak ho sablona Dockerfile webu (PWE/tools/new-webapp.pl)
+    pise do radku FROM a do popisku base.name: web bez databaze (static) ma pevny zaklad pwe-base,
+    web s databazi pwe-${PWE_PROFILE} (profil je argument sestaveni - tentyz Dockerfile jde
+    sestavit pro mariadb, mysql i postgres). Stejnou funkci pouziva PWE/tools/check-webapp.pl
+    ke kontrole radku FROM. Neznamy profil konci pres die.
+
+=cut
+
+sub dockerfile_base {
+    my ($profile) = @_;
+    my $image = profile_image($profile);
+    return ($image eq 'pwe-base') ? $image : 'pwe-${PWE_PROFILE}';
+}
+
+=head2 B<[Public] engine_image_excludes()>
+
+    Vraci polozky korene enginu (PWE/), ktere do image webu NEPATRI: t (testy) a docker (sestaveni
+    zavislostnich image). Vse ostatni v koreni enginu sablona Dockerfile webu kopiruje do
+    /PWE/PWE - hlida to PWE/t/14-tools.t; stejny seznam maji kourove kontroly
+    PWE/tools/smoke-images.sh.
+
+=cut
+
+sub engine_image_excludes {
+    return qw(t docker);
+}
+
+=head2 B<[Public] engine_image_entries($koren)>
+
+    Vraci serazeny seznam polozek (souboru a adresaru) primo v koreni enginu $koren (vychozi
+    core_root()), ktere patri do image webu: vse krome engine_image_excludes() a skrytych
+    polozek (jmeno zacina teckou). Podle nej se kontroluje, ze Dockerfile webu kopiruje cely
+    engine (PWE/tools/check-webapp.pl, PWE/t/14-tools.t).
+
+=cut
+
+sub engine_image_entries {
+    my ($root) = @_;
+    $root = core_root() unless (defined($root) and length($root));
+    my %skip = map { $_ => 1 } engine_image_excludes();
+    opendir(my $dh, $root) or die "Nelze cist adresar enginu $root: $!\n";
+    my @entries = sort grep { !/^\./ and !$skip{$_} } readdir($dh);
+    closedir($dh);
+    return @entries;
 }
 
 =head2 B<[Public] docker_image()>
@@ -222,8 +302,11 @@ sub _git_branch {
     skripty make test, compile, cgi pouzivaji stejne pravidlo pres pwe_tool_image; make new bezi
     na hostiteli a image nepotrebuje): $ENV{PWE_TEST_IMAGE} (cele jmeno vcetne tagu), jinak
     <image_registry()>/pwe-debugger:<image_tag()> - image pwe-debugger ma vsechny databazove
-    ovladace. Vychozi tedy ghcr.io/kukam/pwe-debugger:<vetev>; sestavi ho make images
-    (PWE/tools/build-images.sh). Pri neplatnem $ENV{PWE_IMAGE_TAG} konci chybou jako image_tag().
+    ovladace (kod enginu a weby dostava mountem repozitare). Vychozi tedy
+    ghcr.io/kukam/pwe-debugger:<verze enginu>; sestavi ho make images ARGS=debugger
+    (PWE/tools/build-images.sh).
+    S $ENV{PWE_TEST_IMAGE} se tag nezjistuje ani nekontroluje; jinak pri neurcitelnem tagu konci
+    chybou jako image_tag().
 
 =cut
 
@@ -277,9 +360,10 @@ sub has_docker {
     v argumentech (i cesta ke skriptu), ktere zacinaji korenem repozitare, se prepisou na /PWE/...,
     skript z <repo>/PWE/tools/ se tedy spusti jako /PWE/PWE/tools/<skript>. Do kontejneru se
     predaji PWE_IMAGE_REGISTRY, PWE_IMAGE_TAG a PWE_TEST_IMAGE, aby tam image_tag() a
-    docker_image() vracely totez co na hostiteli (v kontejneru neni git). Neni-li image
-    v lokalnim Dockeru, vypise se rada, jak ho ziskat (docker ho jinak zkusi stahnout z registru).
-    Pokud docker neni k dispozici, skonci chybou.
+    docker_image() vracely totez co na hostiteli (PWE_IMAGE_TAG jen kdyz neni nastaveno
+    PWE_TEST_IMAGE - s nim se tag nepouziva ani nekontroluje). Neni-li image v lokalnim Dockeru,
+    vypise se rada, jak ho ziskat (docker ho jinak zkusi stahnout z registru). Pokud docker neni
+    k dispozici, skonci chybou.
 
 =cut
 
@@ -297,8 +381,9 @@ sub ensure_modules {
     my $script = abs_path($0);
     my @args = map { my $a = $_; $a =~ s{^\Q$repo\E(/|$)}{/PWE$1}; $a } ($script, @ORIG_ARGV);
     my @cmd = ('docker', 'run', '--rm', '--entrypoint', 'perl', '-v', "$repo:/PWE", '-w', '/PWE', '-e', 'PWE_TOOLS_IN_DOCKER=1');
-    push(@cmd, '-e', 'PWE_IMAGE_REGISTRY=' . image_registry(), '-e', 'PWE_IMAGE_TAG=' . image_tag());
-    push(@cmd, '-e', "PWE_TEST_IMAGE=$image") if (length(_env('PWE_TEST_IMAGE')));
+    push(@cmd, '-e', 'PWE_IMAGE_REGISTRY=' . image_registry());
+    if (length(_env('PWE_TEST_IMAGE'))) { push(@cmd, '-e', "PWE_TEST_IMAGE=$image"); }
+    else                                { push(@cmd, '-e', 'PWE_IMAGE_TAG=' . image_tag()); }
     push(@cmd, '--user', "$<:" . (split(/\s+/, $())[0]) if ($^O eq 'linux');
     push(@cmd, $image, '-I/PWE/PWE/tools/lib', @args);
     print STDERR "[tools] chybi moduly @missing -> spoustim v kontejneru $image\n";
@@ -308,11 +393,13 @@ sub ensure_modules {
 
 =head2 B<[Private] _image_missing_note($image)>
 
-    Vraci radu (tri radky zacinajici "[tools]"), kdyz image neni v lokalnim Dockeru (docker image
-    inspect neuspeje), jinak prazdny retezec: docker ho zkusi stahnout z registru, sestavit ho
-    jde pres make images, a ktere tagy tehoz repozitare v lokalnim Dockeru jsou (docker image ls).
-    Image s tagem nove vetve v registru byt nemusi a chyba dockeru ("manifest unknown", u ghcr.io
-    i "denied") sama nerekne, co s tim. Stejny text vypisuje shell funkce pwe_image_missing_hint
+    Vraci radu (radky zacinajici "[tools]"), kdyz image neni v lokalnim Dockeru (docker image
+    inspect neuspeje), jinak prazdny retezec: docker ho zkusi stahnout z registru; jak ho sestavit
+    (image PWE: make images ARGS=<cil>, jiny image: make images); a ktere tagy tehoz repozitare
+    v lokalnim Dockeru jsou (docker image ls). U zruseneho image (pwe, pwe-static ze starsiho
+    usporadani) misto rady k sestaveni rekne, ze byl zrusen a co ho nahrazuje.
+    Image nove (jeste nepublikovane) verze v registru byt nemusi a chyba dockeru ("manifest unknown",
+    u ghcr.io i "denied") sama nerekne, co s tim. Stejny text vypisuje shell funkce pwe_image_missing_hint
     (PWE/tools/lib/images.sh).
 
 =cut
@@ -326,13 +413,23 @@ sub _image_missing_note {
     # repozitar = jmeno bez digestu a bez tagu (dvojtecka v registru s portem zustava)
     (my $repo = $image) =~ s/\@.*\z//s;
     $repo =~ s/:[^:\/]*\z//;
+    (my $name = $repo) =~ s{\A.*/}{}s;
     my $qrepo = shell_quote($repo);
     my $list  = `docker image ls --format '{{.Tag}}' $qrepo 2>/dev/null`;
     my %seen;
     my @tags = sort grep { length($_) and $_ ne '<none>' and !$seen{$_}++ } split(/\n/, (defined($list) ? $list : ''));
 
     my $note = "[tools] image $image neni v lokalnim Dockeru, docker ho zkusi stahnout z registru.\n";
-    $note .= "[tools]   sestaveni: make images (PWE/tools/build-images.sh)\n";
+    if (exists($IMAGES_REMOVED{$name})) {
+        $note .= "[tools]   $IMAGES_REMOVED{$name}\n";
+    }
+    elsif (grep { $_ eq $name } image_names()) {
+        (my $target = $name) =~ s/\Apwe-//;
+        $note .= "[tools]   sestaveni: make images ARGS=$target (PWE/tools/build-images.sh $target)\n";
+    }
+    else {
+        $note .= "[tools]   sestaveni: make images (PWE/tools/build-images.sh)\n";
+    }
     if (@tags) {
         my $var = ($image eq _env('PWE_TEST_IMAGE')) ? "PWE_TEST_IMAGE=$repo:<tag>" : 'PWE_IMAGE_TAG=<tag>';
         $note .= "[tools]   mistne dostupne tagy $repo: @tags (pouziti: $var)\n";

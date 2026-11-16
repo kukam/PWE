@@ -34,11 +34,24 @@ PWE/tools/new-webapp.pl - vytvori kostru noveho webu (webappu) nad enginem PWE
     DBTable, ...) bere engine ze sveho adresare PWE/ (koren enginu = pwe.core) podle seznamu
     pwe.core_* v conf/web.conf. Dalsi kroky vypise na konci.
 
-    Dockerfile webu ma pro vsechny weby stejnou sablonu (lisi se jen nazvem webu a profilem
-    PWE_PROFILE: --db mariadb|mysql|postgres, bez databaze static): behove prostredi bere z image
-    ghcr.io/kukam/pwe-<profil>, engine kopiruje z image ghcr.io/kukam/pwe (COPY --from).
-    Vlastni entrypoint.sh web nema: image webu dedi ENTRYPOINT z image pwe-<profil> (ten ho ma
-    z pwe-base, zdroj PWE/docker/entrypoint.sh).
+    Dockerfile webu ma pro vsechny weby stejnou sablonu (lisi se nazvem webu, profilem PWE_PROFILE
+    a zakladem: --db mariadb|mysql|postgres, bez databaze static). Image webu = zavislostni image
+    + engine + web:
+      - FROM ghcr.io/kukam/pwe-base (web bez databaze) nebo ghcr.io/kukam/pwe-<profil> (web
+        s databazi) - jen knihovny, ovladac databaze a entrypoint; kod enginu v nich neni,
+      - engine se kopiruje z kontextu sestaveni (adresar PWE/ repozitare bez PWE/t a PWE/docker)
+        do /PWE/PWE,
+      - web z webapps/<web> do /PWE/webapps/<web>.
+    Sestavuje se proto vzdy z korene repozitare enginu:
+      docker build -f webapps/<web>/Dockerfile [--build-arg PWE_IMAGE_TAG=<verze>] -t <nazev> .
+    Vlastni entrypoint.sh web nema: image webu dedi ENTRYPOINT ze zakladniho image (zdroj
+    PWE/docker/entrypoint.sh). Stejnou sablonou vznikaji i image vzorovych webu pwe-example-*
+    (docker-bake.hcl je stavi primo z webapps/example.web/Dockerfile a webapps/example-db.web/Dockerfile).
+
+    Existujici web s Dockerfile ze starsi sablony (engine ze zruseneho image pwe nebo ze zakladniho
+    image pwe-<profil>, zruseny zaklad pwe-static): PWE/tools/check-webapp.pl (make check) na nej upozorni. Novy
+    Dockerfile ziskas tak, ze web vygenerujes znovu jinam (--dir <docasny adresar>, stejny nazev
+    a --db) a prevezmes z vysledku jen Dockerfile; vlastni upravy prenes rucne.
 
 =cut
 
@@ -48,7 +61,7 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 use Getopt::Long qw(GetOptions);
 use File::Path qw(make_path);
-use PWE::ToolEnv qw(core_root repo_root resolve_webapp webapp_name write_file symlink_rel);
+use PWE::ToolEnv qw(core_root repo_root resolve_webapp webapp_name write_file symlink_rel profile_image dockerfile_base);
 
 my %opt = ('db' => 'none', 'lang' => 'CZE,EN');
 GetOptions(\%opt, 'db=s', 'title=s', 'lang=s', 'examples', 'dir=s', 'force', 'help|h') or usage(1);
@@ -392,6 +405,8 @@ sub gen_db_conf {
         trayconnect    => 10,
         daomap_file    => "conf/{{DRV}}_daomap.dump",
         dbversion_file => "conf/{{DRV}}.dbversion",
+        dbversion_session_lock     => 1,              # zamek migrace vazany na spojeni, server ho po padu procesu uvolni sam (0 = vypnout); prepis: PWE_CONF_dbi_db1_dbversion_session_lock
+        dbversion_legacy_lock_wait => 300,            # po kolika s beze zmeny prevzit zamek dbversion.lockid po procesu bez zamku spojeni (0 = nikdy); prepis: PWE_CONF_dbi_db1_dbversion_legacy_lock_wait
     }
 };
 CONF
@@ -1348,35 +1363,52 @@ PERL
 # ---------------------------------------------------------------------------------------------
 # Docker / provoz
 # ---------------------------------------------------------------------------------------------
-# Dockerfile webu: jednotna sablona pro vsechny weby (lisi se jen nazvem webu a PWE_PROFILE).
-# Behove prostredi = image pwe-<profil>, engine = COPY --from image pwe (nosic kodu enginu).
-# ENTRYPOINT sablona nenastavuje a web zadny entrypoint.sh nema: image webu ho dedi z pwe-<profil>
-# (ten z pwe-base, zdroj PWE/docker/entrypoint.sh).
+# Dockerfile webu: jednotna sablona pro vsechny weby (lisi se nazvem webu, PWE_PROFILE a zakladem).
+# Image webu = zavislostni image + engine + web:
+#   - jediny FROM = zavislostni image BEZ kodu enginu: pwe-base pro web bez databaze, pwe-${PWE_PROFILE} pro
+#     web s databazi (PWE::ToolEnv::dockerfile_base),
+#   - engine se kopiruje z kontextu sestaveni (koren repozitare): LICENSE a vsechny polozky adresare PWE/
+#     krome PWE::ToolEnv::engine_image_excludes() (t, docker). Vycet COPY je zamerne vyslovny (zadne mazani
+#     v image, zadny COPY --from jineho image); PWE/t/14-tools.t hlida, ze pokryva kazdou polozku PWE/ - nova
+#     polozka enginu = doplnit ji sem a znovu vygenerovat Dockerfile vzorovych webu,
+#   - web z webapps/<web>.
+# ENTRYPOINT sablona nenastavuje a web zadny entrypoint.sh nema: image webu ho dedi ze zakladniho image
+# (zdroj PWE/docker/entrypoint.sh).
+# POZOR pri uprave: prikaz RUN sablony spousti i PWE/t/14-tools.t (v kontejneru s repozitarem v /PWE), mimo
+# docker build. Zadny RUN sablony proto nesmi nic mazat ani zapisovat mimo pracovni adresar webu.
+# Radek FROM a vycet COPY sablony cte PWE/tools/check-webapp.pl (kontrola Dockerfile webu).
 sub gen_dockerfile {
     my $profile = $DB ? $DB : 'static';
     my $image   = lc($name);                 # jmeno image v ukazkach buildu: mujweb.web -> mujweb-web
     $image =~ s/[^a-z0-9]+/-/g;
     $image =~ s/^-+|-+$//g;
     $image = 'web' unless (length($image));
-    return tpl(<<'DOCKER', NAME => $name, PROFILE => $profile, IMAGE => $image);
-# Image webu {{NAME}}. Sklada se ze tri casti:
-#   - behove prostredi z image pwe-<profil> (Perl, knihovny enginu, DB ovladac podle PWE_PROFILE, entrypoint),
-#   - engine zkopirovany z image pwe (nosic kodu enginu) do /PWE/PWE,
-#   - tento web v /PWE/webapps/{{NAME}}.
+    my $base      = dockerfile_base($profile);                 # pwe-base | pwe-${PWE_PROFILE}
+    my $base_name = $DB ? 'pwe-<profil>' : $base;              # zaklad v komentarich
+    my $base_what = $DB
+        ? 'Perl, knihovny enginu, DB ovladac podle PWE_PROFILE a entrypoint'
+        : 'Perl, knihovny enginu a entrypoint (bez DB ovladacu - web bez databaze)';
+    my $profile_arg = $DB
+        ? 'profil databaze: mariadb | mysql | postgres (urcuje zaklad pwe-<profil> a conf/database.conf)'
+        : 'static = web bez databaze (zaklad pwe-base). Web s databazi ma jiny zaklad: vygeneruj Dockerfile s --db';
+    return tpl(<<'DOCKER', NAME => $name, PROFILE => $profile, IMAGE => $image, BASE => $base, BASE_NAME => $base_name, BASE_WHAT => $base_what, PROFILE_ARG => $profile_arg);
+# Image webu {{NAME}} = zavislostni image PWE + engine + tento web:
+#   - zaklad {{BASE_NAME}}: {{BASE_WHAT}};
+#     kod enginu ani zadny web v nem neni,
+#   - engine z kontextu sestaveni (adresar PWE/ repozitare enginu bez PWE/t a PWE/docker) do /PWE/PWE,
+#   - tento web z webapps/{{NAME}} do /PWE/webapps/{{NAME}}.
 #
-# Sestaveni z korene repozitare enginu (kontext "."; co se z webu do image nedostane, urcuje tamni
-# .dockerignore: conf/local.env, conf/database.conf, soukrome klice conf/**/*.pem a *.key, docasna data):
+# Sestaveni VZDY z korene repozitare enginu (kontext "."): engine i web se berou z pracovni kopie, verze enginu
+# v image = PWE/VERSION v okamziku sestaveni (v image /PWE/PWE/VERSION). Co se do image nedostane, urcuje tamni
+# .dockerignore: docasna data webu (ramdisk, log, sessions, uploadfile, temp), conf/local.env, conf/database.conf
+# a soukrome klice a mistni promenne prostredi (*.pem, *.key, *.p12, *.pfx, *.env) - ty v CELEM adresari
+# webu, ne jen pod conf/. Kontejner je dostava mountem nebo jako Secret.
 #
-#   # z image aktualni vetve - tak je oznacuje lokalni sestaveni (make images) i pipeline
-#   docker build --build-arg PWE_IMAGE_TAG="$(bash PWE/tools/lib/images.sh pwe_image_tag)" \
-#       -t {{IMAGE}} -f webapps/{{NAME}}/Dockerfile .
-#
-#   # z image vetve master (vychozi PWE_IMAGE_TAG; musi byt v registru nebo v lokalnim Dockeru)
+#   # nad nejnovejsim zavislostnim image (vychozi PWE_IMAGE_TAG=latest; z registru nebo z lokalniho Dockeru po make images)
 #   docker build -t {{IMAGE}} -f webapps/{{NAME}}/Dockerfile .
 #
-#   # engine pripnuty na verzi: tag image pwe = obsah PWE/VERSION; behovy image dal urcuje PWE_IMAGE_TAG
-#   docker build --build-arg PWE_IMAGE_TAG="$(bash PWE/tools/lib/images.sh pwe_image_tag)" \
-#       --build-arg PWE_ENGINE_TAG="$(cat PWE/VERSION)" -t {{IMAGE}}:1.0 -f webapps/{{NAME}}/Dockerfile .
+#   # zavislosti pripnute na verzi enginu: tag image {{BASE_NAME}} = obsah PWE/VERSION
+#   docker build --build-arg PWE_IMAGE_TAG="$(cat PWE/VERSION)" -t {{IMAGE}}:1.0 -f webapps/{{NAME}}/Dockerfile .
 #
 # Prosty "docker build" stavi vychozim builderem Dockeru (ovladac docker): image z lokalniho Dockeru
 # pouzije a do registru jde jen pro ty, ktere tam nejsou. "docker buildx build" (a prosty "docker build"
@@ -1385,56 +1417,70 @@ sub gen_dockerfile {
 # (Docker Desktop: desktop-linux, Linux: default).
 #
 # Argumenty buildu:
-#   PWE_IMAGE_REGISTRY   registr a jmenny prostor image enginu
-#   PWE_IMAGE_TAG        tag (vetev) behoveho image pwe-<profil>
-#   PWE_ENGINE_TAG       tag image pwe, ze ktereho se kopiruje engine: vetev, nebo verze enginu (PWE/VERSION)
-#   PWE_PROFILE          behovy profil: mariadb | mysql | postgres | static (web bez databaze)
+#   PWE_IMAGE_REGISTRY   registr a jmenny prostor zavislostnich image PWE
+#   PWE_IMAGE_TAG        tag image {{BASE_NAME}}: verze enginu (napr. 2.2.1), nebo latest
+#   PWE_PROFILE          {{PROFILE_ARG}}
 ARG PWE_IMAGE_REGISTRY=ghcr.io/kukam
-ARG PWE_IMAGE_TAG=master
-ARG PWE_ENGINE_TAG=${PWE_IMAGE_TAG}
+ARG PWE_IMAGE_TAG=latest
 ARG PWE_PROFILE={{PROFILE}}
 
-FROM ${PWE_IMAGE_REGISTRY}/pwe:${PWE_ENGINE_TAG} AS engine
-FROM ${PWE_IMAGE_REGISTRY}/pwe-${PWE_PROFILE}:${PWE_IMAGE_TAG}
+FROM ${PWE_IMAGE_REGISTRY}/{{BASE}}:${PWE_IMAGE_TAG}
 ARG PWE_IMAGE_REGISTRY
 ARG PWE_IMAGE_TAG
 ARG PWE_PROFILE
 
-COPY --from=engine /PWE/PWE /PWE/PWE
-COPY --from=engine /PWE/LICENSE /PWE/LICENSE
+# Engine z kontextu sestaveni do /PWE/PWE: vsechny polozky adresare PWE/ krome testu (PWE/t) a sestaveni
+# zavislostnich image (PWE/docker). Vycet musi byt uplny - make check (PWE/tools/check-webapp.pl) upozorni,
+# kdyz v nem nektera polozka enginu chybi (napr. po aktualizaci enginu: pak Dockerfile vygeneruj znovu).
+# Poradi od nejmene po nejcasteji menene. COPY --link: vrstva nezavisi na vrstvach pod sebou - zmena zakladu
+# ji nezneplatni a image webu nad stejnym enginem ji sdili.
+COPY --link LICENSE /PWE/LICENSE
+COPY --link PWE/assets /PWE/PWE/assets
+COPY --link PWE/templates /PWE/PWE/templates
+COPY --link PWE/tools /PWE/PWE/tools
+COPY --link PWE/Entities /PWE/PWE/Entities
+COPY --link PWE/Services /PWE/PWE/Services
+COPY --link PWE/Sites /PWE/PWE/Sites
+COPY --link PWE/Pages /PWE/PWE/Pages
+COPY --link PWE/Libs /PWE/PWE/Libs
+COPY --link PWE/pwe.fcgi PWE/debug.cgi PWE/favicon.ico PWE/README.md PWE/CHANGELOG.md PWE/VERSION /PWE/PWE/
 
-# PWE_CONF_pwe_core=/PWE/PWE nastavuje uz zakladni image pwe-base. PWE_PROFILE = profil, pro ktery je image
-# sestaveny. Za behu ho lze prepsat (-e PWE_PROFILE=...) jen na profil, jehoz ovladac image obsahuje:
+# Web (bez toho, co vynechava .dockerignore - viz zahlavi).
+COPY --link webapps/{{NAME}} /PWE/webapps/{{NAME}}
+
+# PWE_CONF_pwe_core=/PWE/PWE nastavuje uz zakladni image. PWE_PROFILE = profil, pro ktery je image sestaveny.
+# Za behu ho lze prepsat (-e PWE_PROFILE=...) jen na profil, jehoz ovladac zakladni image obsahuje:
 # pwe-mariadb a pwe-mysql umi mariadb i mysql (engine pro oba pouziva DBD::mysql), pwe-postgres jen
-# postgres, pwe-static zadnou databazi. Entrypoint pak conf/database.conf presmeruje na novy profil.
+# postgres, pwe-base zadnou databazi. Entrypoint pak conf/database.conf presmeruje na novy profil.
 ENV PWE_CONF_pwe_home=/PWE/webapps/{{NAME}} \
     PWE_PROFILE=${PWE_PROFILE}
 
-# Popisky image webu. Jinak by se zdedily popisky behoveho image (nazev pwe-<profil>, popis "bez kodu
-# enginu", repozitar a licence enginu), ktere o image webu neplati. source a licenses jsou proto prazdne -
-# dopln adresu repozitare a licenci webu; base.name = behovy image, ze ktereho je image sestaveny.
+# Popisky image webu. Jinak by se zdedily popisky zakladniho image (nazev, popis, repozitar a licence
+# zavislostniho image PWE), ktere o image webu neplati. version, source a licenses jsou proto prazdne - dopln
+# verzi, adresu repozitare a licenci webu; base.name = image, ze ktereho je image webu sestaveny (verzi
+# enginu v image rika soubor /PWE/PWE/VERSION).
 LABEL org.opencontainers.image.title="{{NAME}}" \
       org.opencontainers.image.description="Web {{NAME}} nad PWE (Perl Web Engine): engine v /PWE/PWE, web v /PWE/webapps/{{NAME}}" \
+      org.opencontainers.image.version="" \
       org.opencontainers.image.source="" \
       org.opencontainers.image.licenses="" \
-      org.opencontainers.image.base.name="${PWE_IMAGE_REGISTRY}/pwe-${PWE_PROFILE}:${PWE_IMAGE_TAG}"
-
-WORKDIR /PWE/webapps/
-
-COPY webapps/{{NAME}} {{NAME}}
+      org.opencontainers.image.base.name="${PWE_IMAGE_REGISTRY}/{{BASE}}:${PWE_IMAGE_TAG}"
 
 WORKDIR /PWE/webapps/{{NAME}}
 
 # Pracovni adresare a conf/database.conf (symlink na konfiguraci profilu, pokud ji web ma) vznikaji uz pri
-# buildu: image tak bezi i s korenovym souborovym systemem jen pro cteni (pracovni adresare pak jako tmpfs
-# nebo volume). Entrypoint dela totez pri startu - kvuli prepsani PWE_PROFILE a mountum pres adresar webu.
+# buildu. Image tak jde spustit i s korenovym souborovym systemem jen pro cteni (docker run --read-only,
+# Kubernetes readOnlyRootFilesystem) - engine ale do ramdisk, sessions, uploadfile a log zapisuje, takze
+# tyto ctyri adresare pak musi byt zapisovatelne (tmpfs nebo volume pres adresare z image); bez
+# zapisovatelneho ramdisk neobslouzi ani jeden request. Entrypoint dela totez pri startu - kvuli prepsani
+# PWE_PROFILE a mountum pres adresar webu.
 RUN set -eu; \
     mkdir -p ramdisk/templates sessions uploadfile log; \
     if [ -f "conf/${PWE_PROFILE}.conf" ] && { [ -L conf/database.conf ] || [ ! -e conf/database.conf ]; }; then \
         ln -sfn "${PWE_PROFILE}.conf" conf/database.conf; \
     fi
 
-# ENTRYPOINT se dedi z behoveho image (/usr/local/bin/entrypoint.sh z pwe-base), web vlastni nema.
+# ENTRYPOINT se dedi ze zakladniho image (/usr/local/bin/entrypoint.sh z pwe-base), web vlastni nema.
 CMD ["perl", "/PWE/PWE/pwe.fcgi"]
 DOCKER
 }
@@ -1479,8 +1525,10 @@ sub gen_readme {
     my $dbtext = $DB
         ? "s databází (`conf/$DB.conf`, migrace `conf/$DB.dbversion`, session v DB přes `Services::Session`)"
         : "bez databáze (stav uživatele v souborech `sessions/`)";
-    my $profile = $DB ? $DB : 'static';
-    return tpl(<<'MD', NAME => $name, TITLE => $TITLE, DBTEXT => $dbtext, PROFILE => $profile, LANGS => join(", ", @LANGS));
+    my $profile    = $DB ? $DB : 'static';
+    my $drivertext = $DB ? ' a ovladač databáze' : '';
+    my $baseimage  = profile_image($profile);    # pwe-base (bez databaze) | pwe-<profil>
+    return tpl(<<'MD', NAME => $name, TITLE => $TITLE, DBTEXT => $dbtext, PROFILE => $profile, BASEIMAGE => $baseimage, DRIVERTEXT => $drivertext, LANGS => join(", ", @LANGS));
 # {{TITLE}}
 
 Web postavený nad enginem [PWE](../../docs/README.md), varianta {{DBTEXT}}.
@@ -1512,7 +1560,7 @@ bere, říká `conf/web.conf` (`pwe.core_pages`, `core_sites`, `core_services`, 
 | `Services/UserAccount/` | účet a skupiny uživatele (ve vývoji má každý skupinu `admin`, viz `pwe.development`) |
 | `static/css/site.css` | vlastní styly a obrázky (Bootstrap, jQuery a `pwe.js` se servírují z enginu, `PWE/assets`) |
 | `conf/web.conf` | konfigurace webu včetně toho, co se bere z enginu |
-| `Dockerfile` | image webu: běhové prostředí z image `ghcr.io/kukam/pwe-{{PROFILE}}`, engine zkopírovaný z image `ghcr.io/kukam/pwe` (`COPY --from`) a tento web; `CMD perl /PWE/PWE/pwe.fcgi`. Vstupní skript (entrypoint) se dědí z běhového image — podle `PWE_PROFILE` nasměruje `conf/database.conf` a založí dočasné adresáře; web vlastní `entrypoint.sh` nemá. Příkaz sestavení je v záhlaví souboru |
+| `Dockerfile` | image webu = závislostní image + engine + web: `FROM ghcr.io/kukam/{{BASEIMAGE}}:<tag>` (jen knihovny enginu{{DRIVERTEXT}}, bez kódu enginu; tag = verze enginu nebo `latest`, argument `PWE_IMAGE_TAG`), engine se kopíruje z adresáře `PWE/` repozitáře do `/PWE/PWE` a web do `/PWE/webapps/{{NAME}}`; `CMD perl /PWE/PWE/pwe.fcgi`. Sestavuje se z kořene repozitáře: `docker build -f webapps/{{NAME}}/Dockerfile .` (podrobnosti v záhlaví souboru). Vstupní skript (entrypoint) se dědí ze základního image — podle `PWE_PROFILE` nasměruje `conf/database.conf` a založí dočasné adresáře; web vlastní `entrypoint.sh` nemá |
 
 ## Nová stránka
 

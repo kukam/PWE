@@ -31,7 +31,7 @@ Engine)**. Plná dokumentace je ve složce [`docs/`](docs/README.md).
 
 Postup, nástroje a kontrolní seznamy jsou v
 [`docs/21-novy-web-podle-zadani.md`](docs/21-novy-web-podle-zadani.md). Ve zkratce
-(engine běží v kontejneru z image `ghcr.io/kukam/pwe-*` s tagem podle větve gitu; `make` volá
+(engine běží v kontejneru z image `ghcr.io/kukam/pwe-*` s tagem verze enginu z `PWE/VERSION`; `make` volá
 skripty v `PWE/tools/` — skripty `*.pl` spouští hostitelský Perl, stačí jádro, a zbytek si odbaví
 v kontejneru):
 
@@ -173,65 +173,99 @@ Detaily: [`docs/05-validace.md`](docs/05-validace.md). Při POST musí být `pag
 
 - PWE běží v Dockeru — viz [`docs/17-nasazeni.md`](docs/17-nasazeni.md).
   Libovolný web: `make run WEB=<web> PROFILE=<profil>` (compose dostane `PWE_WEBAPP` a tag image
-  podle větve, engine běží z `/PWE/PWE`); vzorový web s DB přímo:
-  `COMPOSE_PROFILES=mariadb docker compose up` (bez `PWE_IMAGE_TAG` bere image s tagem `master`).
+  = verze z `PWE/VERSION`, engine běží z `/PWE/PWE`); vzorový web s DB přímo:
+  `COMPOSE_PROFILES=mariadb docker compose up` (bez `PWE_IMAGE_TAG` bere image s tagem `latest`).
+  Služba `fcgi` běží v závislostním image profilu `pwe-<profil>`, profil `static` v `pwe-base`
+  (proměnná `PWE_FCGI_IMAGE`; `make run` ji nastavuje sám, přímé
+  `COMPOSE_PROFILES=static docker compose up` potřebuje `PWE_FCGI_IMAGE=pwe-base`).
 - **Testy a kompilace spouštěj v kontejneru**, hostitelský Perl nemá závislosti:
   `make test` (sada `PWE/t/`), `make compile` (`perl -c` všech modulů i skriptů). Oba používají
-  image `ghcr.io/kukam/pwe-debugger:<větev>` a mountují repozitář do `/PWE`. `make test` drží zámek
+  image `ghcr.io/kukam/pwe-debugger:<verze>` a mountují repozitář do `/PWE`. `make test` drží zámek
   pracovní kopie `PWE/t/.run-tests.lock`: souběžný běh nad stejnou kopií (i jediný test) čeká, až
   první skončí (nejvýš `PWE_TEST_LOCK_WAIT` s, výchozí 600; `0` = nečekat), pak končí kódem 2 —
-  hlášku `[run-tests] … cekam, az skonci` neber jako chybu testů. Detaily a pravidla pro psaní testů:
-  [`docs/18-testy.md`](docs/18-testy.md).
-- **Image** (registr `ghcr.io/kukam`, všechny vycházejí z `pwe-base`; přehled v
+  hlášku `[run-tests] … cekam, az skonci` neber jako chybu testů; opuštěný zámek běh převezme sám.
+  Detaily a pravidla pro psaní testů: [`docs/18-testy.md`](docs/18-testy.md).
+- **Image** (registr `ghcr.io/kukam`, celkem 9; přehled v
   [`docs/17-nasazeni.md`](docs/17-nasazeni.md#image)):
-  - `pwe-base` = jen běhové knihovny enginu, **bez kódu enginu** a bez DB ovladačů;
-    `pwe` = základ + kód enginu v `/PWE/PWE` (nosič, z něj si engine kopíruje `Dockerfile` webu);
-    `pwe-static|mariadb|mysql|postgres` = základ + DB ovladač profilu (v nich běží služba `fcgi`);
-    `pwe-debugger` = základ + všechny ovladače + ladicí nástroje (služba `debugger` a **výchozí
-    image nástrojů** `make test/compile/check/cgi/module/smtp-test`; `make new` běží na hostiteli).
-  - **Tag = větev gitu** (znaky mimo `A–Z a–z 0–9 _ . -` → `-`); jen `pwe` má navíc tag verze
-    z `PWE/VERSION`. Tag `latest` neexistuje. Tagy se přepisují — i tag verze, publikuje ho běh
-    pipeline z kterékoli větve; přesný kód určuje jen digest nebo popisek
-    `org.opencontainers.image.revision` image `pwe`
+  - **Závislostní image** (5, stage v `PWE/docker/Dockerfile`) — **bez kódu enginu a bez webu**:
+    `pwe-base` = jen běhové knihovny enginu, bez DB ovladačů (základ image webu bez databáze, běží
+    v něm služba `fcgi` profilu `static`);
+    `pwe-mariadb|mysql|postgres` = `pwe-base` + DB ovladač profilu (základ image webu s databází, běží
+    v nich služba `fcgi`; engine i web dostávají mountem repozitáře);
+    `pwe-debugger` = `pwe-base` + všechny ovladače + ladicí nástroje (služba
+    `debugger` a **výchozí image nástrojů** `make test/compile/check/cgi/module/smtp-test`;
+    `make new` běží na hostiteli).
+  - **Image vzorových webů** (4, staví je přímo `Dockerfile` vzorového webu): `pwe-example-static` =
+    `pwe-base` + engine + `webapps/example.web`; `pwe-example-mariadb|mysql|postgres` = `pwe-<profil>`
+    + engine + `webapps/example-db.web`. Jsou samy spustitelné, ale jen jako ukázka — každý návštěvník
+    vzorového webu je ve skupině `admin` včetně generátoru kódu `pweCreator`; pro veřejný provoz určené
+    nejsou (vstupní skript na to při startu serveru upozorní: `[entrypoint] VAROVANI: bezi vzorovy web …`).
+  - Image `pwe` (samotný engine) a `pwe-static` z verze 2.2.0 byly zrušeny.
+  - **Každý image má právě dva tagy: `<verze>`** (obsah `PWE/VERSION`, tvar `X.Y.Z`) **a `latest`.**
+    Tagy podle větve gitu neexistují (žádné `master`, `pwe.ai`, `pr-N`). Oba tagy se přepisují každým
+    sestavením a publikací; přesný kód určuje jen digest nebo popisek
+    `org.opencontainers.image.revision` image vzorových webů (závislostní image ho nemají)
     ([`docs/17-nasazeni.md`](docs/17-nasazeni.md#registr-a-tagy)).
-  - Výběr image: `PWE_IMAGE_REGISTRY` (výchozí `ghcr.io/kukam`), `PWE_IMAGE_TAG` (výchozí aktuální
-    větev, bez gitu `master`; musí to být platný tag — nepřevedený název větve s `/` nástroje
-    odmítnou), `PWE_TEST_IMAGE` (úplné přepsání image nástrojů). Nástroje použitý image vypisují
-    (`[run-tests] image …`, `[run-webapp] … registr=… tag=…`) a když v místním Dockeru není, vypíšou
-    radu včetně tagů téhož image, které místně jsou.
+  - Výběr image: `PWE_IMAGE_REGISTRY` (výchozí `ghcr.io/kukam`), `PWE_IMAGE_TAG` (výchozí verze
+    z `PWE/VERSION` — na gitu ani větvi nezávisí; musí to být platný tag, hodnotu s `/` nástroje
+    odmítnou; typicky `latest`), `PWE_TEST_IMAGE` (úplné přepsání image nástrojů). Nástroje použitý
+    image vypisují (`[run-tests] image …`, `[run-webapp] … registr=… tag=…`) a když v místním Dockeru
+    není, vypíšou radu včetně tagů téhož image, které místně jsou.
   - `pull access denied` / `manifest unknown`, u `ghcr.io` také `denied` nebo `403 Forbidden` = image
-    pro větev nejsou v registru (nebo jsou balíčky soukromé a Docker není přihlášen) → `make images`
-    (sestaví všech 7 lokálně; `make images ARGS='pwe debugger'` jen vybrané), nebo — jsou-li
-    publikované image větve `master` — `PWE_IMAGE_TAG=master make …`.
+    této verze nejsou v registru (typicky po zvýšení `PWE/VERSION`, nebo jsou balíčky soukromé
+    a Docker není přihlášen) → `make images` (sestaví všech 9 lokálně s tagy `<verze>` a `latest`;
+    `make images ARGS='base debugger'` jen vybrané — cíle `base mariadb mysql postgres debugger
+    example-static example-mariadb example-mysql example-postgres`), nebo — jsou-li image publikované —
+    `PWE_IMAGE_TAG=latest make …`. `PWE_IMAGE_TAG` se při `make images` nepoužívá.
   - Knihovna, kterou potřebuje jen web, patří do `Dockerfile` webu, ne do `pwe-base`. V `pwe-base`
     **nejsou** `LWP::UserAgent` (`libwww-perl`), `LWP::Protocol::https`, `Data::UUID`, `Data::GUID`,
     `Crypt::OpenSSL::X509` ani `curl` (ten je jen v `pwe-debugger`); HTTPS klient kódu webu je
     `HTTP::Tiny` + `IO::Socket::SSL`. Image běží v UTC (`tzdata` v image je); proměnná `TZ` platí jen
     při startu enginu — FastCGI v každém requestu nahradí prostředí, pásmo pro requesty proto předává
-    webserver (`fastcgi_param TZ`) nebo `/etc/localtime` kontejneru. Sestavení image řídí `PWE/docker/Dockerfile` (stage = image, vše z balíčků Ubuntu — `cpanm` se
-    při sestavení nepoužívá), `docker-bake.hcl` a pipeline `.github/workflows/images.yml` (testy
-    v `pwe-base` a kouřové kontroly obou platforem, pak publikace; pull request nepublikuje);
-    lehký `.github/workflows/tests.yml` pouští jen testy pro změny vzorových webů, compose,
-    `kubernetes/` a `Makefile`. Kouřové kontroly místních image: `make images-check`
-    (`PWE/tools/smoke-images.sh`). `make images ARGS=--push` odmítne odpojený `HEAD` bez
-    `PWE_IMAGE_TAG` a necommitnuté změny (`--allow-dirty`), tag tvaru `X.Y.Z` odmítne vždy.
-  - Image webu (`webapps/<web>/Dockerfile`, šablona generátoru): běh z `pwe-<profil>`, engine
-    `COPY --from` image `pwe`, zapečené `PWE_CONF_pwe_home` a `PWE_PROFILE`, vlastní `LABEL`, pracovní
-    adresáře a `conf/database.conf` založené při sestavení (`RUN`). Web **nemá vlastní
-    `entrypoint.sh`** — image webu dědí `ENTRYPOINT` z `pwe-<profil>` (jediný zdroj
+    webserver (`fastcgi_param TZ`) nebo `/etc/localtime` kontejneru. Sestavení image řídí `PWE/docker/Dockerfile` (závislostní image: stage = image, vše z balíčků Ubuntu — `cpanm` se
+    při sestavení nepoužívá; z kontextu sestavení bere jen `PWE/docker/entrypoint.sh`), `Dockerfile`
+    vzorových webů (image `pwe-example-*`),
+    `docker-bake.hcl` (proměnná `VERSION` povinná, každý z 9 cílů s tagy `<verze>` a `latest`; vzorový
+    cíl si základ sestaví sám, uloží se ale jen tehdy, je-li také mezi cíli) a pipeline
+    `.github/workflows/images.yml` (testy v `pwe-base` a kouřové kontroly, pak publikace obou
+    platforem). **Publikuje jen push a ruční spuštění nad výchozí větví repozitáře a nad větvemi
+    z proměnné repozitáře `PUBLISH_BRANCHES`**; ostatní větve a pull requesty image jen sestaví
+    a otestují. Vstupy image jsou `PWE/**`, `docker-bake.hcl`, `.dockerignore`, `LICENSE` a vzorové
+    weby `webapps/example*.web/**`; lehký `.github/workflows/tests.yml` pouští jen testy pro změny
+    compose, `kubernetes/` a `Makefile`. Kouřové kontroly místních image: `make images-check`
+    (`PWE/tools/smoke-images.sh`). `make images ARGS=--push` odmítne necommitnuté změny
+    (`--allow-dirty`).
+  - Image webu (`webapps/<web>/Dockerfile`, šablona generátoru) = závislostní image + engine + web:
+    **jediný `FROM`** `pwe-<profil>:<tag>`, u webu bez databáze `pwe-base:<tag>` (výchozí
+    `PWE_IMAGE_TAG=latest`; žádný image `pwe`, `COPY --from` ani `PWE_ENGINE_TAG`), engine zkopírovaný
+    z kontextu sestavení (`COPY --link` položek `PWE/` kromě `PWE/t` a `PWE/docker` do `/PWE/PWE`), web
+    do `/PWE/webapps/<web>`, zapečené `PWE_CONF_pwe_home` a `PWE_PROFILE`, vlastní `LABEL`,
+    pracovní adresáře a `conf/database.conf` založené při sestavení (jediný `RUN`). **Sestavuje se vždy
+    z kořene repozitáře**; verzi enginu v image určuje pracovní kopie, `PWE_IMAGE_TAG` vybírá jen
+    závislostní image. `make check` na `Dockerfile` ze starší šablony upozorní (`WARN Dockerfile je ze
+    stare sablony …`); nový dá `PWE/tools/new-webapp.pl <web> [--db <profil>] --dir <dočasný adresář>`
+    (převzít z výsledku `Dockerfile`). Web **nemá vlastní
+    `entrypoint.sh`** — image webu dědí `ENTRYPOINT` ze závislostního image (jediný zdroj
     `PWE/docker/entrypoint.sh`); nepřidávej ho do webu ani do `Dockerfile`. Nad lokálně sestavenými
-    image (`make images`) stav prostým `docker build --build-arg PWE_IMAGE_TAG=<větev> …` — místní
-    image vidí; `docker buildx build`
+    image (`make images`) stav prostým `docker build [--build-arg PWE_IMAGE_TAG="$(cat PWE/VERSION)"] …`
+    — místní image vidí; `docker buildx build`
     staví vybraným builderem a s typem `docker-container` je nevidí (pak
     `--builder <builder s ovladačem docker> --load`). Soukromé klíče pod `conf/` webu (`*.pem`, `*.key`,
     `*.p12`, `*.pfx`) se do image nezapékají (`.dockerignore`) — kontejner je dostává mountem, viz
     [`docs/17-nasazeni.md`](docs/17-nasazeni.md#image-vlastního-webu).
-- Všechny image mají zapečené jen `PWE_CONF_pwe_core=/PWE/PWE` (z `pwe-base`); `PWE_CONF_pwe_home`
-  a `PWE_PROFILE` má zapečené až image konkrétního webu. `FCGI_SOCKET_PATH=:7779` v image není — mají ho až
+- Všechny image mají zapečené `PWE_CONF_pwe_core=/PWE/PWE` (z `pwe-base`); `PWE_CONF_pwe_home`
+  a `PWE_PROFILE` má zapečené až image webu — konkrétního webu i vzorového (`pwe-example-*`);
+  závislostní image je nemají.
+  `FCGI_SOCKET_PATH=:7779` v image není — mají ho až
   kontejnery compose stacku (z `docker-compose/docker-compose_common.env`). Skripty v `PWE/tools/` tyto proměnné
   nastavují nebo odstraňují samy; při ručním běhu nastav `PWE_CONF_pwe_home` na adresář webu
   a v kontejneru stacku navíc **odstraň** `FCGI_SOCKET_PATH` (`. vars` nebo
   `unset FCGI_SOCKET_PATH`), jinak engine místo jednoho CGI requestu začne poslouchat na socketu.
+- Běh procesu (od 2.2.1, [`docs/17-nasazeni.md`](docs/17-nasazeni.md#běh-procesu-enginu)):
+  `FCGI_SOCKET_PATH` je `:7779`, `127.0.0.1:7779` nebo cesta k unix socketu (práva
+  `FCGI_SOCKET_PERM` osmičkově, výchozí 0770); `SIGTERM` ukončí engine pořádaně s kódem 0
+  (rozpracovaný request doběhne); migraci schématu při startu chrání zámek vázaný na databázové
+  spojení (klíče `dbversion_session_lock`, `dbversion_legacy_lock_wait` v `conf/<profil>.conf`).
 - Engine lze spustit jako jednorázové CGI bez FastCGI socketu (ladění, smoke test):
   `make cgi WEB=<web> Q='page=X&func=default'` (k síti a databázi compose stacku se připojí jen
   tehdy, když stack běží pro **týž** web; běží-li stack jiného webu, web s databází skončí kódem 2 —
@@ -243,8 +277,11 @@ Detaily: [`docs/05-validace.md`](docs/05-validace.md). Při POST musí být `pag
   `[entrypoint] VAROVANI`), když profil neodpovídá `conf/` webu — web bez databáze spouštěj
   s `PROFILE=static`.
 - **Kubernetes** ([`kubernetes/README.md`](kubernetes/README.md)): `make k8s-image | k8s-template |
-  k8s-deploy | k8s-status | k8s-test | k8s-logs | k8s-delete K8S=<název>` (`static` = `example.web`,
-  `generic` = `example-db.web` + MariaDB; release `pwe-<název>`, skript `PWE/tools/k8s.sh`, chart
+  k8s-deploy | k8s-status | k8s-test | k8s-logs | k8s-delete K8S=<název>` (vzorová nasazení berou
+  hotové image vzorových webů z registru: `static` = `pwe-example-static` s `example.web`, `generic` =
+  `pwe-example-mariadb` s `example-db.web` + MariaDB — nic se nestaví; `make k8s-image` je jen pro
+  vlastní web a staví jeho `Dockerfile` nad `pwe-<profil>`, bez databáze nad `pwe-base`; release
+  `pwe-<název>`, skript `PWE/tools/k8s.sh`, chart
   `nxs-universal-chart` 3.2.2, hodnoty `kubernetes/values-<název>.yml`). **Nikdy bez `KUBE_CONTEXT`**
   — skript aktuální kontext `kubectl` nepoužije a bez něj nic nenasadí; **nikdy `kubectl` bez
   `--context <kontext>`** (ani `helm` bez `--kube-context`), ani pro čtení — na stroji mohou být
@@ -275,8 +312,14 @@ Detaily: [`docs/05-validace.md`](docs/05-validace.md). Při POST musí být `pag
   jen `PWE/docker/entrypoint.sh` (dědí ho všechny image včetně image webu, web vlastní kopii nemá)
   a šablona `Dockerfile` webu je jen v `PWE/tools/new-webapp.pl` (funkce `gen_dockerfile`):
   `Dockerfile` vzorových webů (`webapps/example*.web/Dockerfile`) s výstupem generátoru musí zůstat
-  shodný a web nesmí mít `entrypoint.sh` — hlídá to `PWE/t/14-tools.t`. Změna balíčků stage `base`
+  shodný a web nesmí mít `entrypoint.sh` — hlídá to `PWE/t/14-tools.t`. Šablona vyjmenovává položky
+  adresáře `PWE/` (kromě `t` a `docker`): nová položka přímo v `PWE/` znamená doplnit `COPY` do
+  šablony a `Dockerfile` vzorových webů vygenerovat znovu (i to hlídá `PWE/t/14-tools.t`). Změna
+  balíčků stage `base`
   znamená upravit i přesný seznam v `PWE/t/14-tools.t` a kontroly v `PWE/tools/smoke-images.sh`.
+  Engine a vzorové weby jsou součástí image vzorových webů `pwe-example-*`: po změně v `PWE/`, ve
+  vzorovém webu nebo ve vstupním skriptu sestav image znovu (`make images`), jinak `make images-check`
+  ohlásí rozdíl (srovnává seznam i obsah souborů).
 - **Necommituj** a nepushuj, pokud o to uživatel výslovně nepožádá.
 
 ## 8. Dokumentace v kódu (POD)

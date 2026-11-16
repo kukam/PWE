@@ -248,6 +248,15 @@ require Libs::MyDBI::DRIVER::Postgre;
     is($d->connect(), 1, 'dalsi connect bez konfigurace (ulozene hodnoty) uspeje');
     ok(!$d->error(), 'uspesny connect smaze chybu predchoziho pokusu');
 
+    # Nove spojeni zadny zamek spojeni nedrzi: connect() zahodi hodnotu ticheho reconnectu, kterou si ulozil
+    # sessionLock nad PUVODNIM spojenim - sessionUnlock ji pak nesmi "vratit" novemu handle.
+    $d->{'session_lock_reconnect'} = 0;
+    my $w2 = MockDBH->new(mysql_auto_reconnect => 1);
+    @PLAN = (MockDBH->new, $w2);
+    is($d->connect(), 1, 'MySQL: opakovany connect uspeje');
+    ok(!exists($d->{'session_lock_reconnect'}), 'MySQL: connect() maze hodnotu mysql_auto_reconnect ulozenou v sessionLock (nove spojeni zamek nedrzi)');
+    is($w2->{'mysql_auto_reconnect'}, 1, 'MySQL: nastaveni noveho spojeni DBI_W connect() nemeni');
+
     # Postgre
     my $pgbase = 'dbi:Pg:dbname=eshop;host=dbhost;port=3307';
     my $h = MockDBH->new;
@@ -267,6 +276,10 @@ require Libs::MyDBI::DRIVER::Postgre;
     @PLAN  = (MockDBH->new);
     is($d->connect(), 1, 'Postgre: dalsi connect uspeje');
     ok(!$d->error(), 'Postgre: uspesny connect smaze chybu predchoziho pokusu');
+    $d->{'session_locks'} = {'dbversion' => 1};
+    @PLAN = (MockDBH->new);
+    is($d->connect(), 1, 'Postgre: opakovany connect uspeje');
+    is_deeply($d->{'session_locks'}, {}, 'Postgre: nove spojeni zadny zamek urovne session nedrzi (pocitadlo sessionLock se nuluje)');
 
     # Libs::MyDBI::createConnection: neuspech se loguje vcetne chyby DBI (jeden radek, bez hesla)
     {
@@ -301,6 +314,234 @@ require Libs::MyDBI::DRIVER::Postgre;
     is($M->createConnection('db1', 1, {%conf, dbdriver => 'mysql'}), 1, 'createConnection: uspesne pripojeni vraci 1');
     is($log->{'debug'}->[-1], 'Connect to mysql dbid:db1 connect_status:1', 'uspech se loguje beze zmeny (debug)');
     is(scalar(@{$log->{'error'}}), 2, 'uspech nepridava zaznam error');
+}
+
+# --- sessionLock/sessionUnlock: zamek vazany na spojeni (zamek migrace v Libs::MyDBI::checkDbversion) ---
+# Regrese: zamek migrace byl jen sloupec dbversion.lockid, ktery po padu procesu zustal nastaveny navzdy.
+{
+    # DBI handle, ktery zaznamena volani selectrow_array a vraci dalsi polozku planu:
+    # hodnota (i undef = SQL NULL) = vysledek dotazu, [err, errstr, state] = chyba dotazu.
+    package MockLockDBH;
+    sub new { my ($c, %a) = @_; return bless {calls => [], plan => [], rolled => 0, AutoCommit => 0, %a}, $c; }
+    sub err    { $_[0]->{'err'} }
+    sub errstr { $_[0]->{'errstr'} }
+    sub state  { $_[0]->{'state'} }
+    sub rollback { $_[0]->{'rolled'}++; $_[0]->{'err'} = $_[0]->{'errstr'} = $_[0]->{'state'} = undef; 1 }
+    sub selectrow_array {
+        my ($s, $sql, $attr, @bind) = @_;
+        push(@{$s->{'calls'}}, [$sql, @bind]);
+        $s->{'err'} = $s->{'errstr'} = $s->{'state'} = undef;
+        my $r = shift(@{$s->{'plan'}});
+        if (ref($r) eq 'ARRAY') {
+            ($s->{'err'}, $s->{'errstr'}, $s->{'state'}) = @{$r};
+            return ();
+        }
+        return ($r);
+    }
+
+    package main;
+    require Digest::MD5;
+    require Time::HiRes;
+
+    # MySQL/MariaDB: GET_LOCK/RELEASE_LOCK nad zapisovym spojenim DBI_W
+    my $d = Libs::MyDBI::DRIVER::MySQL->new;
+    ok(($d->can('sessionLock') and $d->can('sessionUnlock')), 'MySQL: ovladac ma sessionLock a sessionUnlock');
+    $d->{'database'} = 'eshop';
+    is($d->sessionLockName('dbversion'), 'pwe.dbversion.eshop', 'MySQL: jmeno zamku obsahuje nazev databaze (jmena jsou spolecna pro cely server)');
+    $d->{'database'} = 'x' x 50;
+    is($d->sessionLockName('dbversion'), 'pwe.dbversion.' . ('x' x 50), 'MySQL: jmeno o 64 znacich se jeste nezkracuje');
+    $d->{'database'} = 'x' x 51;
+    my $long = $d->sessionLockName('dbversion');
+    is($long, 'pwe.' . Digest::MD5::md5_hex('pwe.dbversion.' . ('x' x 51)), 'MySQL: delsi jmeno se nahradi otiskem');
+    cmp_ok(length($long), '<=', 64, 'MySQL: otisk se vejde do 64 znaku');
+    $d->{'database'} = 'y' x 51;
+    isnt($d->sessionLockName('dbversion'), $long, 'MySQL: jina databaze = jiny otisk');
+    $d->{'database'} = 'eshop';
+
+    my ($r, $w) = (MockLockDBH->new, MockLockDBH->new(plan => [1, 0, undef, [2013, 'Lost connection to MySQL server during query', 'HY000'], 1]));
+    $d->{'DBI_R'} = $r;
+    $d->{'DBI_W'} = $w;
+    is($d->sessionLock('dbversion', 5), 1, 'MySQL: GET_LOCK vrati 1 -> zamek ziskan');
+    is_deeply($w->{'calls'}->[0], ['SELECT GET_LOCK(?, 5)', 'pwe.dbversion.eshop'], 'MySQL: GET_LOCK se jmenem zamku a casem cekani');
+    ok(!$d->error(), 'MySQL: po ziskani zamku bez chyby');
+    is($d->sessionLock('dbversion', 5), 0, 'MySQL: GET_LOCK vrati 0 -> zamek drzi jine spojeni');
+    ok(!$d->error(), 'MySQL: obsazeny zamek neni chyba');
+    is($d->sessionLock('dbversion', 5), undef, 'MySQL: GET_LOCK vrati NULL -> undef');
+    ok($d->error(), 'MySQL: NULL z GET_LOCK je ulozena chyba');
+    like($d->getError()->{'errstr'}, qr/GET_LOCK\('pwe\.dbversion\.eshop'\) returned NULL/, 'MySQL: text chyby pro NULL');
+    is($d->sessionLock('dbversion', 5), undef, 'MySQL: chyba dotazu -> undef');
+    is_deeply($d->getError(), {err => 2013, errstr => 'Lost connection to MySQL server during query', state => 'HY000'}, 'MySQL: chyba dotazu ulozena pres setError');
+    is($d->sessionLock('dbversion', 'abc'), 1, 'MySQL: neplatny cas cekani -> jeden pokus');
+    is($w->{'calls'}->[-1]->[0], 'SELECT GET_LOCK(?, 0)', 'MySQL: neplatny cas cekani = 0 (do SQL jde jen cele cislo)');
+    ok(!$d->error(), 'MySQL: uspesne ziskani zamku smaze predchozi chybu');
+    is($d->sessionLock('dbversion'), undef, 'MySQL: vycerpany plan (NULL) -> undef');
+    is($w->{'calls'}->[-1]->[0], 'SELECT GET_LOCK(?, 0)', 'MySQL: bez casu cekani = 0');
+
+    @{$w->{'calls'}} = ();
+    @{$w->{'plan'}}  = (1, 0, undef, [2006, 'MySQL server has gone away', 'HY000']);
+    is($d->sessionUnlock('dbversion'), 1, 'MySQL: RELEASE_LOCK vrati 1 -> uvolneno');
+    is_deeply($w->{'calls'}->[0], ['SELECT RELEASE_LOCK(?)', 'pwe.dbversion.eshop'], 'MySQL: RELEASE_LOCK se stejnym jmenem');
+    is($d->sessionUnlock('dbversion'), 0, 'MySQL: RELEASE_LOCK vrati 0 (zamek drzi jine spojeni) -> 0');
+    is($d->sessionUnlock('dbversion'), 0, 'MySQL: RELEASE_LOCK vrati NULL (zamek neexistuje) -> 0');
+    is($d->sessionUnlock('dbversion'), 0, 'MySQL: chyba dotazu -> 0');
+    is($d->getError()->{'err'}, 2006, 'MySQL: chyba uvolneni ulozena pres setError');
+    is(scalar(@{$r->{'calls'}}), 0, 'MySQL: zamek se bere i uvolnuje jen nad zapisovym spojenim DBI_W (stejny handle)');
+    is($w->{'rolled'} + $r->{'rolled'}, 0, 'MySQL: zamek nesaha na transakci (zadny rollback)');
+
+    # Regrese: tichy reconnect ovladace DBD::mysql (mysql_auto_reconnect; ovladac ho sam zapina pri AutoCommit 1
+    # a promenne GATEWAY_INTERFACE v prostredi) po zaniku spojeni DBI_W spojeni obnovil BEZ zamku a migrace
+    # pokracovala nechranena - soubezne startujici proces jeji lockid prevzal jako opusteny a kroky probehly
+    # dvakrat. Po dobu drzeni zamku se proto tichy reconnect vypina a sessionUnlock ho vraci.
+    $d->{'session_lock_reconnect'} = 0;    # pozustatek po predchozich blocich (uvolneni, ktere selhalo)
+    delete($d->{'session_lock_reconnect'});
+    ($r, $w) = (MockLockDBH->new(mysql_auto_reconnect => 1), MockLockDBH->new(plan => [0, 1, 1, 1, 0], mysql_auto_reconnect => 1));
+    $d->{'DBI_R'} = $r;
+    $d->{'DBI_W'} = $w;
+    is($d->sessionLock('dbversion', 1), 0, 'MySQL: zamek drzi jine spojeni');
+    is($w->{'mysql_auto_reconnect'}, 1, 'MySQL: bez ziskaneho zamku se tichy reconnect nemeni');
+    is($d->sessionLock('dbversion', 1), 1, 'MySQL: zamek ziskan');
+    is($w->{'mysql_auto_reconnect'}, 0, 'MySQL: po dobu drzeni zamku je tichy reconnect na DBI_W vypnuty');
+    is($r->{'mysql_auto_reconnect'}, 1, 'MySQL: cteci spojeni DBI_R se nemeni');
+    is($d->sessionLock('dbversion', 1), 1, 'MySQL: opakovane ziskani zamku');
+    is($w->{'mysql_auto_reconnect'}, 0, 'MySQL: tichy reconnect zustava vypnuty');
+    is($d->sessionUnlock('dbversion'), 1, 'MySQL: uvolneni zamku');
+    is($w->{'mysql_auto_reconnect'}, 1, 'MySQL: sessionUnlock vraci puvodni hodnotu ticheho reconnectu');
+    ok(!exists($d->{'session_lock_reconnect'}), 'MySQL: ulozena hodnota se po vraceni maze');
+    is($d->sessionUnlock('dbversion'), 0, 'MySQL: dalsi uvolneni vrati 0');
+    is($w->{'mysql_auto_reconnect'}, 1, 'MySQL: opakovane uvolneni hodnotu nemeni');
+
+    # puvodne vypnuty tichy reconnect zustava po uvolneni vypnuty; uvolneni, ktere selze, hodnotu vraci take
+    $w = MockLockDBH->new(plan => [1, [2006, 'MySQL server has gone away', 'HY000']], mysql_auto_reconnect => 0);
+    $d->{'DBI_W'} = $w;
+    is($d->sessionLock('dbversion'), 1, 'MySQL: zamek ziskan (tichy reconnect puvodne vypnuty)');
+    is($w->{'mysql_auto_reconnect'}, 0, 'MySQL: tichy reconnect vypnuty');
+    is($d->sessionUnlock('dbversion'), 0, 'MySQL: uvolneni selze (spojeni zaniklo)');
+    is($w->{'mysql_auto_reconnect'}, 0, 'MySQL: puvodne vypnuty tichy reconnect zustava vypnuty');
+    ok(!exists($d->{'session_lock_reconnect'}), 'MySQL: po neuspesnem uvolneni nezustava ulozena hodnota');
+
+    # PostgreSQL: poradni zamek urovne session
+    my $p = Libs::MyDBI::DRIVER::Postgre->new;
+    ok(($p->can('sessionLock') and $p->can('sessionUnlock')), 'Postgre: ovladac ma sessionLock a sessionUnlock');
+    my @key = $p->sessionLockKey('dbversion');
+    is_deeply(\@key, [unpack('l> l>', Digest::MD5::md5('pwe.dbversion.public'))], 'Postgre: klic = prvnich 8 bajtu MD5 z "pwe.<jmeno>.<schema>"');
+    is(scalar(@key), 2, 'Postgre: klic jsou dve cisla');
+    ok((!grep { $_ !~ /^-?\d+$/ or $_ < -2147483648 or $_ > 2147483647 } @key), 'Postgre: obe cisla jsou int4 se znamenkem');
+    is_deeply([$p->sessionLockKey('dbversion')], \@key, 'Postgre: klic je stabilni');
+    $p->{'schema'} = 'eshop';
+    isnt(join(',', $p->sessionLockKey('dbversion')), join(',', @key), 'Postgre: jine schema = jiny klic');
+    $p->{'schema'} = 'public';
+    # Prvni ziskani: dotaz nejdriv overi v pg_locks, ze zamek uz nedrzi samo serverove spojeni (hodnota 2).
+    my $relock = "SELECT CASE WHEN pg_try_advisory_lock($key[0], $key[1]) THEN 1 ELSE 0 END";
+    my $lock   = "SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND classid = ($key[0])::oid AND objid = ($key[1])::oid AND objsubid = 2) THEN 2 WHEN pg_try_advisory_lock($key[0], $key[1]) THEN 1 ELSE 0 END";
+    my $unlock = "SELECT CASE WHEN pg_advisory_unlock($key[0], $key[1]) THEN 1 ELSE 0 END";
+
+    my $h = MockLockDBH->new(plan => [1, 1, 1, 1, 1, 1, 1, 0]);
+    $p->{'DBI'} = $h;
+    is($p->sessionLock('dbversion', 5), 1, 'Postgre: zamek ziskan na prvni pokus');
+    is_deeply($h->{'calls'}, [[$lock]], 'Postgre: pg_try_advisory_lock (uroven session), ne pg_advisory_xact_lock; pred nim kontrola pg_locks');
+    unlike($h->{'calls'}->[0]->[0], qr/xact/, 'Postgre: zadny transakcni zamek (ten by commit uvolnil)');
+
+    # Opakovane ziskani tymz objektem (zamek je v ramci session opakovatelny) a pocitadlo vlastnich zamku
+    is($p->sessionLock('dbversion', 5), 1, 'Postgre: tentyz objekt ziska zamek opakovane');
+    is($h->{'calls'}->[1]->[0], $relock, 'Postgre: vlastni zamek se podruhe bere bez kontroly pg_locks');
+    is($p->sessionUnlock('dbversion'), 1, 'Postgre: prvni uvolneni opakovane ziskaneho zamku');
+    is($p->sessionLock('dbversion', 5), 1, 'Postgre: zamek stale drzime -> dalsi ziskani');
+    is($h->{'calls'}->[3]->[0], $relock, 'Postgre: dokud objekt zamek drzi, kontrola pg_locks se nedela');
+    is($p->sessionUnlock('dbversion'), 1, 'Postgre: druhe uvolneni');
+    is($p->sessionUnlock('dbversion'), 1, 'Postgre: treti uvolneni - zamek je volny');
+    is($p->sessionLock('dbversion', 5), 1, 'Postgre: nove ziskani po uplnem uvolneni');
+    is($h->{'calls'}->[6]->[0], $lock, 'Postgre: po uplnem uvolneni se pg_locks kontroluje znovu');
+    is($p->sessionUnlock('dbversion'), 0, 'Postgre: uvolneni vrati 0 - zamek toto serverove spojeni nedrzi');
+    ok(!$p->{'session_locks'}->{'dbversion'}, 'Postgre: po neuspesnem uvolneni objekt zadny vlastni zamek neeviduje');
+
+    # Regrese: za poolerem v rezimu transaction pooling (PgBouncer) dostal klient serverove spojeni, na
+    # kterem zamek vzal JINY klient. pg_try_advisory_lock tam vrati true (zamek je v ramci session
+    # opakovatelny), engine si myslel, ze zamek drzi, prevzal lockid ziveho procesu a kroky migrace
+    # probehly dvakrat. Dotaz proto vraci 2 a sessionLock undef (migrace pak chrani jen sloupec lockid).
+    foreach my $autocommit (0, 1) {
+        $h = MockLockDBH->new(plan => [2, 1], AutoCommit => $autocommit);
+        $p->{'DBI'} = $h;
+        is($p->sessionLock('dbversion', 5), undef, "Postgre: zamek uz drzi serverove spojeni (cizi klient za poolerem) -> undef (AutoCommit $autocommit)");
+        is_deeply($h->{'calls'}, [[$lock]], 'Postgre: zadny dalsi pokus, zamek se nebere');
+        is_deeply($p->getError(), {err => -1, errstr => 'advisory lock is already held by this server connection (connection pooler in transaction mode?)', state => undef}, 'Postgre: chyba popisuje pricinu (getError)');
+        ok($p->error(), 'Postgre: cizi zamek na serverovem spojeni je chyba (error)');
+        is($h->{'rolled'}, 0, 'Postgre: transakce volajiciho se nevraci (zadny rollback)');
+        ok(!$p->{'session_locks'}->{'dbversion'}, 'Postgre: objekt zamek neeviduje jako vlastni');
+    }
+    $h = MockLockDBH->new(plan => [0, 2]);
+    $p->{'DBI'} = $h;
+    is($p->sessionLock('dbversion', 5), undef, 'Postgre: cizi zamek na serverovem spojeni zjisteny az behem cekani -> undef');
+    is(scalar(@{$h->{'calls'}}), 2, 'Postgre: cekani konci hned po zjisteni');
+    $h = MockLockDBH->new(plan => [1]);
+    $p->{'DBI'} = $h;
+    is($p->sessionLock('dbversion'), 1, 'Postgre: dalsi pokus bez ciziho zamku uspeje');
+    ok(!$p->error(), 'Postgre: uspesne ziskani smaze chybu');
+    $p->{'session_locks'} = {};    # dalsi bloky zacinaji s novym handlem = spojenim bez vlastniho zamku
+
+    $h = MockLockDBH->new(plan => [0, 0, 0]);
+    $p->{'DBI'} = $h;
+    is($p->sessionLock('dbversion', 0), 0, 'Postgre: obsazeny zamek a cas 0 -> 0');
+    is(scalar(@{$h->{'calls'}}), 1, 'Postgre: cas 0 = jediny pokus');
+    ok(!$p->error(), 'Postgre: obsazeny zamek neni chyba');
+    is($p->sessionLock('dbversion'), 0, 'Postgre: bez casu = jediny pokus');
+    is(scalar(@{$h->{'calls'}}), 2, 'Postgre: bez casu jediny dalsi pokus');
+
+    $h = MockLockDBH->new(plan => [0, 0, 1]);
+    $p->{'DBI'} = $h;
+    my $t0 = Time::HiRes::time();
+    is($p->sessionLock('dbversion', 5), 1, 'Postgre: zamek ziskan po uvolneni jinym spojenim');
+    is(scalar(@{$h->{'calls'}}), 3, 'Postgre: pokusy v cyklu (dva neuspesne, treti uspesny)');
+    cmp_ok(Time::HiRes::time() - $t0, '<', 2, 'Postgre: cyklus konci hned po ziskani zamku, ne az po vyprseni casu');
+
+    $h = MockLockDBH->new(plan => [(0) x 50]);
+    $p->{'DBI'} = $h;
+    $t0 = Time::HiRes::time();
+    is($p->sessionLock('dbversion', 0.5), 0, 'Postgre: zamek obsazeny po celou dobu -> 0');
+    my $took = Time::HiRes::time() - $t0;
+    ok(($took >= 0.45 and $took < 2), 'Postgre: cekani trva zadany cas') or diag("trvalo $took s");
+    cmp_ok(scalar(@{$h->{'calls'}}), '>=', 3, 'Postgre: behem cekani se zamek zkousi opakovane');
+
+    $h = MockLockDBH->new(plan => [[7, 'ERROR:  current transaction is aborted', '25P02']], AutoCommit => 0);
+    $p->{'DBI'} = $h;
+    is($p->sessionLock('dbversion', 5), undef, 'Postgre: chyba dotazu -> undef (bez dalsich pokusu)');
+    is(scalar(@{$h->{'calls'}}), 1, 'Postgre: po chybe zadny dalsi pokus');
+    is($p->getError()->{'state'}, '25P02', 'Postgre: chyba ulozena pres setError (zustava i po rollbacku)');
+    is($h->{'rolled'}, 1, 'Postgre: vypnuty autocommit -> po chybe rollback (spojeni nezustane ve zrusene transakci)');
+    $h = MockLockDBH->new(plan => [[7, 'ERROR:  function pg_try_advisory_lock does not exist', '42883']], AutoCommit => 1);
+    $p->{'DBI'} = $h;
+    is($p->sessionLock('dbversion', 5), undef, 'Postgre: chyba dotazu se zapnutym autocommitem -> undef');
+    is($h->{'rolled'}, 0, 'Postgre: zapnuty autocommit -> zadny rollback');
+
+    $h = MockLockDBH->new(plan => [1, 0]);
+    $p->{'DBI'} = $h;
+    is($p->sessionUnlock('dbversion'), 1, 'Postgre: pg_advisory_unlock vrati true -> 1');
+    is_deeply($h->{'calls'}, [[$unlock]], 'Postgre: pg_advisory_unlock se stejnym klicem');
+    is($p->sessionUnlock('dbversion'), 0, 'Postgre: zamek toto spojeni nedrzi -> 0');
+    is($h->{'rolled'}, 0, 'Postgre: uvolneni bez chyby nesaha na transakci');
+
+    $h = MockLockDBH->new(plan => [[7, 'ERROR:  current transaction is aborted, commands ignored until end of transaction block', '25P02'], 1]);
+    $p->{'DBI'} = $h;
+    is($p->sessionUnlock('dbversion'), 1, 'Postgre: zrusena transakce -> rollback a druhy pokus zamek uvolni');
+    is($h->{'rolled'}, 1, 'Postgre: prave jeden rollback');
+    is(scalar(@{$h->{'calls'}}), 2, 'Postgre: dva pokusy o uvolneni');
+    ok(!$p->error(), 'Postgre: po uspesnem druhem pokusu bez chyby');
+
+    $h = MockLockDBH->new(plan => [[7, 'ERROR:  current transaction is aborted', '25P02'], [7, 'ERROR:  current transaction is aborted', '25P02'], 1]);
+    $p->{'DBI'} = $h;
+    is($p->sessionUnlock('dbversion'), 0, 'Postgre: ani druhy pokus neuspel -> 0');
+    is(scalar(@{$h->{'calls'}}), 2, 'Postgre: nejvys dva pokusy o uvolneni');
+
+    $h = MockLockDBH->new(plan => [[7, 'server closed the connection unexpectedly', '08006'], 1]);
+    $p->{'DBI'} = $h;
+    is($p->sessionUnlock('dbversion'), 0, 'Postgre: jina chyba (ztracene spojeni) -> 0');
+    is(scalar(@{$h->{'calls'}}), 1, 'Postgre: jina chyba se neopakuje');
+    is($h->{'rolled'}, 0, 'Postgre: jina chyba bez rollbacku');
+    is($p->getError()->{'state'}, '08006', 'Postgre: chyba uvolneni ulozena pres setError');
+
+    # DESTROY ovladacu vola rollback nad handle - at po sobe test nenecha varovani
+    $d->{'DBI_R'} = MockDBH->new;
+    $d->{'DBI_W'} = MockDBH->new;
+    $p->{'DBI'}   = MockDBH->new;
 }
 
 done_testing();

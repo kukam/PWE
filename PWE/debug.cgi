@@ -33,8 +33,9 @@ debug.cgi - vstupni bod enginu PWE pro ladeni (debugger ve VS Code, nginx locati
       - Jen pod debuggerem (perl -d, $^P): cekani na dalsi request (CGI::Fast->new) se po
         preruseni signalem INT zopakuje. VS Code posila ladenemu procesu INT pri kazdem
         pridani nebo odebrani breakpointu a pri Pause; FastCGI accept by se tim prerusil,
-        smycka enginu by skoncila a ladeny server by se ukoncil. Signal TERM (a bez debuggeru
-        i INT / Ctrl-C) ukoncuje server beze zmeny.
+        smycka enginu by skoncila a ladeny server by se ukoncil. Od verze 2.2.1 opakuje
+        prerusene cekani (EINTR) i sam pwe.fcgi; obal tu zustava jako pojistka. Signal TERM
+        (a bez debuggeru i INT / Ctrl-C) ukoncuje server beze zmeny.
 
 =cut
 

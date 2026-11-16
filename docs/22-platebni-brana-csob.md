@@ -125,7 +125,7 @@ web => {
 Tajemství (`merchant_id`, `cron_key`) patří do prostředí: `PWE_CONF_csob_merchant_id=…`,
 `PWE_CONF_csob_mode=production`, `PWE_CONF_web_cron_key=…` ([03 — Konfigurace](03-struktura-webu.md)).
 
-Závislosti jsou už v základu `pwe-base`, tedy ve všech image enginu: `libjson-perl` (JSON), `HTTP::Tiny` (součást Perlu),
+Závislosti jsou už v základu `pwe-base`, tedy ve všech image PWE: `libjson-perl` (JSON), `HTTP::Tiny` (součást Perlu),
 `libio-socket-ssl-perl` + `libnet-ssleay-perl` (HTTPS), `libcrypt-openssl-rsa-perl` (podpis).
 Bez `Crypt::OpenSSL::RSA` služba automaticky použije CLI `openssl dgst` s dočasnými soubory
 v `<pwe.home>ramdisk/`; bez `IO::Socket::SSL` skončí reálný režim chybou `error_payment_ssl`.

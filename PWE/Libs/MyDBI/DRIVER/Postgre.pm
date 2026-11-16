@@ -8,6 +8,8 @@ Libs::MyDBI::DRIVER::Postgre - driver pro PostgreSQL (DBD::Pg), jedno spojeni se
 
 use strict;
 use DBI;
+use Digest::MD5 ();
+use Time::HiRes ();
 
 =head2 B<[Public] new()>
 
@@ -118,6 +120,9 @@ sub connect {
 
         # INCLUDE DBIOBJECT
         $self->{'DBI'} = $dbi;
+
+        # Nove spojeni zadny zamek urovne session nedrzi (pocitadlo viz sessionLock).
+        $self->{'session_locks'} = {};
 
         # SET LOGING/DEBUGING
         $self->{'DBI'}->trace($self->{'loglevel'}, $self->{'logfile'});
@@ -350,6 +355,135 @@ sub ping {
 
     return 1 if ($self->{'DBI'}->ping());
     return 0;
+}
+
+=head2 B<[Public] sessionLock($name,$timeout)>
+
+    Ziska zamek vazany na databazove spojeni - poradni zamek urovne session
+    (pg_try_advisory_lock) s klicem odvozenym od $name a schematu (viz sessionLockKey). Zamek
+    zkousi v cyklu po 0,2 s, nejvys $timeout sekund (vychozi 0 = jen jeden pokus). Vraci:
+    1     - zamek ziskan,
+    0     - do $timeout sekund ho drzi jine spojeni,
+    undef - chyba dotazu (je pak v getError()/error()); pri vypnutem autocommitu se po chybe
+            provede rollback, aby spojeni nezustalo ve zrusene transakci. Take tehdy, kdyz zamek
+            uz drzi serverove spojeni, ale tento objekt si ho nevzal (err -1, errstr "advisory
+            lock is already held by this server connection ..."; bez rollbacku, zamek se nebere).
+
+    Zamek urovne session neni soucasti transakce: commit ani rollback ho neuvolni (proto ne
+    pg_advisory_xact_lock) a funguje stejne s autocommitem zapnutym i vypnutym. Server ho uvolni
+    sam, kdyz spojeni zanikne (pad procesu, SIGKILL, vypadek site); jinak ho uvolnuje
+    sessionUnlock() nad stejnym spojenim. Poradni zamky plati v ramci jedne databaze. Totez
+    spojeni muze zamek ziskat opakovane, pak ho musi stejnekrat uvolnit (pocet vlastnich zamku
+    si objekt pamatuje v 'session_locks', connect() ho nuluje). Pri vypnutem autocommitu
+    dotaz na zamek otevre transakci jako kazdy jiny SELECT.
+
+    Pooler v rezimu transaction pooling (PgBouncer pool_mode = transaction): serverove spojeni
+    se mezi transakcemi stridaji a pg_try_advisory_lock je v ramci jedne session opakovatelny -
+    klient, ktery dostane spojeni se zamkem jineho klienta, by ho "ziskal" take. Proto se pred
+    prvnim ziskanim overuje v pg_locks, ze serverove spojeni zamek jeste nema; kdyz ho ma, vraci
+    se undef (viz vyse). Zamek urovne session za takovym poolerem nelze spolehlive drzet ani
+    uvolnit - migrace se tam ma provozovat s conf dbversion_session_lock => 0.
+
+    Pouziva Libs::MyDBI::checkDbversion jako zamek migrace.
+
+=cut
+
+sub sessionLock {
+    my ($self, $name, $timeout) = @_;
+
+    my ($key1, $key2) = $self->sessionLockKey($name);
+    my $deadline = Time::HiRes::time() + ((defined($timeout) and ($timeout =~ /^\d+(?:\.\d+)?$/)) ? $timeout : 0);
+
+    # pg_try_advisory_lock je v ramci jedne session opakovatelny: vrati true i tehdy, kdyz zamek uz
+    # drzi SERVEROVE spojeni, na kterem dotaz bezi. Za poolerem v rezimu transaction pooling
+    # (PgBouncer) to muze byt spojeni, na kterem zamek vzal jiny klient. Dokud tento objekt zamek
+    # sam nedrzi, dotaz proto nejdriv zjisti, zda ho serverove spojeni uz nema (hodnota 2).
+    my $try  = "pg_try_advisory_lock($key1, $key2)";
+    my $held = "EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid() AND classid = ($key1)::oid AND objid = ($key2)::oid AND objsubid = 2)";
+
+    while (1) {
+        my $mine = ($self->{'session_locks'}->{$name} ? 1 : 0);
+        my ($got) = $self->{'DBI'}->selectrow_array($mine ? "SELECT CASE WHEN $try THEN 1 ELSE 0 END" : "SELECT CASE WHEN $held THEN 2 WHEN $try THEN 1 ELSE 0 END");
+        $self->setError();
+        if ($self->error()) {
+
+            # Chyba zustava ulozena pro getError(); rollback jde primo pres handle, aby ji neprepsal.
+            $self->{'DBI'}->rollback unless ($self->{'DBI'}->{'AutoCommit'});
+            return undef;
+        }
+        if ($got and ($got == 2)) {
+
+            # Zamek drzi serverove spojeni, ale tento objekt si ho nevzal: spojeni je sdilene s jinym
+            # klientem a zamek urovne session tu nic nechrani. Zamek se nebere, vraci se chyba.
+            $self->{'err'}    = -1;
+            $self->{'errstr'} = "advisory lock is already held by this server connection (connection pooler in transaction mode?)";
+            $self->{'state'}  = undef;
+            return undef;
+        }
+        if ($got) {
+            $self->{'session_locks'}->{$name}++;
+            return 1;
+        }
+
+        my $left = $deadline - Time::HiRes::time();
+        return 0 if ($left <= 0);
+        CORE::select(undef, undef, undef, (($left < 0.2) ? $left : 0.2));    # CORE::, paket ma vlastni select()
+    }
+}
+
+=head2 B<[Public] sessionUnlock($name)>
+
+    Uvolni zamek ziskany pres sessionLock($name) - pg_advisory_unlock nad stejnym spojenim.
+    Vraci 1, pokud byl zamek uvolnen, jinak 0 (toto spojeni zamek nedrzi nebo dotaz selhal; chyba
+    dotazu je v getError()/error()). Kdyz dotaz selze, protoze spojeni je ve zrusene transakci
+    (SQLSTATE 25P02 po chybe predchoziho prikazu pri vypnutem autocommitu), provede rollback
+    a uvolneni zkusi jeste jednou - jinak by zamek zustal drzeny do konce spojeni.
+
+=cut
+
+sub sessionUnlock {
+    my ($self, $name) = @_;
+
+    my ($key1, $key2) = $self->sessionLockKey($name);
+
+    foreach my $try (1, 2) {
+        my ($released) = $self->{'DBI'}->selectrow_array("SELECT CASE WHEN pg_advisory_unlock($key1, $key2) THEN 1 ELSE 0 END");
+        $self->setError();
+        unless ($self->error()) {
+
+            # Pocitadlo vlastnich zamku (viz sessionLock): neuspesne uvolneni = toto spojeni zamek nema.
+            if ($released) {
+                $self->{'session_locks'}->{$name}-- if ($self->{'session_locks'}->{$name});
+            } else {
+                delete($self->{'session_locks'}->{$name});
+            }
+            return ($released ? 1 : 0);
+        }
+
+        last unless (($try == 1) and defined($self->{'state'}) and ($self->{'state'} eq "25P02"));
+        $self->{'DBI'}->rollback;
+    }
+
+    return 0;
+}
+
+=head2 B<[Private] sessionLockKey($name)>
+
+    Vraci dvojici celych cisel se znamenkem (2x 32 bitu) - klic poradniho zamku pro
+    pg_try_advisory_lock(int, int)/pg_advisory_unlock(int, int). Klic je prvnich 8 bajtu MD5
+    z retezce "pwe.<name>.<schema>": stejne jmeno a schema davaji vzdy stejny klic, weby
+    v ruznych schematech teze databaze se navzajem neblokuji (mezi databazemi se poradni zamky
+    nesdileji vubec).
+
+=cut
+
+sub sessionLockKey {
+    my ($self, $name) = @_;
+
+    my $bytes = "pwe.$name.$self->{'schema'}";
+    utf8::encode($bytes) if (utf8::is_utf8($bytes));
+
+    return unpack("l> l>", Digest::MD5::md5($bytes));
 }
 
 =head2 B<[Public] getMetaData()>

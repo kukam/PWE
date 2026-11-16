@@ -17,6 +17,16 @@ PWE/tools/check-webapp.pl - kontrola webappu: struktura, konvence nazvu, rb soub
 
       struktura   conf/web.conf, adresare Pages/Sites/Services/Entities, platnost pripadnych symlinku
                   (web nema obsahovat kod enginu - ten se bere z adresare enginu PWE/ podle pwe.core_*)
+      Dockerfile  jen varovani (WARN), ma-li web Dockerfile. Sablona generatoru (PWE/tools/new-webapp.pl):
+                  jediny FROM = zavislostni image bez enginu (pwe-base pro web bez databaze, pwe-<profil>
+                  pro web s databazi), engine se kopiruje z kontextu sestaveni (COPY PWE/...). Hlasi se
+                  zbytky starsich sablon - engine z image pwe (dalsi FROM, ARG PWE_ENGINE_TAG, COPY
+                  --from=engine), engine ocekavany v zakladnim image (chybi COPY polozek enginu, RUN test -f
+                  /PWE/PWE/pwe.fcgi, mazani vzoroveho webu), zruseny zaklad pwe-static, vychozi
+                  PWE_IMAGE_TAG jiny nez latest nebo verze X.Y.Z, vlastni ENTRYPOINT / entrypoint.sh - a radek
+                  FROM vysledneho image jiny nez v sablone, Dockerfile pro web bez databaze (zaklad pwe-base)
+                  u webu s konfiguraci databaze. Rada: vygenerovat web znovu do docasneho adresare a prevzit
+                  z nej Dockerfile.
       konfigurace nacitatelny web.conf, http.languages, pwe.default_page existuje, save_opt_to=db
                   jen s databazi a sluzbou Session
       moduly      <Dir>/<X>/<X>.pm existuje, package = <Dir>::<X>::<X>, blok KOMODO, u stranek
@@ -29,7 +39,7 @@ PWE/tools/check-webapp.pl - kontrola webappu: struktura, konvence nazvu, rb soub
                   preskakuje - pouzijte PWE/tools/run-webapp.sh a curl]
 
     Dynamicke kontroly potrebuji Perl zavislosti enginu; mimo kontejner se skript sam spusti
-    znovu v kontejneru s image nastroju (docker; vychozi ghcr.io/kukam/pwe-debugger:<aktualni vetev>,
+    znovu v kontejneru s image nastroju (docker; vychozi ghcr.io/kukam/pwe-debugger:<verze enginu>,
     zmena pres PWE_IMAGE_TAG / PWE_IMAGE_REGISTRY / PWE_TEST_IMAGE, viz PWE::ToolEnv::docker_image()).
     --static funguje vsude.
 
@@ -41,7 +51,7 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 use Getopt::Long qw(GetOptions);
 use File::Basename qw(basename);
-use PWE::ToolEnv qw(core_root resolve_webapp webapp_name ensure_modules read_conf conf_languages run_cgi parse_response);
+use PWE::ToolEnv qw(core_root resolve_webapp webapp_name ensure_modules read_conf conf_languages run_cgi parse_response dockerfile_base engine_image_entries);
 
 my %opt;
 GetOptions(\%opt, 'static', 'request=s', 'verbose|v', 'help|h') or usage(1);
@@ -77,6 +87,7 @@ ok_("engine: $ROOT (verze " . (core_version() || '?') . ")", 1);
 foreach my $d (qw(ramdisk sessions uploadfile log)) {
     warn_("chybi docasny adresar $d/ (vytvori: mkdir -p $d)") unless (-d "$APP/$d");
 }
+check_dockerfile();
 
 # ---------------------------------------------------------------------------------------------
 # 2. KONFIGURACE
@@ -269,6 +280,177 @@ sub usage {
     my ($code) = @_;
     print STDERR "Pouziti: PWE/tools/check-webapp.pl <web> [--static] [--request 'page=X&func=Y'] [--verbose]\n";
     exit($code);
+}
+
+# Instrukce Dockerfile: bez komentaru a prazdnych radku, pokracovaci radky (\ na konci) spojene do jednoho -
+# co radek, to jedna instrukce. Kontroly se tak tykaji toho, co build provede: zminka o stare sablone
+# v komentari varovani nevyvola.
+sub dockerfile_instructions {
+    my ($text) = @_;
+    $text =~ s/\r\n/\n/g;
+    $text =~ s/^[ \t]*#.*\n?//mg;
+    $text =~ s/^[ \t]*\n//mg;
+    $text =~ s/[ \t]*\\\n[ \t]*/ /g;
+    return $text;
+}
+
+# Image z instrukci FROM v poradi stage: bez voleb (--platform=...) a bez "AS <jmeno>", promenne ve tvaru
+# $JMENO (sablona pise ${JMENO}; oba zapisy znamenaji totez). Vraci seznam [image, jmeno stage nebo '',
+# image tak, jak je zapsany].
+sub dockerfile_from {
+    my ($ins) = @_;
+    my @from;
+    foreach my $f ($ins =~ /^FROM[ \t]+(\S[^\n]*?)[ \t]*$/mig) {
+        $f =~ s/^(?:--\S+[ \t]+)+//;
+        my ($image, $as) = $f =~ /^(\S+)(?:[ \t]+AS[ \t]+(\S+))?/i;
+        next unless (defined($image));
+        (my $norm = $image) =~ s/\$\{(\w+)\}/\$$1/g;
+        push(@from, [$norm, (defined($as) ? $as : ''), $image]);
+    }
+    return @from;
+}
+
+# Radek FROM sablony Dockerfile webu pro dany profil, jak ji pise generator (PWE/tools/new-webapp.pl, funkce
+# gen_dockerfile). Cte se primo ze sablony vedle tohoto skriptu - jediny zdroj pravdy je generator; zaklad
+# ({{BASE}}: pwe-base pro web bez databaze, pwe-${PWE_PROFILE} pro web s databazi) doplni stejna funkce jako
+# v generatoru (PWE::ToolEnv::dockerfile_base). Vraci polozku jako dockerfile_from(); undef, kdyz generator
+# neni k dispozici, profil neni znamy nebo sablona nema prave jeden FROM.
+sub template_from {
+    my ($profile) = @_;
+    my $base = eval { dockerfile_base($profile) };
+    return undef unless (defined($base));
+    my $src = slurp("$FindBin::Bin/new-webapp.pl");
+    my ($tpl) = $src =~ /^sub gen_dockerfile\b.*?<<'DOCKER'[^\n]*\n(.*?)^DOCKER$/ms;
+    return undef unless (defined($tpl));
+    $tpl =~ s/\{\{BASE\}\}/$base/g;
+    my @from = dockerfile_from(dockerfile_instructions($tpl));
+    return (@from == 1) ? $from[0] : undef;
+}
+
+# Polozky korene enginu (PWE/<polozka>), ktere Dockerfile kopiruje z kontextu sestaveni: zdroje instrukci
+# COPY bez --from (zdroj PWE/<polozka>; zastupne znaky * a ? v nazvu polozky; zdroj PWE nebo PWE/ = cely
+# adresar enginu). Dostane instrukce (dockerfile_instructions) a seznam polozek enginu, vraci hash
+# { polozka => 1 } tech, ktere Dockerfile kopiruje.
+sub dockerfile_engine_copies {
+    my ($ins, @entries) = @_;
+    my %copied;
+    foreach my $copy ($ins =~ /^COPY[ \t]+([^\n]+)$/mig) {
+        my @words = split(' ', $copy);
+        next if (grep { /^--from=/i } @words);
+        @words = grep { !/^--/ } @words;
+        pop(@words);    # posledni slovo je cil
+        foreach my $source (@words) {
+            $source =~ s{^\./}{};
+            if ($source =~ m{^PWE/?\.?$}) { $copied{$_} = 1 foreach (@entries); next; }
+            next unless ($source =~ m{^PWE/([^/]+)/?$});
+            my $glob = join('', map { $_ eq '*' ? '.*' : $_ eq '?' ? '.' : quotemeta($_) } split(/([*?])/, $1));
+            foreach my $entry (@entries) { $copied{$entry} = 1 if ($entry =~ /\A$glob\z/); }
+        }
+    }
+    return \%copied;
+}
+
+# Dockerfile webu (jen varovani, web ho mit nemusi). Sablona generatoru: jediny FROM = zavislostni image
+# BEZ enginu (pwe-base pro web bez databaze, pwe-<profil> pro web s databazi; tagy jen <verze> a latest),
+# engine se kopiruje z kontextu sestaveni (COPY PWE/<polozka> pro kazdou polozku korene enginu krome t a
+# docker), entrypoint se dedi ze zakladniho image. Varuje se na:
+#   - zbytky prvniho usporadani image: image pwe (jen engine) jako dalsi FROM, ARG PWE_ENGINE_TAG,
+#     COPY --from=engine,
+#   - zbytky usporadani, kde engine obsahoval zakladni image pwe-<profil>: mazani vzoroveho webu (RUN rm -rf
+#     /PWE/webapps/example...), kontrola enginu v zakladu (RUN test -f /PWE/PWE/pwe.fcgi - nad dnesnim
+#     zakladem by sestaveni skoncilo chybou), zaklad pwe-static (image byl zrusen),
+#   - polozku enginu, kterou Dockerfile nekopiruje (starsi sablona, nebo polozka pribyla s novou verzi
+#     enginu) - image by ji neobsahoval,
+#   - vychozi PWE_IMAGE_TAG jiny nez latest nebo verze X.Y.Z (tag podle vetve uz nikdo neaktualizuje),
+#     vlastni ENTRYPOINT / entrypoint.sh (dedi se ze zakladniho image),
+#   - radek FROM vysledneho image (posledni FROM), ktery se lisi od sablony generatoru,
+#   - Dockerfile pro web bez databaze (PWE_PROFILE=static, zaklad pwe-base) u webu s konfiguraci databaze.
+# Vlastni upravy Dockerfile (dalsi balicky, RUN, COPY) se nehlasi.
+sub check_dockerfile {
+    my $file = "$APP/Dockerfile";
+    unless (-f $file) {
+        ok_("web nema Dockerfile (image webu se nestavi)");
+        return;
+    }
+    my $ins  = dockerfile_instructions(slurp($file));
+    my @from = dockerfile_from($ins);
+
+    # profil webu: z Dockerfile (vychozi hodnota ARG PWE_PROFILE), jinak ze symlinku conf/database.conf,
+    # jinak podle konfiguraci databaze v conf/ (zadna = web bez databaze)
+    my ($profile) = $ins =~ /^ARG[ \t]+PWE_PROFILE=["']?(\w+)/mi;
+    if (!defined($profile) and -l "$APP/conf/database.conf") { ($profile) = (readlink("$APP/conf/database.conf") || '') =~ /^(\w+)\.conf$/; }
+    my $guessed = 0;
+    if (!defined($profile)) {
+        my @db_confs = grep { -f "$APP/conf/$_.conf" } qw(mariadb mysql postgres);
+        $profile = @db_confs ? $db_confs[0] : 'static';
+        $guessed = scalar(@db_confs);
+    }
+
+    # jak web vygenerovat znovu
+    my $db = '';
+    if    ($guessed)                                   { $db = ' --db <mariadb|mysql|postgres>'; }
+    elsif ($profile =~ /^(?:mariadb|mysql|postgres)$/) { $db = " --db $profile"; }
+    my $regen = "PWE/tools/new-webapp.pl $NAME$db --dir <docasny adresar> a prevezmi z nej Dockerfile (vlastni upravy prenes rucne)";
+
+    my @old;
+    my $is_pwe = sub { return ($_[0] =~ m{(?:^|/)pwe(?:[:@]|$)}) ? 1 : 0; };
+    my %engine_stage = map { $_->[1] => 1 } grep { length($_->[1]) and $is_pwe->($_->[0]) } @from;
+    $engine_stage{'engine'} = 1 if (grep { lc($_->[1]) eq 'engine' } @from);
+    if (grep { $is_pwe->($_->[0]) } @from) { push(@old, scalar(@from) . 'x FROM - image pwe jako zdroj enginu'); }
+    push(@old, 'ARG PWE_ENGINE_TAG') if ($ins =~ /\bPWE_ENGINE_TAG\b/);
+    if (grep { my $s = quotemeta($_); $ins =~ /^COPY[ \t]+(?:--\S+[ \t]+)*?--from=$s(?:[ \t]|$)/mi } keys %engine_stage) { push(@old, 'COPY --from=engine'); }
+    elsif ($ins =~ m{^COPY[ \t]+(?:--\S+[ \t]+)*?--from=\S*/pwe[:@]}mi) { push(@old, 'COPY --from=<image pwe>'); }
+
+    # zaklad vysledneho image s dosazenym vychozim profilem (FROM .../pwe-${PWE_PROFILE}:... s profilem static)
+    my $removed_base = 0;
+    if (@from) {
+        (my $resolved = $from[-1]->[0]) =~ s/\$PWE_PROFILE\b/$profile/g;
+        $removed_base = 1 if ($resolved =~ m{(?:^|/)pwe-static(?:[:@]|$)});    # zruseny image profilu static
+    }
+    push(@old, 'zaklad pwe-static - image byl zrusen') if ($removed_base);
+    push(@old, 'RUN test -f /PWE/PWE/pwe.fcgi - kontrola enginu v zakladnim image') if ($ins =~ m{^RUN[ \t]+test[ \t]+-f[ \t]+/PWE/PWE/pwe\.fcgi\b}mi);
+    push(@old, 'RUN rm vzoroveho webu ze zakladniho image') if ($ins =~ m{^RUN[ \t][^\n]*\brm[ \t][^\n]*/PWE/webapps/example(?:-db)?\.web\b}mi);
+
+    # engine z kontextu sestaveni: kazda polozka korene enginu (krome t a docker) musi mit svuj COPY
+    my @entries = eval { engine_image_entries($ROOT) };
+    my $copied  = dockerfile_engine_copies($ins, @entries);
+    my @missing = grep { !$copied->{$_} } @entries;
+    if (@entries and @missing == @entries) { push(@old, 'engine se nekopiruje z kontextu sestaveni (zadne COPY PWE/...)'); }
+    elsif (@missing)                       { push(@old, 'chybi COPY polozek enginu: ' . join(', ', map { "PWE/$_" } @missing)); }
+
+    my ($default_tag) = $ins =~ /^ARG[ \t]+PWE_IMAGE_TAG=["']?([^"'\s]+)/mi;
+    if (defined($default_tag) and $default_tag !~ /^(?:latest|\d+\.\d+\.\d+)$/) { push(@old, "vychozi PWE_IMAGE_TAG=$default_tag"); }
+    if ($ins =~ /^ENTRYPOINT\b/mi or $ins =~ /entrypoint\.sh/ or -e "$APP/entrypoint.sh") { push(@old, 'vlastni ENTRYPOINT / entrypoint.sh'); }
+    if (@old) {
+        warn_("Dockerfile je ze stare sablony (" . join('; ', @old) . "): image webu se stavi nad zavislostnim image BEZ enginu "
+            . "(pwe-base pro web bez databaze, pwe-<profil> pro web s databazi; tagy jen <verze> a latest), engine kopiruje z kontextu sestaveni "
+            . "(adresar PWE/ repozitare) a entrypoint dedi ze zakladniho image. Image tohoto Dockerfile by se nesestavil nebo by neobsahoval "
+            . "aktualni engine. Vygeneruj novy: $regen");
+    }
+
+    # Dockerfile pro web bez databaze u webu, ktery konfiguraci databaze ma: zaklad pwe-base nema ovladace a
+    # profil static databazi nezapina - image webu by bezel bez databaze (web s databazi ma jinou sablonu)
+    my @db_confs = grep { -f "$APP/conf/$_.conf" } qw(mariadb mysql postgres);
+    if ($profile eq 'static' and @db_confs) {
+        warn_("Dockerfile je pro web bez databaze (PWE_PROFILE=static, zaklad pwe-base nema ovladace databaze), ale web ma " . join(', ', map { "conf/$_.conf" } @db_confs)
+            . " - image webu pobezi bez databaze. Web s databazi: PWE/tools/new-webapp.pl $NAME --db <mariadb|mysql|postgres> --dir <docasny adresar> a prevezmi z nej Dockerfile (vlastni upravy prenes rucne)");
+    }
+
+    my $want = template_from($profile);
+    if (!@from) {
+        warn_("Dockerfile nema instrukci FROM - image webu ma vychazet ze zavislostniho image (pwe-base pro web bez databaze, pwe-<profil> pro web s databazi). Sablona: $regen");
+    }
+    elsif ($removed_base) {
+        # zruseny zaklad pwe-static uz hlasi varovani o stare sablone
+    }
+    elsif (defined($want) and $from[-1]->[0] ne $want->[0]) {
+        warn_("Dockerfile: radek FROM vysledneho image (FROM $from[-1]->[2]) se lisi od sablony generatoru (FROM $want->[2]) - "
+            . "image webu ma vychazet ze zavislostniho image: pwe-base pro web bez databaze, pwe-<profil> pro web s databazi. Sablona: $regen");
+    }
+    elsif (!@old) {
+        ok_("Dockerfile: FROM a kopie enginu podle sablony generatoru" . (defined($want) ? '' : ' (sablona neni k dispozici, radek FROM se nesrovnava)'), 1);
+    }
+    return;
 }
 
 sub dir_name { my ($d) = @_; $d =~ s{/+$}{}; $d =~ s{^/+}{}; return $d; }

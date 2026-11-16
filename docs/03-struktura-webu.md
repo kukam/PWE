@@ -27,7 +27,7 @@ webapps/<nazev>/
 │   ├── css/site.css               vlastní styly (Bootstrap, jQuery, Font Awesome a pwe.js jsou v enginu)
 │   └── images/                    vlastní obrázky
 ├── ramdisk/  sessions/  uploadfile/  log/     dočasná data (v .gitignore; zakládá generátor, run-webapp.sh, sestavení image webu i entrypoint image)
-├── Dockerfile                     image webu: běh z pwe-<profil> (včetně entrypointu), engine zkopírovaný z image pwe, + tento web
+├── Dockerfile                     image webu: závislostní image (pwe-<profil>, bez databáze pwe-base) + engine z repozitáře + tento web
 ├── .htaccess                      Apache: zákaz přímého čtení .pm/.tmpl/.conf…
 ├── robots.txt                     servírován z kořene (pwe.assets_file)
 ├── vars                           proměnné pro ruční běh v CGI režimu (. vars)
@@ -179,6 +179,8 @@ kterým se databáze adresuje v kódu (`$DBI->select("db1", …)`, entity).
         dsn_options    => "",                         # volitelné: doplňkové volby DSN ovladače, např. "mysql_ssl=1"
         daomap_file    => "conf/mariadb_daomap.dump", # volitelná cache mapy tabulek (pokud existuje, nečte se information_schema)
         dbversion_file => "conf/mariadb.dbversion",   # migrace schématu
+        dbversion_session_lock     => 1,              # zámek migrace vázaný na spojení (0 = vypnout); přepis: PWE_CONF_dbi_db1_dbversion_session_lock
+        dbversion_legacy_lock_wait => 300,            # po kolika s beze změny převzít zámek po procesu bez zámku spojení (0 = nikdy)
     }
 };
 ```
@@ -195,6 +197,12 @@ kterým se databáze adresuje v kódu (`$DBI->select("db1", …)`, entity).
 | `dsn_options` | volitelné doplňkové volby DSN ovladače oddělené středníkem; připojí se za `dbi:mysql:dbname=…;host=…;port=…` (resp. `dbi:Pg:…`), např. `"mysql_ssl=1"`, `"mysql_connect_timeout=5"`, `"sslmode=require"`. Výchozí prázdné = DSN jako ve starších verzích. Přepis přes `PWE_CONF_dbi_db1_dsn_options` funguje jen tehdy, když klíč v konfiguraci existuje (stačí prázdný). Podrobnosti: [09 — Šifrované spojení a volby DSN](09-databaze-a-entity.md#šifrované-spojení-a-volby-dsn-dsn_options) |
 | `daomap_file` | pokud soubor existuje, mapa tabulek se čte z něj (rychlejší start, ale po změně schématu ho smaž) |
 | `dbversion_file` | soubor migrací; bez něj se migrace nespouští |
+| `dbversion_session_lock` | zámek migrace vázaný na databázové spojení (od 2.2.1): výchozí zapnuto i bez klíče, `0` = vypnout (chování starších verzí). Viz [Zámek migrace](#zámek-migrace) |
+| `dbversion_legacy_lock_wait` | po kolika sekundách beze změny smí proces převzít zámek po procesu, který zámek spojení nemá (starší verze enginu); výchozí `300`, `0` = nikdy |
+
+Generátor oba klíče `dbversion_*` zapisuje od verze 2.2.1. Do staršího webu je doplň ručně — přepis
+přes `PWE_CONF_dbi_db1_dbversion_session_lock` (stejně jako u každého jiného klíče) funguje jen
+tehdy, když klíč v konfiguraci existuje.
 
 Více databází = více klíčů (`db1`, `db2`, …). Bez sekce `dbi` (web bez `database.conf`) běží
 engine bez databáze; entity a služby závislé na DB se pak nenačtou.
@@ -204,11 +212,13 @@ engine bez databáze; entity a služby závislé na DB se pak nenačtou.
 Soubor je Perl hash `{ číslo => "SQL příkaz", … }`. Při startu engine (pro každé `dbid`
 s `dbversion_file`):
 
-1. založí tabulku `dbversion (dbversion int, lockid int)`, pokud neexistuje,
-2. vezme zámek (`lockid`; souběžné procesy čekají),
+1. vezme **zámek migrace** (souběžně startující procesy čekají, viz [níže](#zámek-migrace)),
+2. založí tabulku `dbversion (dbversion int, lockid int)`, pokud neexistuje,
 3. provede **vzestupně** všechny příkazy s číslem **větším** než uložená verze, po každém
    zapíše novou verzi a commitne,
 4. při chybě SQL udělá rollback, uvolní zámek a skončí s chybou (proces se nespustí).
+
+Když není co migrovat (uložená verze ≥ nejvyšší číslo v souboru), do tabulky se nic nezapisuje.
 
 ```perl
 {
@@ -240,96 +250,167 @@ Pravidla:
   `Email` (SQL je v POD `PWE/Entities/MailQueue/MailQueue.pm`).
 - Vývojový stack má databázi pro každý web zvlášť (pojmenované volumes); `make down … ARGS=-v`
   ji smaže a migrace se při dalším startu spustí znovu.
+- Každý krok piš tak, aby šel bezpečně dokončit: rozběhnutý krok engine nikdy nepřerušuje (ani při
+  `SIGTERM`), a v MySQL/MariaDB není DDL transakční — krok přerušený zabitím procesu může zůstat
+  napůl proveden.
+
+### Zámek migrace
+
+Web běží ve více procesech (tři `fcgi` ve vývojovém stacku, repliky a pody v produkci) a všechny
+startují nad stejnou databází. Aby migraci provedl jen jeden, chrání ji engine dvěma zámky:
+
+- **Zámek spojení** (od 2.2.1) — zámek databázového serveru vázaný na spojení: MySQL/MariaDB
+  `GET_LOCK('pwe.dbversion.<databáze>')`, PostgreSQL poradní zámek úrovně session. Proces ho získá
+  jako první, tabulku `dbversion` zakládá a kroky provádí až pod ním. Když proces skončí (i násilně —
+  `SIGKILL`, OOM, výměna podu), spojení zanikne a server zámek uvolní sám. Další start se proto
+  zotaví bez zásahu: opuštěný `lockid` převezme, migraci dokončí a zapíše to do logu jako `[E]`.
+- **Sloupec `dbversion.lockid`** (náhodné číslo procesu, `0` = odemčeno) — původní zámek. Zapisuje se
+  dál kvůli procesům, které zámek spojení nemají (starší verze enginu, `dbversion_session_lock => 0`),
+  ale jen když je co migrovat. Proces se zámkem spojení zapisuje číslo záporné, proces bez něj kladné.
+
+Co z toho plyne:
+
+- dva současně startující procesy založí tabulku `dbversion` jednou a každý krok proběhne právě
+  jednou; ostatní procesy na migraci počkají (bez časového limitu) a pak pokračují;
+- proces, který nemá co migrovat, na cizí migraci nečeká — leda že si strukturu tabulek čte
+  z databáze (`dao => 1` bez souboru `daomap_file`), pak počká, aby nenačetl rozpracované schéma
+  (i na migraci procesu bez zámku spojení, tedy na jeho kladný `lockid`);
+- `SIGTERM` během migrace: rozběhnutý krok se dokončí a zapíše, další se nespustí; příští start
+  pokračuje následujícím krokem;
+- bez zámku spojení (`dbversion_session_lock => 0`) platí chování starších verzí: čeká se na cizí
+  `lockid` bez limitu a zámek, který zůstal po pádu procesu, je potřeba uvolnit ručně
+  (`UPDATE dbversion SET lockid = 0`). Vypnout ho je nutné za poolerem v režimu transaction pooling
+  (PgBouncer) a v clusteru s více zapisovacími uzly (Galera);
+- na kladný cizí `lockid` (proces bez zámku spojení) čeká proces se zámkem spojení, dokud migrace
+  postupuje, a převezme ho až po `dbversion_legacy_lock_wait` sekundách beze změny — doba proto má být
+  delší než nejdelší krok migrace.
+
+Hlášky v logu, postupná výměna starší verze enginu a kontrola zámku v databázi:
+[17 — Migrace schématu při startu](17-nasazeni.md#migrace-schématu-při-startu).
 
 ## `Dockerfile`, `vars` a vstupní skript
 
-`Dockerfile` (generátor ho vytvoří; všechny weby mají stejnou šablonu, liší se názvem webu a profilem).
-Začíná komentářem s popisem image a příkazy sestavení; za ním následuje (zde pro web s MariaDB,
-`<nazev>` = název webu, přesně jako `webapps/example-db.web/Dockerfile`):
+`Dockerfile` (generátor ho vytvoří; všechny weby mají stejnou šablonu, liší se názvem webu a základním
+image podle toho, jestli web má databázi). Začíná komentářem s popisem image a příkazy sestavení; za
+ním následuje (zde pro web s MariaDB, `<nazev>` = název webu, přesně jako
+`webapps/example-db.web/Dockerfile`):
 
 ```dockerfile
 ARG PWE_IMAGE_REGISTRY=ghcr.io/kukam
-ARG PWE_IMAGE_TAG=master
-ARG PWE_ENGINE_TAG=${PWE_IMAGE_TAG}
+ARG PWE_IMAGE_TAG=latest
 ARG PWE_PROFILE=mariadb
 
-FROM ${PWE_IMAGE_REGISTRY}/pwe:${PWE_ENGINE_TAG} AS engine
 FROM ${PWE_IMAGE_REGISTRY}/pwe-${PWE_PROFILE}:${PWE_IMAGE_TAG}
 ARG PWE_IMAGE_REGISTRY
 ARG PWE_IMAGE_TAG
 ARG PWE_PROFILE
 
-COPY --from=engine /PWE/PWE /PWE/PWE
-COPY --from=engine /PWE/LICENSE /PWE/LICENSE
+# Engine z kontextu sestaveni do /PWE/PWE: vsechny polozky adresare PWE/ krome testu (PWE/t) a sestaveni
+# zavislostnich image (PWE/docker). Vycet musi byt uplny - make check (PWE/tools/check-webapp.pl) upozorni,
+# kdyz v nem nektera polozka enginu chybi (napr. po aktualizaci enginu: pak Dockerfile vygeneruj znovu).
+# Poradi od nejmene po nejcasteji menene. COPY --link: vrstva nezavisi na vrstvach pod sebou - zmena zakladu
+# ji nezneplatni a image webu nad stejnym enginem ji sdili.
+COPY --link LICENSE /PWE/LICENSE
+COPY --link PWE/assets /PWE/PWE/assets
+COPY --link PWE/templates /PWE/PWE/templates
+COPY --link PWE/tools /PWE/PWE/tools
+COPY --link PWE/Entities /PWE/PWE/Entities
+COPY --link PWE/Services /PWE/PWE/Services
+COPY --link PWE/Sites /PWE/PWE/Sites
+COPY --link PWE/Pages /PWE/PWE/Pages
+COPY --link PWE/Libs /PWE/PWE/Libs
+COPY --link PWE/pwe.fcgi PWE/debug.cgi PWE/favicon.ico PWE/README.md PWE/CHANGELOG.md PWE/VERSION /PWE/PWE/
 
-# PWE_CONF_pwe_core=/PWE/PWE nastavuje uz zakladni image pwe-base. PWE_PROFILE = profil, pro ktery je image
-# sestaveny. Za behu ho lze prepsat (-e PWE_PROFILE=...) jen na profil, jehoz ovladac image obsahuje:
+# Web (bez toho, co vynechava .dockerignore - viz zahlavi).
+COPY --link webapps/<nazev> /PWE/webapps/<nazev>
+
+# PWE_CONF_pwe_core=/PWE/PWE nastavuje uz zakladni image. PWE_PROFILE = profil, pro ktery je image sestaveny.
+# Za behu ho lze prepsat (-e PWE_PROFILE=...) jen na profil, jehoz ovladac zakladni image obsahuje:
 # pwe-mariadb a pwe-mysql umi mariadb i mysql (engine pro oba pouziva DBD::mysql), pwe-postgres jen
-# postgres, pwe-static zadnou databazi. Entrypoint pak conf/database.conf presmeruje na novy profil.
+# postgres, pwe-base zadnou databazi. Entrypoint pak conf/database.conf presmeruje na novy profil.
 ENV PWE_CONF_pwe_home=/PWE/webapps/<nazev> \
     PWE_PROFILE=${PWE_PROFILE}
 
-# Popisky image webu. Jinak by se zdedily popisky behoveho image (nazev pwe-<profil>, popis "bez kodu
-# enginu", repozitar a licence enginu), ktere o image webu neplati. source a licenses jsou proto prazdne -
-# dopln adresu repozitare a licenci webu; base.name = behovy image, ze ktereho je image sestaveny.
+# Popisky image webu. Jinak by se zdedily popisky zakladniho image (nazev, popis, repozitar a licence
+# zavislostniho image PWE), ktere o image webu neplati. version, source a licenses jsou proto prazdne - dopln
+# verzi, adresu repozitare a licenci webu; base.name = image, ze ktereho je image webu sestaveny (verzi
+# enginu v image rika soubor /PWE/PWE/VERSION).
 LABEL org.opencontainers.image.title="<nazev>" \
       org.opencontainers.image.description="Web <nazev> nad PWE (Perl Web Engine): engine v /PWE/PWE, web v /PWE/webapps/<nazev>" \
+      org.opencontainers.image.version="" \
       org.opencontainers.image.source="" \
       org.opencontainers.image.licenses="" \
       org.opencontainers.image.base.name="${PWE_IMAGE_REGISTRY}/pwe-${PWE_PROFILE}:${PWE_IMAGE_TAG}"
 
-WORKDIR /PWE/webapps/
-
-COPY webapps/<nazev> <nazev>
-
 WORKDIR /PWE/webapps/<nazev>
 
 # Pracovni adresare a conf/database.conf (symlink na konfiguraci profilu, pokud ji web ma) vznikaji uz pri
-# buildu: image tak bezi i s korenovym souborovym systemem jen pro cteni (pracovni adresare pak jako tmpfs
-# nebo volume). Entrypoint dela totez pri startu - kvuli prepsani PWE_PROFILE a mountum pres adresar webu.
+# buildu. Image tak jde spustit i s korenovym souborovym systemem jen pro cteni (docker run --read-only,
+# Kubernetes readOnlyRootFilesystem) - engine ale do ramdisk, sessions, uploadfile a log zapisuje, takze
+# tyto ctyri adresare pak musi byt zapisovatelne (tmpfs nebo volume pres adresare z image); bez
+# zapisovatelneho ramdisk neobslouzi ani jeden request. Entrypoint dela totez pri startu - kvuli prepsani
+# PWE_PROFILE a mountum pres adresar webu.
 RUN set -eu; \
     mkdir -p ramdisk/templates sessions uploadfile log; \
     if [ -f "conf/${PWE_PROFILE}.conf" ] && { [ -L conf/database.conf ] || [ ! -e conf/database.conf ]; }; then \
         ln -sfn "${PWE_PROFILE}.conf" conf/database.conf; \
     fi
 
-# ENTRYPOINT se dedi z behoveho image (/usr/local/bin/entrypoint.sh z pwe-base), web vlastni nema.
+# ENTRYPOINT se dedi ze zakladniho image (/usr/local/bin/entrypoint.sh z pwe-base), web vlastni nema.
 CMD ["perl", "/PWE/PWE/pwe.fcgi"]
 ```
 
-Image webu se skládá ze tří částí: **běhové prostředí** z image `pwe-<profil>` (Perl, knihovny,
-DB ovladač a vstupní skript; `PWE_PROFILE` je `mariadb`, `mysql`, `postgres`, nebo `static` u webu bez
-databáze), **engine** zkopírovaný z image `pwe` do `/PWE/PWE` a **web** v `/PWE/webapps/<nazev>`.
+Image webu má tři části: **závislostní image** (jediný `FROM`), **engine** a **web**.
+
+- Závislostní image je `pwe-<profil>` (`mariadb`, `mysql`, `postgres`) u webu s databází a `pwe-base`
+  u webu bez databáze — ten má v `Dockerfile` `ARG PWE_PROFILE=static`,
+  `FROM ${PWE_IMAGE_REGISTRY}/pwe-base:${PWE_IMAGE_TAG}` a stejný image v popisku `base.name`. Nese Perl
+  a knihovny, DB ovladač a vstupní skript; **kód enginu ani žádný web v něm není**.
+- Engine se kopíruje z kontextu sestavení — adresář `PWE/` repozitáře enginu bez `PWE/t` a `PWE/docker`
+  — do `/PWE/PWE`. Verzi enginu v image tedy určuje pracovní kopie v okamžiku sestavení (soubor
+  `/PWE/PWE/VERSION`); `PWE_IMAGE_TAG` (výchozí `latest`, nebo verze jako `2.2.1`) vybírá jen závislostní
+  image. Samostatný image s enginem, `COPY --from` ani argument `PWE_ENGINE_TAG` se nepoužívají.
+- Web se kopíruje z `webapps/<nazev>` do `/PWE/webapps/<nazev>`.
+
 Proměnnou `PWE_CONF_pwe_core=/PWE/PWE` má už základ `pwe-base`, proto v `Dockerfile` webu není.
-`PWE_PROFILE` je argument sestavení i proměnná prostředí hotového image (proto jsou `ARG` za druhým
+`PWE_PROFILE` je argument sestavení i proměnná prostředí hotového image (proto jsou `ARG` za
 `FROM` deklarované znovu); kontejner ji předávat nemusí, za běhu ji lze přepsat (`-e PWE_PROFILE=…`)
-na profil, jehož ovladač image obsahuje. `LABEL` dá image webu vlastní popisky (`source` a `licenses`
-doplň podle repozitáře webu). `RUN` založí pracovní adresáře a symlink `conf/database.conf` už při
-sestavení, takže image běží i s kořenovým souborovým systémem jen pro čtení.
+na profil, jehož ovladač základní image obsahuje. `LABEL` dá image webu vlastní popisky (`version`,
+`source` a `licenses` doplň podle webu a jeho repozitáře). `RUN` založí pracovní adresáře a symlink
+`conf/database.conf` už při sestavení, takže image jde spustit i s kořenovým souborovým systémem jen pro
+čtení — `ramdisk`, `sessions`, `uploadfile` a `log` pak ale musí být zapisovatelné (`tmpfs` nebo
+svazek).
 
 ```bash
-# z kořene repozitáře; z image aktuální větve (tak je označuje make images i pipeline)
-docker build --build-arg PWE_IMAGE_TAG="$(bash PWE/tools/lib/images.sh pwe_image_tag)" \
-    -t muj-web -f webapps/<nazev>/Dockerfile .
-docker build -t muj-web -f webapps/<nazev>/Dockerfile .                                    # image větve master
-docker build --build-arg PWE_IMAGE_TAG="$(bash PWE/tools/lib/images.sh pwe_image_tag)" \
-    --build-arg PWE_ENGINE_TAG="$(cat PWE/VERSION)" -t muj-web:1.0 -f webapps/<nazev>/Dockerfile .   # engine připnutý na verzi
+# VŽDY z kořene repozitáře enginu; nad nejnovějším závislostním image (výchozí PWE_IMAGE_TAG=latest; z registru nebo z místního Dockeru po make images)
+docker build -t muj-web -f webapps/<nazev>/Dockerfile .
+# závislosti připnuté na verzi enginu: tag image pwe-<profil> = obsah PWE/VERSION
+docker build --build-arg PWE_IMAGE_TAG="$(cat PWE/VERSION)" -t muj-web:1.0 -f webapps/<nazev>/Dockerfile .
 ```
 
-Staví se z kořene repozitáře, protože `COPY` kopíruje `webapps/<nazev>`; kořenový `.dockerignore`
-přitom vynechá `conf/local.env`, `conf/database.conf`, soukromé klíče pod `conf/` (`*.pem`, `*.key`,
+Staví se z kořene repozitáře, protože `COPY` kopíruje `LICENSE`, `PWE/…` i `webapps/<nazev>`; kořenový
+`.dockerignore` přitom vynechá `conf/local.env`, `conf/database.conf`, soukromé klíče (`*.pem`, `*.key`,
 `*.p12`, `*.pfx` — kontejner je dostává až za běhu mountem), dočasné adresáře a `.git` webu.
-`docker build` bere image enginu z místního Dockeru, a když tam nejsou, z registru: nad image
-sestavenými jen lokálně (`make images`) proto stačí předat jejich tag
-(`--build-arg PWE_IMAGE_TAG=<větev>`, první příkaz). Jen `docker buildx build` staví vybraným
-builderem, který místní image vidět nemusí — pak `--builder <builder s ovladačem docker> --load`.
-To, argumenty sestavení, přidání vlastní knihovny a registr image:
-[17 — Nasazení](17-nasazeni.md#image-vlastního-webu).
+`docker build` bere závislostní image z místního Dockeru, a když tam není, z registru; `make images`
+označuje místní image tagy `<verze>` i `latest`, takže fungují oba příkazy. Jen `docker buildx build`
+staví vybraným builderem, který místní image vidět nemusí — pak
+`--builder <builder s ovladačem docker> --load`. Pro produkci připínej závislosti na verzi (`latest` se
+přepisuje s každou publikací) a stav z čistého checkoutu enginu. To, argumenty sestavení, přidání
+vlastní knihovny a registr image: [17 — Nasazení](17-nasazeni.md#image-vlastního-webu).
 
-**Vstupní skript** web nemá. `ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]` dědí image webu z běhového
-image `pwe-<profil>`; jediný zdroj je `PWE/docker/entrypoint.sh` a stejný skript mají všechny image
-enginu i služby `fcgi` a `debugger` vývojového stacku (nový skript se do image webu dostane se
-sestavením nad novým běhovým image). Spouští se v adresáři webu (`WORKDIR` image, `working_dir`
+Šablona vyjmenovává všechny položky adresáře `PWE/`. Po aktualizaci enginu, která do `PWE/` přidá soubor
+nebo adresář, a u webu založeného starší verzí generátoru je potřeba `Dockerfile` vygenerovat znovu —
+`make check WEB=<nazev>` na to upozorní řádkem `WARN Dockerfile je ze stare sablony (…)`:
+
+```bash
+PWE/tools/new-webapp.pl <nazev> --db <profil> --dir /tmp/<nazev>-novy   # web bez databáze: bez --db
+cp /tmp/<nazev>-novy/Dockerfile webapps/<nazev>/Dockerfile              # vlastní úpravy přenes ručně
+```
+
+**Vstupní skript** web nemá. `ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]` dědí image webu ze
+závislostního image; jediný zdroj je `PWE/docker/entrypoint.sh` a stejný skript mají všechny image
+PWE i služby `fcgi` a `debugger` vývojového stacku (nový skript se do image webu dostane se
+sestavením nad novým závislostním image). Spouští se v adresáři webu (`WORKDIR` image, `working_dir`
 služby v compose) a před spuštěním příkazu:
 
 1. podle `PWE_PROFILE` (`mariadb`, `mysql`, `postgres`) nasměruje symlink `conf/database.conf` na
@@ -341,17 +422,29 @@ služby v compose) a před spuštěním příkazu:
 
 Chyby zápisu ignoruje (web namountovaný jen pro čtení start neshodí); mimo adresář webu, tedy bez
 `conf/web.conf` v aktuálním adresáři, jen spustí příkaz. Start nikdy nepřeruší, ale když `PWE_PROFILE`
-neodpovídá webu (neznámá hodnota, databázový profil u webu bez `conf/<profil>.conf`, symlink nejde
-nastavit, profil `static` se zbylým symlinkem), vypíše jednořádkové varování
-`[entrypoint] VAROVANI: …` ([17 — Nasazení](17-nasazeni.md#co-je-v-pwe-base)). Web vytvořený starší
-šablonou měl vlastní kopii `entrypoint.sh` — smaž ji a `Dockerfile` nahraď výstupem generátoru.
+neodpovídá webu nebo image (neznámá hodnota, databázový profil u webu bez `conf/<profil>.conf`,
+symlink nejde nastavit, profil `static` se zbylým symlinkem, image nemá ovladač databáze profilu),
+vypíše jednořádkové varování `[entrypoint] VAROVANI: …`
+([17 — Nasazení](17-nasazeni.md#co-je-v-pwe-base)); stejně tak upozorní, když jako server běží vzorový
+web z image `pwe-example-*` (ukázka, ne veřejný provoz). Web vytvořený starší šablonou (vlastní kopie
+`entrypoint.sh`, nebo `Dockerfile` se dvěma `FROM` a `PWE_ENGINE_TAG`): případný `entrypoint.sh` smaž
+a `Dockerfile` nahraď výstupem generátoru (viz výše).
 
 Soubor `vars` nastaví proměnné pro ruční běh enginu v CGI režimu uvnitř kontejneru
 (`. vars; QUERY_STRING='page=default' perl /PWE/PWE/pwe.fcgi`).
 
-Proměnné prostředí, které engine čte mimo `PWE_CONF_*`: `FCGI_SOCKET_PATH` (`:7779` = TCP
-port FastCGI; bez něj engine obslouží jeden request z prostředí a skončí), `FCGI_DAEMONIZE`
-(odpojit od terminálu), `PWE_PROFILE` (jen pro vstupní skript). Image běží v UTC; proměnná `TZ`
+Proměnné prostředí, které engine čte mimo `PWE_CONF_*`:
+
+| Proměnná | Význam |
+| --- | --- |
+| `FCGI_SOCKET_PATH` | kde engine poslouchá: `:7779` = TCP port na všech rozhraních, `127.0.0.1:7779` = jen na daném rozhraní (od 2.2.1), nebo cesta k unix socketu; bez ní engine obslouží jeden request z prostředí a skončí |
+| `FCGI_SOCKET_PERM` | práva unix socketu zapsaná osmičkově (`0660`), výchozí `0770` — připojit se smí vlastník a skupina procesu enginu (od 2.2.1; dřív socket vznikal kvůli chybě s právy 1402 a hodnota proměnné se četla desítkově) |
+| `FCGI_LISTEN_QUEUE` | délka fronty čekajících spojení (výchozí 100) |
+| `FCGI_DAEMONIZE` | odpojit od terminálu |
+| `PWE_PROFILE` | jen pro vstupní skript |
+
+Signál `SIGTERM` ukončí engine pořádaně: rozpracovaný request doběhne, pak proces skončí s kódem 0.
+Podrobně [17 — Běh procesu enginu](17-nasazeni.md#běh-procesu-enginu). Image běží v UTC; proměnná `TZ`
 platí jen při startu enginu, ne během požadavků (FastCGI při každém požadavku nahradí prostředí
 parametry od webserveru) — viz [17 — Časové pásmo](17-nasazeni.md#časové-pásmo).
 
@@ -367,4 +460,5 @@ a lokálních tajných údajů (`conf/local.env`, soukromé klíče). Dočasné 
 ([17 — Nasazení](17-nasazeni.md#image-vlastního-webu)).
 Stejný adresář pak funguje dvěma způsoby: ve vývoji ho spouští kořenový `docker-compose.yml`
 s enginem z pracovní kopie (adresář `PWE/` repozitáře, v kontejneru `/PWE/PWE`); v produkci má
-vlastní `Dockerfile`, který si engine zkopíruje z image `ghcr.io/kukam/pwe` (tamtéž, `/PWE/PWE`).
+vlastní `Dockerfile`, který nad závislostní image `ghcr.io/kukam/pwe-<profil>` (web bez databáze
+`pwe-base`) zkopíruje engine (tamtéž, `/PWE/PWE`) i web.

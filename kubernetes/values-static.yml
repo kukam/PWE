@@ -1,26 +1,44 @@
-# Nasazeni vzoroveho webu BEZ databaze (webapps/example.web) do Kubernetes.
+# Nasazeni vzoroveho webu BEZ databaze (example.web) do Kubernetes.
 #
 #   chart:   oci://registry.nixys.ru/nuc/nxs-universal-chart, verze 3.2.2
 #   release: pwe-static  ->  https://pwe-static.<domena>
-#   postup:  kubernetes/README.md  (make k8s-image K8S=static; make k8s-deploy K8S=static)
+#   image:   ghcr.io/kukam/pwe-example-static - hotovy image vzoroveho webu: knihovny (zavislostni image
+#            pwe-base), engine (/PWE/PWE) a web (/PWE/webapps/example.web); pro toto nasazeni se zadny
+#            image nestavi
+#   postup:  kubernetes/README.md  (make k8s-deploy K8S=static)
 #
-# Jeden pod = dva kontejnery: nginx (port 80) a engine (FastCGI na portu 7779, z jinych podu zavrenem). Statiku - static/
-# a assets/ webu a assets/ enginu - zkopiruje pri startu initContainer z image webu do sdileneho svazku
-# a nginx ji posila primo, stejne jako ve vyvojovem stacku (docker-compose/docker-compose_nginx.conf).
+# Jeden pod = dva kontejnery: nginx (port 80) a engine (FastCGI na 127.0.0.1:7779, tedy jen uvnitr podu).
+# Statiku - static/ a assets/ webu a assets/ enginu - zkopiruje pri startu initContainer z image do
+# sdileneho svazku a nginx ji posila primo, stejne jako ve vyvojovem stacku
+# (docker-compose/docker-compose_nginx.conf).
 #
-# Vlastni web (bez databaze): zkopiruj tento soubor jako values-<nazev>.yml, uprav generic.pweWeb,
-# generic.pweImage (a pripadne generic.pweHost), sestav image (make k8s-image K8S=<nazev>) a nasad ho
-# (make k8s-deploy K8S=<nazev>, release pwe-<nazev>). Podrobnosti: kubernetes/README.md, Vlastni web.
+# Vlastni web (bez databaze): zkopiruj tento soubor jako values-<nazev>.yml, uprav generic.pweWeb
+# a generic.pweImage (a pripadne generic.pweHost), nastav K8S_REGISTRY, sestav image webu
+# (make k8s-image K8S=<nazev>; webapps/<web>/Dockerfile z korene repozitare: zavislostni image pwe-base
+# + engine z pracovni kopie + web) a nasad ho (make k8s-deploy K8S=<nazev>, release pwe-<nazev>).
+# Podrobnosti: kubernetes/README.md, Vlastni web.
 
 generic:
   # --- nastaveni PWE: cte je i PWE/tools/k8s.sh a pouzivaji je sablony niz ({{ .Values.generic.pwe... }}) ---
-  pweWeb: example.web              # adresar webu ve webapps/ (image se stavi z webapps/<web>/Dockerfile)
-  pweProfile: static               # profil behoveho image; tento soubor je pro web bez databaze
-  pweImage: pwe-example-static     # nazev image webu (bez registru a tagu)
+  pweWeb: example.web              # adresar webu: v image /PWE/webapps/<web>, u vlastniho webu i webapps/<web>
+  pweProfile: static               # profil webu: static = bez databaze (image webu se stavi nad pwe-base)
+  # Nazev image (bez registru a tagu) urcuje druh nasazeni:
+  #   pwe-example-<profil>  hotovy image vzoroveho webu - nic se nestavi (make k8s-image neni potreba):
+  #                 pwe-example-static (web example.web, profil static) nebo pwe-example-mariadb,
+  #                 pwe-example-mysql, pwe-example-postgres (web example-db.web, profil podle nazvu);
+  #                 pweWeb a pweProfile musi nazvu image odpovidat
+  #   jiny nazev    image vlastniho webu - stavi a nahrava ho make k8s-image z webapps/<web>/Dockerfile.
+  #                 Vyhrazene nazvy (image webu se tak jmenovat nesmi): pwe-base, pwe-mariadb, pwe-mysql,
+  #                 pwe-postgres, pwe-debugger (zavislostni image - jen knihovny, nasadit je nejde),
+  #                 pwe-example-* a zrusene pwe a pwe-static.
+  pweImage: pwe-example-static
   pweHost: ""                      # cela adresa webu, napr. www.mujweb.cz; prazdne = <release>.<pweDomain>
-  # --- nasledujici ctyri hodnoty prepisuje make k8s-deploy podle kubernetes/local.env (--set-string) ---
-  pweRegistry: docker.io/kukam     # registr, ze ktereho image webu taha cluster   (K8S_PULL_REGISTRY)
-  pweImageTag: master              # tag image webu, pripadne tag@sha256:<digest>    (K8S_IMAGE_TAG)
+  # --- nasledujici ctyri hodnoty prepisuje make k8s-deploy (--set-string) podle kubernetes/local.env;
+  #     registr a tag maji u vzoroveho nasazeni vychozi hodnotu i bez nej (registr image PWE a verze
+  #     enginu z PWE/VERSION) ---
+  pweRegistry: ghcr.io/kukam       # registr, ze ktereho image taha cluster          (K8S_PULL_REGISTRY, K8S_REGISTRY)
+  pweImageTag: latest              # tag image, pripadne tag@sha256:<digest>; make k8s-deploy predava tag
+                                   # verze enginu vcetne digestu                     (K8S_IMAGE_TAG)
   pweDomain: example.com           # web pobezi na https://<release>.<pweDomain>     (K8S_DOMAIN)
   pweIssuer: letsencrypt           # ClusterIssuer cert-manageru pro certifikat      (K8S_ISSUER)
   # --- dalsi hodnoty make k8s-deploy sam neprepisuje: zmen je tady, nebo je predej pres K8S_HELM_ARGS
@@ -133,15 +151,13 @@ deployments:
           preStop:
             exec:
               command: ["sleep", "5"]
-        ports:
-          - name: fcgi
-            containerPort: 7779
         env:
-          # FastCGI posloucha na vsech rozhranich podu (engine adresu host:port nepodporuje - nastavuje
-          # socket_perm a CGI::Fast pak zkousi chmod). Z jinych podu je port 7779 zavreny pravidlem
-          # networkPolicies.web niz.
+          # FastCGI posloucha jen na loopbacku podu: nginx tehoz podu se pripojuje na 127.0.0.1:7779,
+          # z jinych podu port dostupny neni - ani v clusteru, kde se pravidla NetworkPolicy neuplatni.
+          # Kontejner proto port 7779 nedeklaruje (zadne ports). Adresu host:port umi engine od verze
+          # 2.2.1; starsi engine s ni nenastartuje (Couldn't chmod) a potrebuje ":7779" (vsechna rozhrani).
           - name: FCGI_SOCKET_PATH
-            value: ":7779"
+            value: "127.0.0.1:7779"
           # TZ pro start enginu (pro requesty ho predava nginx, viz fastcgi_param TZ)
           - name: TZ
             value: "{{ .Values.generic.pweTimezone }}"
@@ -231,7 +247,7 @@ deployments:
     volumes:
       - name: nginx-conf          # ConfigMap <release>-nginx-conf (viz configMaps)
         type: configMap
-      - name: static              # kopie statiky z image webu (plni ji initContainer)
+      - name: static              # kopie statiky z image (plni ji initContainer)
         type: emptyDir
       # Nahrane soubory jsou jen v tomto podu a zaniknou s nim. Pro skutecny web je nahrad svazkem
       # sdilenym mezi pody: type: pvc + polozka v pvcs s accessModes ReadWriteMany.
@@ -266,10 +282,10 @@ ingresses:
             servicePort: http
 
 # Sitova pravidla: do podu webu smi zvenku jen port 80 (nginx; ingress controller i ostatni pody).
-# Port enginu 7779 je dostupny jen uvnitr podu (nginx -> 127.0.0.1) - jinak by jiny pod mohl obejit
-# ingress i nginx a podvrhnout enginu adresu klienta nebo HTTPS. Pravidla musi podporovat sitovy plugin
-# clusteru (Calico, Cilium ...); bez nej se tise ignoruji. Port 80 lze dal omezit jen na namespace
-# ingress controlleru (from: namespaceSelector).
+# Pravidla musi podporovat sitovy plugin clusteru (Calico, Cilium ...); bez nej se tise ignoruji.
+# Port enginu 7779 na nich nezavisi: engine posloucha jen na 127.0.0.1 (FCGI_SOCKET_PATH vyse), takze
+# jiny pod nemuze obejit ingress a nginx a podvrhnout enginu adresu klienta nebo HTTPS.
+# Port 80 lze dal omezit jen na namespace ingress controlleru (from: namespaceSelector).
 networkPolicies:
   web:
     podSelector:

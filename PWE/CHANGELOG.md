@@ -10,6 +10,198 @@ dnešního názvu (`PWE/…`); kde záznam popisuje tehdejší stav, je to výsl
 Podle dnešního umístění jsou psané i cesty k souborům vývojového stacku (`docker-compose/`) a nasazení
 do Kubernetes (`kubernetes/`), přesunutým 15. 11. 2026 (viz 2.2.0).
 
+## 2.2.1 — 2026-11-16
+
+Opravy jádra enginu (ukončování procesu, FastCGI socket, zámek migrace schématu) a nové uspořádání image.
+Kontrakt stránek, API pro weby ani konfigurace webu se nemění — `pwe.require_core => ">=2.2"` vyhovuje dál.
+Co má zkontrolovat provozovatel, shrnuje `docs/17-nasazeni.md`, oddíl „Přechod na verzi 2.2.1“.
+
+**Ukončování procesu a FastCGI socket** (`PWE/pwe.fcgi`; popis v `docs/17-nasazeni.md`, „Běh procesu enginu“):
+
+- **Oprava: pořádané ukončení na `SIGTERM`.** Handler dřív jen odpojil databázi — i pod rozpracovaným
+  requestem — a proces po requestu (nebo po signálu těsně po odeslání odpovědi) neskončil, takže na něj
+  orchestrátor čekal až do `SIGKILL`; signál během startu končil chybou
+  `Can't call method "getDbidList" on an undefined value`. Nově: nečinný proces skončí hned, rozpracovaný
+  request doběhne s funkční databází a klient dostane celou odpověď, naslouchající socket se zavře hned po
+  signálu a proces končí kódem 0. Během startu se engine přeruší na bezpečném místě (mezi pokusy o připojení
+  k databázi, mezi kroky migrace) a skončí, aniž otevře socket. `SIGUSR1` má stejný účinek jako `SIGTERM`.
+  Na Linuxu engine čeká na spojení sám (neblokující socket, probuzení nejpozději po 1 s), takže se signál
+  neztratí a nezdrží ho prázdná spojení (TCP sondy). Do logu: `PWE server ukoncen signalem TERM`, při startu
+  `Start PWE serveru prerusen signalem TERM`.
+- Skutečná chyba čekání na request ukončí engine s kódem 1 a hláškou
+  `PWE server konci: cekani na request FastCGI selhalo (…)` (dřív tichý konec s kódem 0).
+- **Oprava: `FCGI_SOCKET_PATH` ve tvaru `host:port`** (`127.0.0.1:7779`, `*:7779`). Dřív start skončil chybou
+  `Couldn't chmod(127.0.0.1:7779)`; fungovalo jen `:7779` a cesta k unix socketu. Engine za webserverem na
+  stejném stroji nebo ve stejném podu tak může poslouchat jen na loopbacku.
+- **Oprava a změna chování: práva unix socketu.** Socket měl mít práva 0770, hodnota se ale četla desítkově
+  a socket vznikal s právy **1402** — připojit se směli „ostatní“, vlastník a skupina ne. Nově má skutečných
+  0770. **Nasazení, kde webserver běží pod jiným uživatelem než engine a není ve skupině jeho procesu, se po
+  aktualizaci k socketu nepřipojí** (nginx: `connect() … failed (13: Permission denied)`, 502): dej webserver
+  a engine do společné skupiny, nastav `FCGI_SOCKET_PERM` (např. `0666`), nebo přejdi na
+  `FCGI_SOCKET_PATH=127.0.0.1:7779`.
+- **Změna: `FCGI_SOCKET_PERM` se čte osmičkově** (`0660`, `660`, `0777`), výchozí 0770; jiná hodnota než tři
+  až čtyři osmičkové číslice ukončí start chybou. U adresy TCP se nepoužívá. Dřív proměnnou četla knihovna
+  `CGI::Fast` jako desítkové číslo — **hodnotu zapsanou desítkově přepiš** (`432` → `0660`, `438` → `0666`,
+  `511` → `0777`); `432` a `511` jsou platný osmičkový zápis a daly by jiná práva. Úspěšné otevření socketu
+  engine loguje včetně skutečných práv (`FastCGI socket :7779: adresa TCP`, `… unix socket s pravy 0770`).
+- Omezení daná knihovnou FastCGI (nemění se): signál ve chvíli, kdy knihovna čte hlavičku právě přijatého
+  requestu nebo čeká na další request na spojení drženém webserverem (`fastcgi_keep_conn on`), tento request
+  neobslouží. `fastcgi_keep_conn` s enginem nepoužívat — jeden proces obsluhuje jedno spojení.
+
+**Zámek migrace schématu** (`Libs::MyDBI`, `Libs::MyDBI::DRIVER::MySQL`, `Libs::MyDBI::DRIVER::Postgre`; popis
+v `docs/03-struktura-webu.md`, „Zámek migrace“, a `docs/17-nasazeni.md`, „Migrace schématu při startu“):
+
+- **Oprava: zámek migrace, který zůstal po pádu procesu.** Když proces skončil uprostřed migrace (`SIGKILL`,
+  OOM, výměna podu), zůstal v tabulce `dbversion` nastavený `lockid` a každý další start čekal donekonečna
+  (`Dbversion is locked by lockid:N`). Migraci nově chrání **zámek vázaný na databázové spojení**
+  (MySQL/MariaDB `GET_LOCK('pwe.dbversion.<databáze>')`, PostgreSQL poradní zámek úrovně session), který
+  server uvolní sám, jakmile spojení zanikne. Další start se zotaví bez zásahu: opuštěný `lockid` převezme,
+  migraci dokončí a zapíše to do logu (`[E] Dbversion: zamek lockid:N … je opusteny … Prebiram ho`).
+- **Oprava: souběžný start.** Tabulku `dbversion` zakládá proces až pod zámkem spojení — dva současně
+  startující procesy ji už nezaloží dvakrát a každý krok proběhne právě jednou. Řádek do nové tabulky vkládá
+  až po kontrolním čtení o sekundu později (první start nad čistou databází je o tu sekundu delší), aby při
+  souběhu se starší verzí enginu nezůstaly v tabulce dva řádky. Proces, který nemá co
+  migrovat, na cizí migraci nečeká (leda že si strukturu tabulek čte z databáze — pak počká, aby nenačetl
+  rozpracované schéma, a to i na migraci procesu bez zámku spojení) a do sloupce `lockid` vůbec nezapisuje.
+- Sloupec `dbversion.lockid` se zapisuje dál kvůli procesům bez zámku spojení: proces se zámkem spojení
+  zapisuje číslo záporné, proces bez něj (i starší verze enginu) kladné. Na kladný cizí `lockid` proces čeká,
+  dokud migrace postupuje, a převezme ho až po `dbversion_legacy_lock_wait` sekundách beze změny — postupná
+  výměna starší verze enginu za novou tak kroky migrace nespustí dvakrát, pokud žádný krok netrvá déle než
+  tato doba.
+- **Nové klíče v `conf/<profil>.conf`** (sekce `dbi`): `dbversion_session_lock` (výchozí zapnuto i bez klíče;
+  `0` = chování starších verzí, nutné za poolerem v režimu transaction pooling a v clusteru s více zapisovacími
+  uzly) a `dbversion_legacy_lock_wait` (výchozí 300 s, `0` = cizí zámek nikdy nepřebírat). Generátor webu je
+  zapisuje; do staršího webu je potřeba je doplnit, aby šly přepsat přes `PWE_CONF_dbi_db1_*`.
+- **Přerušení startu:** nové funkce `Libs::MyDBI::requestStop()` a `stopRequested()`; konstruktor kontroluje
+  příznak před každým pokusem o připojení, migrace při čekání na zámek a před každým krokem. Rozběhnutý krok
+  se vždy dokončí a zapíše, start pak končí výjimkou `Startup interrupted by termination request`
+  (`pwe.fcgi` ji po `SIGTERM` převede na kód 0).
+- **Chyby místo tichého pokračování nebo nekonečné smyčky:** selhání zápisu verze po provedeném kroku,
+  nečitelná tabulka `dbversion`, soubor migrací, který nejde načíst (`Dbversion: <soubor>: <důvod>`), a zámek
+  `lockid`, který se nepodaří získat ani na 20 pokusů, ukončí start chybou. Tabulce bez řádku (pád mezi
+  `CREATE TABLE` a `INSERT`) engine pod zámkem spojení řádek doplní. Po převzetí opuštěného zámku chyba
+  prvního kroku upozorní, že krok mohl být už dřív částečně proveden (DDL v MySQL/MariaDB není transakční).
+- Hláška `Dbversion is locked by lockid:N` (jen bez zámku spojení) se loguje poprvé a pak po 30 s místo každou
+  sekundu a radí, jak zámek uvolnit ručně; čekání na zámek spojení se loguje poprvé jako info, opakovaně jako
+  error.
+- Ovladače: nové metody `sessionLock($name,$timeout)` a `sessionUnlock($name)`. MySQL po dobu držení zámku
+  vypíná tichý reconnect ovladače (`mysql_auto_reconnect` — spojení obnovené bez zámku by migrovalo dál
+  nechráněné). PostgreSQL pozná serverové spojení sdílené poolerem v režimu transaction pooling (PgBouncer
+  `pool_mode = transaction`) a zámek nevezme — start pak chrání jen sloupec `lockid`; je to pojistka, za
+  takovým poolerem nastav `dbversion_session_lock => 0` u všech procesů.
+- PostgreSQL: tabulku `dbversion`, která leží v jiném schématu, než kde ji hledá kontrola existence (conf
+  `schema` neodpovídá `search_path`), engine použije a zapíše `[E]` do logu (start kvůli tomu nespadne). Po
+  získání zámku spojení se při vypnutém autocommitu ukončí transakce, ve které se o zámek žádalo — čtení pod
+  zámkem vidí aktuální stav i při izolaci REPEATABLE READ.
+- Známé omezení z 2.2.0 („zámek migrace zůstane nastavený … handler SIGTERM odpojí databázi i pod
+  rozpracovaným požadavkem“) tím přestává platit.
+
+**Nové uspořádání image** (API enginu beze změny; popis v `docs/17-nasazeni.md`, oddíl „Image“):
+
+- **Devět image dvou druhů místo sedmi.** *Závislostní image* `pwe-base` (běhové knihovny), `pwe-mariadb`,
+  `pwe-mysql`, `pwe-postgres` (základ + DB ovladač) a `pwe-debugger` (všechny ovladače + ladicí nástroje)
+  nesou jen závislosti — kód enginu ani web v nich není; balíčky v nich se proti 2.2.0 nemění. Nové *image
+  vzorových webů* `pwe-example-static` (`pwe-base` + engine + `webapps/example.web`) a `pwe-example-mariadb`,
+  `pwe-example-mysql`, `pwe-example-postgres` (`pwe-<profil>` + engine + `webapps/example-db.web`) jsou samy
+  spustitelné; staví je přímo `Dockerfile` vzorového webu (`make images` i pipeline) a publikují se. Jsou to
+  **ukázky, nejsou určené pro veřejný provoz** — každý návštěvník vzorového webu je ve skupině `admin`
+  včetně generátoru kódu `pweCreator`.
+- **Zrušené image `pwe` a `pwe-static`.** Image `pwe` (základ + kód enginu, zdroj pro `COPY --from`
+  v `Dockerfile` webu) už není potřeba — engine se do image webu kopíruje z repozitáře; web bez databáze
+  (profil `static`) běží nad `pwe-base`. Zanikly i stage a cíle `pwe` a `static` a kontrola při sestavení
+  `PWE_VERSION=… neodpovida PWE/VERSION=…` (shodu verze hlídají kouřové kontroly). Nástroje zrušené názvy
+  odmítají s vysvětlením (`image pwe-static byl zrusen: web bez databaze bezi nad pwe-base, …`). Balíčky
+  zrušených image v registru nic nemaže — smazat ručně.
+- **`Dockerfile` webu = závislostní image + engine z repozitáře + web.** Jediný `FROM` `pwe-<profil>:<tag>`
+  (web bez databáze `pwe-base:<tag>`; výchozí `PWE_IMAGE_TAG=latest`), engine `COPY --link` z kontextu
+  sestavení (položky `PWE/` kromě `PWE/t` a `PWE/docker`) do `/PWE/PWE`, jediný `RUN` (pracovní adresáře
+  a `conf/database.conf`); popisek `version` vyprazdňuje. Sestavuje se **vždy z kořene repozitáře**; verzi
+  enginu v image určuje pracovní kopie, `PWE_IMAGE_TAG` vybírá jen závislostní image. Argument
+  `PWE_ENGINE_TAG`, druhý `FROM` s image `pwe` a `COPY --from=engine` zanikly. Šablona je jen
+  v `PWE/tools/new-webapp.pl` (`gen_dockerfile`); nová položka přímo v `PWE/` znamená doplnit ji do šablony
+  a `Dockerfile` vzorových webů vygenerovat znovu. **Existující web:** `Dockerfile` vygenerovat znovu
+  (`PWE/tools/new-webapp.pl <web> [--db <profil>] --dir <dočasný adresář>` a převzít z výsledku `Dockerfile`)
+  a image webu sestavit z kořene repozitáře.
+- **`make check` varuje na `Dockerfile` webu ze staré šablony** (`check-webapp.pl`:
+  `WARN Dockerfile je ze stare sablony (<znaky>): … Vygeneruj novy: …`) — image `pwe` jako zdroj enginu,
+  `PWE_ENGINE_TAG`, `COPY --from=engine`, základ `pwe-static`, chybějící `COPY` položek enginu, výchozí tag
+  podle větve, vlastní `ENTRYPOINT`. Varuje i na `Dockerfile` webu bez databáze u webu s `conf/<profil>.conf`
+  a na `FROM` odlišný od šablony. Kontrolu neshodí.
+- **Tagy: každý image má právě `<verze>` (obsah `PWE/VERSION`) a `latest`.** Tagy podle větve gitu zanikly
+  (žádné `master`, `pwe.ai`, `pr-N`); oba tagy se přepisují každým sestavením a publikací. Staré tagy podle
+  větve v registru nic nemaže — smazat ručně.
+- **Nástroje berou tag z `PWE/VERSION`**, ne z větve gitu: výchozí `PWE_IMAGE_TAG` je verze enginu, výchozí
+  image nástrojů `pwe-debugger:<verze>`. Nové funkce `pwe_image_version`, `pwe_image_names`
+  a `pwe_profile_image` (`PWE::ToolEnv`: `image_version()`, `image_names()`, `profile_image()`,
+  `dockerfile_base()`, `engine_image_entries()`), zrušené `pwe_image_branch` a `pwe_image_tag_sanitize`
+  (`image_tag_sanitize()`). Rada při chybějícím image jmenuje cíl sestavení (`make images ARGS=<cíl>`). Po
+  zvýšení `PWE/VERSION` je potřeba `make images` (nebo dočasně `PWE_IMAGE_TAG=latest`).
+  `PWE_IMAGE_TAG=master` už neexistuje.
+- `make images` (`build-images.sh`) staví devět cílů — `base`, `mariadb`, `mysql`, `postgres`, `debugger`,
+  `example-static`, `example-mariadb`, `example-mysql`, `example-postgres` — s tagy `<verze>` a `latest`;
+  `PWE_IMAGE_TAG` se při sestavení nepoužívá a pojistky kolem větve a tagu tvaru verze zanikly (zůstává
+  `--push` jen z čisté pracovní kopie nebo s `--allow-dirty`). Vzorový cíl si základ sestaví sám z téhož
+  volání (`contexts` v `docker-bake.hcl`), do místního Dockeru nebo registru se ale základ uloží jen tehdy,
+  je-li také mezi cíli — skript na to upozorní. `docker-bake.hcl`: proměnná `TAG` zanikla, `VERSION` je
+  povinná.
+- `docker-compose.yml`: výchozí tag služeb `fcgi` a `debugger` je `latest` (dřív `master`); `make run` nastavuje
+  verzi z `PWE/VERSION`. Nová proměnná `PWE_FCGI_IMAGE` (image služby `fcgi`, výchozí
+  `pwe-<COMPOSE_PROFILES>`): profil `static` běží nad `pwe-base`. `make run` ji nastavuje sám; **přímé
+  `COMPOSE_PROFILES=static docker compose up` potřebuje `PWE_FCGI_IMAGE=pwe-base`**.
+- Kouřové kontroly (`smoke-images.sh`) pro devět image: závislostní image nesmějí obsahovat engine ani web,
+  image vzorových webů musejí vycházet ze závislostního image téhož tagu a jejich výchozí příkaz musí vrátit
+  stránku (databázové profily dojít k pokusu o připojení). **Srovnání s pracovní kopií porovnává i obsah
+  souborů** enginu, vzorového webu a vstupního skriptu (dřív jen seznam souborů enginu): po změně v `PWE/`
+  nebo ve vzorovém webu je `FAIL`, dokud neproběhne `make images`. Nové volby `--tree` / `--no-tree`
+  a řádky `SKIP`; bez voleb se srovnává jen místní image s tagem = verze.
+- `entrypoint.sh`: nová varování — image nemá ovladač databáze profilu
+  (`[entrypoint] VAROVANI: PWE_PROFILE=…, ale image nema ovladac databaze …`) a jako server běží vzorový web
+  zapečený v image (`[entrypoint] VAROVANI: bezi vzorovy web … - neni urcen pro verejny provoz …`).
+- `.dockerignore`: testy enginu (`PWE/t`) se nedostanou do žádného image.
+- `run-tests.sh`: v kontejneru odstraňuje i `PWE_PROFILE`; zbylou značku přebírání zámku smaže sám, opuštěný
+  zámek v adresáři bez práva zápisu běh nezablokuje.
+- **Pipeline:** `.github/workflows/images.yml` staví, kontroluje a publikuje všech devět image; publikuje jen
+  `push` a ruční spuštění nad výchozí větví repozitáře a nad větvemi z proměnné repozitáře `PUBLISH_BRANCHES`
+  (přesné názvy oddělené mezerou nebo čárkou). Ostatní větve a pull requesty image jen sestaví a otestují
+  (job nemá podmínku `if` — pull request z větve téhož repozitáře se sestaví vedle běhu `push`). Vstupem image
+  jsou nově i vzorové weby (`webapps/example.web/**`, `webapps/example-db.web/**`), které proto přestal
+  sledovat workflow Tests. Kontrola před sestavením ověřuje cíle i tagy (cíl `<cíl>` = právě
+  `pwe-<cíl>:<verze>` a `pwe-<cíl>:latest`), základní image Ubuntu se v běhu připíná na digest (krok *Base
+  image digest*), sestavení `linux/arm64` dostává stejné proměnné pro bake jako publikace. Kouřové kontroly
+  běží s `--tree` a **mají časový limit** (`linux/amd64` 15 minut, `linux/arm64` 30 minut), aby zaseknutý
+  proces nevisel až do limitu jobu. Ruční spuštění nad gitovým tagem už nekončí chybou (jen sestaví
+  a otestuje).
+- **Kubernetes** (`PWE/tools/k8s.sh`, `kubernetes/values-*.yml`): vzorová nasazení `static` a `generic` berou
+  hotové image `ghcr.io/kukam/pwe-example-static` a `pwe-example-mariadb` — nic se nestaví (ve 2.2.0 si image
+  `pwe-example-static` / `pwe-example-generic` stavěla sama). `make k8s-image` je jen pro vlastní web a staví
+  jeho `Dockerfile` nad `pwe-<profil>`, bez databáze nad `pwe-base`. Engine v podu poslouchá jen na
+  `127.0.0.1:7779`. Opravy a pojistky skriptu:
+  - **oprava:** `deploy` nezaloží nová hesla, když chybí `kubernetes/secrets-<název>.yml` a stav releasu nebo
+    jeho svazků v clusteru **nejde zjistit** (nedostupný cluster, chybějící `kubectl`) — skončí chybou
+    `stav releasu … v clusteru nelze zjistit (…) - nova hesla nezakladam`. Dřív se nezjistitelný stav bral jako
+    „release neexistuje“ a nová hesla by nesouhlasila s existující databází. Výslovně `K8S_NEW_SECRETS=1`;
+  - `delete` odmítne odinstalovat release s hesly, když soubor s hesly na stroji chybí (pojistka; obejití
+    `K8S_DELETE_WITHOUT_SECRETS=1`);
+  - **vyhrazené názvy image:** `generic.pweImage` vlastního webu nesmí být závislostní image, název
+    `pwe-example-*` ani zrušené `pwe` a `pwe-static` (ani s cestou); vzorové nasazení je právě jeden ze čtyř
+    názvů `pwe-example-*` a `pweWeb` i `pweProfile` mu musí odpovídat; nové kontroly znaků v `pweImage`
+    a hodnoty `pweProfile`;
+  - odmítané přepínače: vedle přepínačů clusteru a přihlášení (`--kube-context`, `--kubeconfig`, `--context`,
+    `--server`, …) nově i namespace (`--namespace`, `-n`) a krátké slepené tvary; proměnné `HELM_KUBE*`,
+    `HELM_NAMESPACE` a `KUBERNETES_MASTER`, kterými by `helm` nebo `kubectl` vybraly cluster či namespace mimo
+    `KUBE_CONTEXT` a `K8S_NAMESPACE`, skript před spuštěním ruší a oznámí to. Neznámá hodnota `--dry-run` se
+    odmítne;
+  - `make k8s-image` odmítne `Dockerfile` webu ze starší šablony ještě před sestavením.
+
+**Testy:** nové `t/23-dbversion-lock.t` (zámek migrace nad falešnou databází), `t/24-shutdown.t` (ukončování
+a socket nad skutečným FastCGI serverem) a `t/25-pipeline.t` (pravidla workflow: devět image, kdo publikuje,
+kroky s bake přehrané s falešným `docker`); pomocné moduly
+`t/lib/PWE/TestServer.pm` a `t/lib/PWE/ShutdownHooks.pm`, akce `slow` a `plen` fixture stránky `tPage2`;
+rozšířené `t/10-drivers.t` (zámek spojení ovladačů), `t/14-tools.t`, `t/21-image-tools.t` a `t/22-k8s-tool.t`
+(nové uspořádání image — závislostní image, image vzorových webů, šablona `Dockerfile` webu a její kontrola
+v `make check` —, tagy, Makefile, kouřové kontroly, vyhrazené názvy image a ochrana hesel v `k8s.sh`);
+`t/20-debug-entry.t` používá `PWE::TestServer`.
+
 ## 2.2.0 — 2026-11-08
 
 **Přejmenování adresáře enginu `core/` → `PWE/`** (2026-11-15; mění se jen cesty — API enginu, kontrakt
@@ -214,9 +406,10 @@ názvy a tagy, `Dockerfile` webu a výchozí image nástrojů; popis je v `docs/
   (starý chart, image `kukam/pwe:latest`, vložený self-signed certifikát s klíčem).
 - Generátor webu zakládá `conf/<profil>.conf` s `loglevel => 0` (dřív 1 = trasování každého SQL včetně vázaných
   hodnot do `log/<ovladač>`). Existující weby si hodnotu upraví samy.
-- Známé omezení enginu (nemění se): zámek migrace schématu (`dbversion.lockid`) zůstane nastavený, když proces
-  skončí uprostřed migrace, a další starty pak čekají donekonečna; handler SIGTERM v `PWE/pwe.fcgi` odpojí databázi
-  i pod rozpracovaným požadavkem. `startupProbe` a `preStop` riziko v Kubernetes zmenšují, neodstraňují.
+- Známé omezení enginu ve verzi 2.2.0 (**opraveno ve 2.2.1**, viz výše): zámek migrace schématu
+  (`dbversion.lockid`) zůstane nastavený, když proces skončí uprostřed migrace, a další starty pak čekají
+  donekonečna; handler SIGTERM v `PWE/pwe.fcgi` odpojí databázi i pod rozpracovaným požadavkem. `startupProbe`
+  a `preStop` riziko v Kubernetes zmenšují, neodstraňují.
 
 **Vývojové profily `mysql` a `postgres`** (2026-11-15; oba profily s aktuálními image `mysql:latest` (MySQL 26.10)
 a `postgres:latest` (PostgreSQL 18) nenastartovaly — chyba nesouvisí s novým uspořádáním image, starý

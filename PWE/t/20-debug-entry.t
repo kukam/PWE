@@ -14,11 +14,9 @@ use lib "$FindBin::Bin/lib";
 use lib "$FindBin::Bin/../tools/lib";
 use File::Basename qw(dirname basename);
 use File::Path qw(make_path remove_tree);
-use IO::Socket::INET;
-use IO::Select;
-use POSIX qw(:sys_wait_h);
 use PWE::TestEnv;
 use PWE::ToolEnv qw(run_cgi parse_response);
+use PWE::TestServer qw(free_port port_open wait_for alive);
 
 plan skip_all => 'chybi Template / CGI::Fast' unless (eval { require Template; require CGI::Fast; 1 });
 PWE::TestEnv::clean_env();
@@ -107,71 +105,25 @@ is($o_dbg, '', 'web bez conf/web.conf: zadny vystup na STDOUT');
 # ---------------------------------------------------------------------------------------------
 # 4) FastCGI server a signal INT (pod debuggerem / bez nej)
 # ---------------------------------------------------------------------------------------------
-sub free_port {
-    my $s = IO::Socket::INET->new(Listen => 1, LocalAddr => '127.0.0.1', LocalPort => 0, Proto => 'tcp') or return undef;
-    my $p = $s->sockport;
-    close($s);
-    return $p;
-}
+# FastCGI server a klient jsou v PWE::TestServer (t/lib); tady jen obaly pro debug.cgi nad app2.
 
-sub port_open {
-    my ($port) = @_;
-    my $s = IO::Socket::INET->new(PeerAddr => '127.0.0.1', PeerPort => $port, Proto => 'tcp', Timeout => 1) or return 0;
-    close($s);
-    return 1;
-}
-
-sub wait_for {
-    my ($cond, $sec) = @_;
-    for (1 .. $sec * 10) { return 1 if ($cond->()); select(undef, undef, undef, 0.1); }
-    return 0;
-}
-
-sub alive { my ($pid) = @_; return (waitpid($pid, WNOHANG) == 0) ? 1 : 0; }
-
-# spusti debug.cgi jako FastCGI server na portu; @opts = volby perlu (napr. -d), %extra = dalsi prostredi
+# spusti debug.cgi jako FastCGI server na portu; $opts = volby perlu (napr. -d), %extra = dalsi prostredi
 sub start_server {
     my ($port, $opts, %extra) = @_;
-    my $pid = fork();
-    die "fork: $!" unless (defined($pid));
-    if (!$pid) {
-        chdir($APP2) or POSIX::_exit(126);
-        %ENV = (%ENV_BASE, 'FCGI_SOCKET_PATH' => ":$port", %extra);
-        open(STDIN,  '<',  '/dev/null');
-        open(STDOUT, '>>', "$TMP/server.out");
-        open(STDERR, '>>', "$TMP/server.err");
-        exec($^X, @{$opts}, "$ROOT/debug.cgi") or POSIX::_exit(127);
-    }
-    return $pid;
+    return PWE::TestServer::start_server(
+        script => "$ROOT/debug.cgi",
+        cwd    => $APP2,
+        perl   => $opts,
+        out    => "$TMP/server.out",
+        err    => "$TMP/server.err",
+        env    => {%ENV_BASE, 'FCGI_SOCKET_PATH' => ":$port", %extra},
+    );
 }
 
-# jeden FastCGI request (role RESPONDER) jako nginx; vraci (1|0 = prisel END_REQUEST, CGI vystup)
+# jeden FastCGI request na /debug.cgi; vraci (1|0 = prisel END_REQUEST, CGI vystup)
 sub fcgi_get {
     my ($port, $query) = @_;
-    my $s = IO::Socket::INET->new(PeerAddr => '127.0.0.1', PeerPort => $port, Proto => 'tcp', Timeout => 5) or return (0, "connect: $!");
-    my $rec = sub { my ($type, $body) = @_; return pack('CCnnCx', 1, $type, 1, length($body), 0) . $body; };
-    my $nv  = sub { my ($n, $v) = @_; return join('', map { length($_) < 128 ? pack('C', length($_)) : pack('N', length($_) | 0x80000000) } ($n, $v)) . $n . $v; };
-    my %p = ('SCRIPT_FILENAME' => '/debug.cgi', 'QUERY_STRING' => $query, 'REQUEST_METHOD' => 'GET', 'REMOTE_ADDR' => '127.0.0.1',
-        'HTTP_HOST' => 'localhost', 'SERVER_NAME' => 'localhost', 'GATEWAY_INTERFACE' => 'CGI/1.1', 'CONTENT_LENGTH' => '', 'CONTENT_TYPE' => '');
-    print $s $rec->(1, pack('nCx5', 1, 0)) . $rec->(4, join('', map { $nv->($_, $p{$_}) } sort keys %p)) . $rec->(4, '') . $rec->(5, '');
-    $s->flush;
-    my ($outb, $buf, $done, $t0) = ('', '', 0, time);
-    my $sel = IO::Select->new($s);
-    while (!$done and time - $t0 < 20) {
-        next unless ($sel->can_read(1));
-        my $n = sysread($s, $buf, 65536, length($buf));
-        last unless ($n);
-        while (length($buf) >= 8) {
-            my ($v, $type, $id, $len, $pad) = unpack('CCnnC', $buf);
-            last if (length($buf) < 8 + $len + $pad);
-            my $body = substr($buf, 8, $len);
-            substr($buf, 0, 8 + $len + $pad) = '';
-            if    ($type == 6) { $outb .= $body; }
-            elsif ($type == 3) { $done = 1; }
-        }
-    }
-    close($s);
-    return ($done, $outb);
+    return PWE::TestServer::fcgi_get($port, $query, script => '/debug.cgi');
 }
 
 SKIP: {

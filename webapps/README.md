@@ -21,41 +21,51 @@ make run   WEB=mujweb.web PROFILE=static                              # http://1
 
 | Adresář | Co to je | Git |
 |---------|----------|-----|
-| `example.web/` | vzorový web **bez databáze** (nejmenší funkční web) | verzován zde, jen ke čtení |
-| `example-db.web/` | vzorový web **s databází** (session, `dbTableExamples`, entita `User`, služba `Accounts`) | verzován zde, jen ke čtení |
+| `example.web/` | vzorový web **bez databáze** (nejmenší funkční web); vzniká z něj image `pwe-example-static` | verzován zde, jen ke čtení |
+| `example-db.web/` | vzorový web **s databází** (session, `dbTableExamples`, entita `User`, služba `Accounts`); vznikají z něj image `pwe-example-mariadb`, `pwe-example-mysql` a `pwe-example-postgres` | verzován zde, jen ke čtení |
 | `<tvuj-web>/` | tvůj web | **není** v tomto repozitáři (`.gitignore: webapps/*`) — má vlastní git, naklonovaný sem |
 
 Vlastní web tedy verzuješ a vydáváš nezávisle na enginu. Stejný adresář funguje dvěma způsoby:
 tady ho spouští kořenový `docker-compose.yml` s enginem z pracovní kopie (`../PWE/`, v kontejneru
-`/PWE/PWE`), a sám o sobě má `Dockerfile`, takže jde nasadit bez pracovní kopie enginu: běhové
-prostředí bere z image `ghcr.io/kukam/pwe-<profil>` a engine si zkopíruje z image
-`ghcr.io/kukam/pwe` (v image webu je také v `/PWE/PWE`).
+`/PWE/PWE`), a sám o sobě má `Dockerfile`, ze kterého vznikne image webu se vším potřebným:
+jediným `FROM` vychází ze **závislostního image** `ghcr.io/kukam/pwe-<profil>` (web bez databáze
+z `pwe-base`) — běhové knihovny, DB ovladač a vstupní skript, bez kódu enginu a bez webu —, zkopíruje
+do něj **engine** z adresáře `../PWE/` (v image webu `/PWE/PWE`) a přidá **sebe**. Sestavuje se proto
+vždy z kořene repozitáře enginu a verzi enginu v image určuje pracovní kopie.
 
 ```bash
-# z kořene repozitáře; PWE_IMAGE_TAG = větev image (výchozí master), PWE_ENGINE_TAG = větev nebo verze enginu
-# z image aktuální větve (tak je označuje make images i pipeline)
-docker build --build-arg PWE_IMAGE_TAG="$(bash PWE/tools/lib/images.sh pwe_image_tag)" \
-    -t muj-web -f webapps/mujweb.web/Dockerfile .
-# z image větve master (musí být v registru nebo v místním Dockeru)
+# VŽDY z kořene repozitáře; PWE_IMAGE_TAG = tag závislostního image pwe-<profil>: latest (výchozí), nebo verze enginu
+# nad nejnovějším závislostním image (z registru nebo z místního Dockeru po make images)
 docker build -t muj-web -f webapps/mujweb.web/Dockerfile .
-# engine připnutý na verzi (obsah PWE/VERSION)
-docker build --build-arg PWE_IMAGE_TAG="$(bash PWE/tools/lib/images.sh pwe_image_tag)" \
-    --build-arg PWE_ENGINE_TAG="$(cat PWE/VERSION)" -t muj-web:1.0 -f webapps/mujweb.web/Dockerfile .
+# závislosti připnuté na verzi enginu (obsah PWE/VERSION)
+docker build --build-arg PWE_IMAGE_TAG="$(cat PWE/VERSION)" -t muj-web:1.0 -f webapps/mujweb.web/Dockerfile .
 ```
 
-Tytéž příkazy (s názvem image podle webu) jsou v záhlaví `Dockerfile` každého webu.
+Tytéž příkazy (s názvem image podle webu) jsou v záhlaví `Dockerfile` každého webu. Image PWE mají
+jen tagy `<verze>` a `latest` (tagy podle větve neexistují); pro produkci připínej verzi — `latest` se
+přepisuje s každou publikací.
 
-`docker build` bere image enginu z místního Dockeru, a když tam nejsou, stáhne je z `ghcr.io` (dokud
+Stejnou šablonou vznikají i image vzorových webů `pwe-example-static` (z `example.web`)
+a `pwe-example-mariadb`, `pwe-example-mysql`, `pwe-example-postgres` (z `example-db.web`), které staví
+`make images` a publikuje pipeline. Jsou to **ukázky, ne image pro veřejný provoz**: každý návštěvník
+vzorového webu je ve skupině `admin` včetně generátoru kódu `pweCreator`.
+
+`docker build` bere závislostní image z místního Dockeru, a když tam není, stáhne ho z `ghcr.io` (dokud
 jsou balíčky soukromé, je potřeba `docker login ghcr.io`). Prostý `docker build` místní image vidí,
 i když je v `docker buildx ls` vybraný jiný builder; jen `docker buildx build` s builderem typu
 `docker-container` je nevidí — pak přidej `--builder <builder s ovladačem docker> --load` (v Docker
 Desktopu `desktop-linux`, na Linuxu zpravidla `default`). Profil (`PWE_PROFILE`) je do image webu
 zapečený, kontejner ho předávat nemusí. Web **nemá vlastní `entrypoint.sh`**: image webu dědí vstupní
-skript z běhového image `pwe-<profil>` (jediný zdroj `../PWE/docker/entrypoint.sh`), který podle
+skript ze závislostního image (jediný zdroj `../PWE/docker/entrypoint.sh`), který podle
 `PWE_PROFILE` nasměruje `conf/database.conf` a založí dočasné adresáře; ty a symlink vznikají už při
-sestavení, takže image běží i s kořenovým souborovým systémem jen pro čtení. Web vytvořený starší
-šablonou s vlastním `entrypoint.sh`: soubor smaž a `Dockerfile` nahraď výstupem generátoru
-([`../docs/17-nasazeni.md`](../docs/17-nasazeni.md#image-vlastního-webu)). Image webu dostane vlastní
+sestavení, takže image jde spustit i s kořenovým souborovým systémem jen pro čtení (`ramdisk`,
+`sessions`, `uploadfile` a `log` pak musí být zapisovatelné — `tmpfs` nebo svazek). Web vytvořený
+starší šablonou (vlastní `entrypoint.sh`, nebo `Dockerfile` se dvěma `FROM` a argumentem
+`PWE_ENGINE_TAG`) se nad dnešními image nesestaví nebo by v image chyběl engine — `make check` na to
+upozorní (`WARN Dockerfile je ze stare sablony …`). Případný `entrypoint.sh` smaž a `Dockerfile` nahraď
+výstupem generátoru: `PWE/tools/new-webapp.pl <web> [--db <profil>] --dir <dočasný adresář>` a převezmi
+z výsledku `Dockerfile`
+([`../docs/17-nasazeni.md`](../docs/17-nasazeni.md#dockerfile-ze-starší-šablony)). Image webu dostane vlastní
 popisky (`LABEL`) — `source` a `licenses` doplň podle repozitáře webu. Knihovny, které v `pwe-base`
 nejsou (např. `LWP::UserAgent` = `libwww-perl`, `curl`), si web instaluje ve svém `Dockerfile`; image
 běží v UTC, časové pásmo pro požadavky nastav ve webserveru (`fastcgi_param TZ Europe/Prague;`) nebo

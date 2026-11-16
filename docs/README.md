@@ -30,7 +30,7 @@ v kapitole [12 — Tutoriál: Úkolníček](12-tutorial-ukolnicek.md).
 | --- | --- | --- |
 | 01 | [Úvod a koncepty](01-uvod.md) | co je PWE, pojmy, životní cyklus requestu, dva kořeny (web + engine), mapa repozitáře |
 | 02 | [Rychlý start](02-rychly-start.md) | požadavky, `make new` → `make run`, první stránka, kontrola `make check` |
-| 03 | [Struktura webu a konfigurace](03-struktura-webu.md) | anatomie `webapps/<web>/`, kompletní reference `conf/web.conf`, `database.conf`, migrace `dbversion`, Dockerfile |
+| 03 | [Struktura webu a konfigurace](03-struktura-webu.md) | anatomie `webapps/<web>/`, kompletní reference `conf/web.conf`, `database.conf`, migrace `dbversion` a jejich zámek, Dockerfile |
 | 04 | [Stránky (Pages)](04-stranky.md) | kontrakt stránky: konstruktor, akce a práva, injektáž, render, návratové kódy, čtení vstupů |
 | 05 | [Validace vstupů](05-validace.md) | `defined`, `validate`, `unique`, `exist`, `rules`, `replace`, vestavěné validátory, vlastní validátory |
 | 06 | [Šablony a texty (i18n)](06-sablony-a-i18n.md) | Template Toolkit, layout pipeline, automatické proměnné, resource bundle, messenger, odkazy `href.tmpl` |
@@ -44,9 +44,9 @@ v kapitole [12 — Tutoriál: Úkolníček](12-tutorial-ukolnicek.md).
 | 14 | [API reference](14-api-reference.md) | metody `$CONF`, `$LOG`, `$USER`, `$WEB`, `$DBI`, `$ENTITIES`, `$VALIDATE`, entit/DAO a vestavěných služeb |
 | 15 | [Vestavěné moduly enginu](15-vestavene-moduly.md) | co je v adresáři enginu `PWE/`: stránky, vzhledy, služby, entity, šablony, assets; co a jak přebít |
 | 16 | [Nástroje a ladění](16-nastroje.md) | `make`, `PWE/tools/*`, výběr, sestavení a kouřové kontroly image (`make images`, `make images-check`), `make k8s-*`, `pweCreator`, CGI režim, logy, VS Code debugger |
-| 17 | [Nasazení](17-nasazeni.md) | sedm image enginu (`pwe-base`, `pwe`, profily, `pwe-debugger`), přidání knihovny, časové pásmo, registr a tagy, kouřové kontroly, workflow GitHub Actions (Images, Tests, Dependabot), image vlastního webu, docker compose, nginx, proměnné prostředí, Apache, Kubernetes (`make k8s-*`), produkční checklist |
+| 17 | [Nasazení](17-nasazeni.md) | devět image (závislostní `pwe-base`, `pwe-mariadb`, `pwe-mysql`, `pwe-postgres`, `pwe-debugger` a image vzorových webů `pwe-example-*`), přidání knihovny, časové pásmo, registr a tagy (`<verze>` a `latest`), kouřové kontroly, workflow GitHub Actions (Images, Tests, Dependabot; kdo publikuje), image vlastního webu, docker compose, nginx, proměnné prostředí, běh procesu (FastCGI socket, ukončení na `SIGTERM`, migrace při startu), Apache, Kubernetes (`make k8s-*`), produkční checklist, přechod na verzi 2.2.1 |
 | 18 | [Testy](18-testy.md) | testy enginu (`make test`, zámek souběžných běhů), psaní testů, test vlastního webu, integrační test přes compose, CI |
-| 19 | [Vnitřní fungování enginu](19-engine-internals.md) | pro údržbáře enginu (adresář `PWE/`): loadery, samoléčení, opts, pooling, dbversion, bezpečnostní pojistky |
+| 19 | [Vnitřní fungování enginu](19-engine-internals.md) | pro údržbáře enginu (adresář `PWE/`): vstupní bod, socket a ukončování, loadery, samoléčení, opts, pooling, dbversion a zámek migrace, bezpečnostní pojistky |
 | 20 | [Časté problémy a známá omezení](20-faq.md) | diagnostika podle projevu, známá omezení enginu |
 | 21 | [Nový web podle zadání](21-novy-web-podle-zadani.md) | postup pro AI asistenta i vývojáře: od zadání k běžícímu webu, mapování požadavků, Definition of Done |
 | 22 | [Platební brána ČSOB](22-platebni-brana-csob.md) | napojení ČSOB eAPI v1.9 v PWE: režimy simulator/test/production, klíče, konfigurace `csob.*`, průběh init → process → return → status, stavy, cron, simulátor, přechod do produkce, bezpečnost |
@@ -56,12 +56,12 @@ v kapitole [12 — Tutoriál: Úkolníček](12-tutorial-ukolnicek.md).
 Potřebujete Docker (s `docker compose` a `docker buildx`), `make` a libovolný Perl 5 (stačí jádro,
 bez závislostí enginu — spouštějí se jím jen skripty `PWE/tools/*.pl`, které si zbytek odbaví
 v kontejnerech z image `ghcr.io/kukam/pwe-*`). Závislosti enginu se na hostitele neinstalují; engine,
-testy i kompilace běží vždy v kontejneru. Image mají tag podle větve gitu; když pro vaši větev
-v registru nejsou, sestaví je `make images`.
+testy i kompilace běží vždy v kontejneru. Image mají tag verze enginu (obsah `PWE/VERSION`) a tag
+`latest`; když image této verze v registru nejsou, sestaví je `make images`.
 
 ```bash
 git clone <repozitar> PWE && cd PWE                                           # kořen repozitáře; engine je v jeho podadresáři PWE/
-make images                                                                   # jen když image pro vaši větev nejsou v ghcr.io/kukam
+make images                                                                   # jen když image této verze enginu nejsou v ghcr.io/kukam
 make new WEB=mujweb.web ARGS='--title "Můj web" --lang CZE,EN --db mariadb'   # kostra webu (bez --db = web bez databáze)
 make run WEB=mujweb.web PROFILE=mariadb                                       # http://127.0.0.1:7778/
 make module TYPE=page WEB=mujweb.web NAME=kontakt ARGS='--site Default --services UserAccount'

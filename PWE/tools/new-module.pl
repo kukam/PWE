@@ -28,7 +28,7 @@ PWE/tools/new-module.pl - vytvori kostru stranky / sluzby / vzhledu / entity ve 
     se berou z conf/web.conf webappu (http.languages). Volba --force prepise existujici soubory.
 
     Skript potrebuje Template Toolkit a Class::Inspector; pokud na hostiteli chybi, spusti se sam
-    znovu v kontejneru s image nastroju (docker; vychozi ghcr.io/kukam/pwe-debugger:<aktualni vetev>,
+    znovu v kontejneru s image nastroju (docker; vychozi ghcr.io/kukam/pwe-debugger:<verze enginu>,
     zmena pres PWE_IMAGE_TAG / PWE_IMAGE_REGISTRY / PWE_TEST_IMAGE, viz PWE::ToolEnv::docker_image()).
     Po vytvoreni modulu je nutne restartovat bezici FastCGI proces (engine nacita moduly pri startu).
 

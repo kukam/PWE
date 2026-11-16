@@ -209,7 +209,7 @@ $WEB->printHttpHeader('type' => 'file', 'filename' => 'export.zip');        # ap
 open(my $fh, '<', $path) or return 404; binmode($fh); print while (<$fh>); close($fh);
 
 $WEB->printHttpHeader('type' => 'static', 'content_type' => 'application/json; charset=UTF-8');   # JSON API bez cookie
-print JSON::to_json({total => $stats->{'total'}});                         # JSON je v image enginu (use JSON; ve službě)
+print JSON::to_json({total => $stats->{'total'}});                         # JSON je ve všech image PWE (use JSON; ve službě)
 ```
 
 ## 14. Vlastní validátor s přístupem do DB
@@ -318,7 +318,7 @@ sub obrazek {
     return $self->fail('error_upload') if ($err or !@files);
     my $file = $CONF->getHome() . "uploadfile/products/$files[0]";
     my ($ext) = ($files[0] =~ /\.(jpe?g|png|webp|gif)$/i);
-    my $ok = $ext && imageLooksValid($file);                 # magická hlavička + Image::Magick->Ping (je v image enginu)
+    my $ok = $ext && imageLooksValid($file);                 # magická hlavička + Image::Magick->Ping (je ve všech image PWE)
     unless ($ok) { unlink($file); return $self->fail('error_image_type'); }
     my $new = sprintf("%d-%d.%s", $id, time(), lc($ext));      # bezpečné jméno bez vstupu od uživatele
     rename($file, $CONF->getHome() . "uploadfile/products/$new");

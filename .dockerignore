@@ -1,8 +1,22 @@
-# Kontext pro docker build (PWE/docker/Dockerfile a webapps/<web>/Dockerfile se stavi z korene repozitare)
+# Kontext pro docker build. Z korene repozitare se stavi
+#   - zavislostni image (PWE/docker/Dockerfile): z kontextu berou jen PWE/docker/entrypoint.sh,
+#   - image webu (webapps/<web>/Dockerfile, i image vzorovych webu pwe-example-*): z kontextu berou engine
+#     (LICENSE a adresar PWE/ bez PWE/t a PWE/docker) a adresar webu webapps/<web>.
+# Co je tady vyjmenovane, se do zadneho image nedostane, ani kdyby na to Dockerfile ukazoval.
+
 # **/.git: weby ve webapps/<web> maji vlastni git repozitar - jeho historie do image webu nepatri
 .git
 **/.git
 webapps-example
+
+# Engine: testy (vcetne docasnych dat fixture webu a zamku PWE/t/.run-tests.lock) do image nepatri. Dockerfile
+# webu je nekopiruje (vyjmenovava polozky PWE/), tady jsou vyrazene i pro Dockerfile, ktery by kopiroval cely
+# adresar PWE/. Adresar PWE/docker v kontextu zustava - PWE/docker/entrypoint.sh potrebuje image pwe-base.
+PWE/t
+
+# Docasna data a mistni nastaveni webu - plati pro kazdy web vcetne vzorovych (webapps/example.web,
+# webapps/example-db.web): pracovni adresare a symlink conf/database.conf se do image nedostanou z pracovni
+# kopie, zaklada je az Dockerfile webu podle profilu.
 webapps/*/ramdisk
 webapps/*/log
 webapps/*/sessions
@@ -23,7 +37,6 @@ webapps/*/**/*.pfx
 webapps/*/**/*.env
 # Lokalni nastaveni editoru
 webapps/*/.vscode
-PWE/t/fixtures/app*/ramdisk
 **/.DS_Store
 # mistni nastaveni a hesla nasazeni do Kubernetes (kubernetes/README.md) do kontextu buildu nepatri
 kubernetes/local.env

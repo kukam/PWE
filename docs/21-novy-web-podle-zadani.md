@@ -13,15 +13,19 @@ postup s kontrolními seznamy. Kompletní příklad výsledku je [12 — Tutori�
 - **Engine běží v kontejneru** (`make …`). Na hostiteli je potřeba Docker s `docker compose`, `make`
   a libovolný Perl 5 (stačí jádro, bez závislostí enginu) — spouštějí se jím jen skripty
   `PWE/tools/*.pl`, které si zbytek odbaví v kontejneru; závislosti enginu se na hostitele neinstalují.
-- **Image mají tag podle větve gitu** (`ghcr.io/kukam/pwe-<profil>:<větev>`, nástroje běží
-  v `ghcr.io/kukam/pwe-debugger:<větev>`). Když Docker hlásí `pull access denied`,
-  `manifest unknown`, u `ghcr.io` také `denied` nebo `403 Forbidden`, image pro aktuální větev
-  v registru nejsou: jednou spusť `make images` (sestaví je lokálně), nebo pracuj s image větve
-  `master`, jsou-li publikované (`PWE_IMAGE_TAG=master make …`).
+- **Image mají tag verze enginu** — obsah `PWE/VERSION` (stack běží v závislostním image
+  `ghcr.io/kukam/pwe-<profil>:<verze>`, web bez databáze v `pwe-base`, nástroje
+  v `ghcr.io/kukam/pwe-debugger:<verze>`; druhý tag každého image je `latest`, tagy podle větve gitu
+  neexistují). Tyto image nesou jen závislosti — engine i web dostávají mountem repozitáře. Když Docker hlásí `pull access denied`,
+  `manifest unknown`, u `ghcr.io` také `denied` nebo `403 Forbidden`, image této verze
+  v registru nejsou: jednou spusť `make images` (sestaví je lokálně; po každém zvýšení `PWE/VERSION`
+  znovu), nebo pracuj s naposledy publikovanými image (`PWE_IMAGE_TAG=latest make …`).
   Image se kvůli webu neupravují — knihovna navíc (např. `LWP::UserAgent` = `libwww-perl`; HTTPS
   klient v image je `HTTP::Tiny`) patří do `Dockerfile` webu
-  ([17 — Nasazení](17-nasazeni.md#přidání-knihovny)). Vlastní `entrypoint.sh` web nemá (dědí ho
-  z image), `WEB` je u `make new` a `make module` povinný.
+  ([17 — Nasazení](17-nasazeni.md#přidání-knihovny)). `Dockerfile` webu vytváří generátor (jediný
+  `FROM` závislostního image — `pwe-<profil>`, bez databáze `pwe-base` —, engine a web se do image
+  kopírují z repozitáře, sestavuje se z jeho kořene) a ručně se nepíše; vlastní `entrypoint.sh` web
+  nemá (dědí ho z image), `WEB` je u `make new` a `make module` povinný.
 - **Necommituje se**, pokud o to uživatel výslovně nepožádá.
 
 ## 1. Rozbor zadání
@@ -47,7 +51,8 @@ make new WEB=rezervace.web ARGS='--title "Rezervace sálu" --lang CZE,EN --db ma
 ```
 
 Vznikne úvodní stránka, vzhled, služba účtu, konfigurace, migrace (`dbtable`, `session`),
-`Dockerfile` (image webu: běh z `pwe-<profil>`, engine z image `pwe`), `README.md`
+`Dockerfile` (image webu: závislostní image `pwe-<profil>`, bez databáze `pwe-base`, + engine
+z repozitáře + web), `README.md`
 ([03 — Struktura webu](03-struktura-webu.md)). Bez `--db` web bez databáze.
 `--examples` zapne ukázkové stránky enginu (do produkce ne).
 

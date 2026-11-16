@@ -14,7 +14,14 @@ s entitami; nízkoúrovňové SQL se hodí pro agregace a hromadné operace.
   (typ, délka, NULL, default, unikátnost, primární klíč, hodnoty ENUM). Z ní se pak staví DAO
   objekty a validují hodnoty. Mapu lze cachovat do `daomap_file` (po změně schématu soubor smaž).
 - Schéma se mění **jen migracemi** v `conf/<driver>.dbversion`
-  ([03 — Migrace](03-struktura-webu.md#migrace-schématu-confdriverdbversion)).
+  ([03 — Migrace](03-struktura-webu.md#migrace-schématu-confdriverdbversion)). Web běží ve více
+  procesech a všechny startují nad stejnou databází: migraci provede jen jeden, ostatní na něj
+  počkají. Hlídá to zámek vázaný na databázové spojení (od 2.2.1), který server po pádu procesu
+  uvolní sám — klíče `dbversion_session_lock` a `dbversion_legacy_lock_wait`
+  ([03 — Zámek migrace](03-struktura-webu.md#zámek-migrace)).
+- Proces, který při startu čeká na databázi nebo migruje, lze bezpečně ukončit signálem `SIGTERM`:
+  start se přeruší mezi pokusy o připojení nebo mezi kroky migrace, rozběhnutý krok se vždy dokončí
+  ([17 — Běh procesu enginu](17-nasazeni.md#běh-procesu-enginu)).
 
 Podporované drivery: `mysql`/`mariadb` (`Libs::MyDBI::DRIVER::MySQL` — dvě spojení na pool:
 čtecí s autocommit a zapisovací transakční) a `postgres` (`DRIVER::Postgre` — jedno spojení,

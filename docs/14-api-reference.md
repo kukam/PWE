@@ -122,6 +122,7 @@ Automatické proměnné šablon: [06 — Šablony](06-sablony-a-i18n.md#automati
 | `getDAOList($dbid)`, `getDaoMetaData($dbid)` | tabulky / struktura |
 | `getDbDriver($dbid)`, `getDbidList()`, `getDbIdPoolList($dbid)`, `getDBIObject($dbid, $pool)` | informace o spojeních |
 | `ping($dbid, $pool)`, `testConnection()`, `reconnect($dbid)`, `disconnect($dbid)` | správa spojení (volá engine) |
+| `Libs::MyDBI::requestStop()`, `Libs::MyDBI::stopRequested()` | žádost o ukončení během startu: `pwe.fcgi` ji nastavuje z handleru `SIGTERM`, konstruktor a migrace ji kontrolují na bezpečných místech (od 2.2.1; stránky je nevolají) |
 
 ## `$ENTITIES` — `Libs::Entities`
 
@@ -198,7 +199,7 @@ reporty) — moduly webu třídy enginu ne-`require`-ují, e-maily posílají p�
 `new()`, `getInfo($file)` → `{ type, width, height, geometry, size, major, bad, msg }`,
 `convert(f => $in, o => $out, w => $width, h => $height, q => $quality, r => $rotate, …)` — obálka
 nad `/usr/bin/identify` a `/usr/bin/convert` (balíček `imagemagick` je v základu `pwe-base`, tedy ve
-všech image enginu). Detail v POD `PWE/Libs/Pics.pm`.
+všech image PWE). Detail v POD `PWE/Libs/Pics.pm`.
 
 ## Loadery (`Libs::Pages`, `Libs::Sites`, `Libs::Services`, `Libs::Entities`)
 

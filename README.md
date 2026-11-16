@@ -17,10 +17,15 @@ Dokumentace je psána tak, aby podle ní **vývojář i AI asistent napsali web 
 > paginated tables, AJAX, crash isolation). The engine itself lives in the [`PWE/`](PWE/README.md)
 > directory of this repository; web applications live in `webapps/<name>/` without any
 > engine code and are versioned separately. Container images are built by GitHub Actions and
-> published to `ghcr.io/kukam`, tagged by git branch: `pwe-base` (runtime libraries only), `pwe`
-> (engine code carrier, also tagged by version), runtime profiles `pwe-static`, `pwe-mariadb`,
-> `pwe-mysql`, `pwe-postgres`, and `pwe-debugger` (debugging tools); build them locally with
-> `make images`. Documentation (Czech) is in [`docs/`](docs/README.md);
+> published to `ghcr.io/kukam`, each tagged with the engine version (`PWE/VERSION`) and `latest`:
+> dependency images without engine code — `pwe-base` (runtime libraries only), `pwe-mariadb`,
+> `pwe-mysql`, `pwe-postgres` (base + DB driver) and `pwe-debugger` (debugging tools) — and sample
+> web application images `pwe-example-static`, `pwe-example-mariadb`, `pwe-example-mysql`,
+> `pwe-example-postgres` (dependency image + engine + a sample web application; demos, not meant
+> for public deployment). The image of your own web application is built from the repository
+> root by `webapps/<name>/Dockerfile`: dependency image + engine copied from `PWE/` + the web
+> application. Build the images locally with `make images`. Documentation (Czech) is in
+> [`docs/`](docs/README.md);
 > start with [`docs/02-rychly-start.md`](docs/02-rychly-start.md) and the complete tutorial
 > [`docs/12-tutorial-ukolnicek.md`](docs/12-tutorial-ukolnicek.md). License: Apache 2.0.
 
@@ -29,12 +34,13 @@ Dokumentace je psána tak, aby podle ní **vývojář i AI asistent napsali web 
 Potřebujete Docker s `docker compose` a `docker buildx`, `make` a libovolný Perl 5 (stačí jádro, bez
 závislostí enginu — spouštějí se jím jen skripty `PWE/tools/*.pl`, které si zbytek odbaví v kontejneru).
 Závislosti enginu se na hostitele neinstalují. Image enginu si Docker stáhne z `ghcr.io/kukam`
-(tag = větev gitu); když pro vaši větev publikované nejsou (nebo jsou balíčky soukromé a nejste
-přihlášeni — `docker login ghcr.io`), sestaví je `make images`.
+(tag = verze enginu z `PWE/VERSION`, druhý tag každého image je `latest`); když image této verze
+publikované nejsou (nebo jsou balíčky soukromé a nejste přihlášeni — `docker login ghcr.io`), sestaví
+je `make images`.
 
 ```bash
 git clone <url> PWE && cd PWE
-make images                                                                   # jen když image pro vaši větev nejsou v registru
+make images                                                                   # jen když image této verze enginu nejsou v registru
 make new WEB=mujweb.web ARGS='--title "Můj web" --lang CZE,EN --db mariadb'   # kostra webu (bez --db = bez databáze)
 make run WEB=mujweb.web PROFILE=mariadb                                       # http://127.0.0.1:7778/
 make module TYPE=page WEB=mujweb.web NAME=kontakt ARGS='--site Default --services UserAccount'
@@ -68,9 +74,9 @@ Rozcestník všech kapitol: [`docs/README.md`](docs/README.md).
 | [`webapps/`](webapps/README.md) | weby postavené nad enginem (vlastní weby jsou mimo tento git: `.gitignore webapps/*`) |
 | [`docs/`](docs/README.md) | dokumentace |
 | `Makefile`, `docker-compose.yml`, `docker-compose/` | vývojový stack: nginx + 3× engine + databáze (`make run`); v adresáři `docker-compose/` je konfigurace nginx (`docker-compose_nginx.conf`) a proměnné prostředí služeb (`docker-compose_*.env`) |
-| [`kubernetes/`](kubernetes/README.md) | nasazení do Kubernetes chartem `nxs-universal-chart` (`make k8s-*`, skript `PWE/tools/k8s.sh`): hodnoty `values-static.yml` (`example.web`) a `values-generic.yml` (`example-db.web` + MariaDB), vzory `secrets-generic.example.yml` a `local.env.example`; cílový cluster jen přes povinný `KUBE_CONTEXT` ([17 — Nasazení](docs/17-nasazeni.md#kubernetes)) |
-| `PWE/docker/`, `docker-bake.hcl` | sestavení image: jeden vícestupňový `Dockerfile` + `entrypoint.sh` (vstupní skript všech image, i image webu), cíle a tagy pro `docker buildx bake` (`make images`, kouřové kontroly `make images-check`) |
-| `.github/` | GitHub Actions: `workflows/images.yml` (testy enginu, sestavení, kouřové kontroly a publikace image do `ghcr.io/kukam`), `workflows/tests.yml` (jen testy pro změny vzorových webů, compose, `kubernetes/` a `Makefile`), `dependabot.yml` (týdenní aktualizace akcí připnutých na SHA) |
+| [`kubernetes/`](kubernetes/README.md) | nasazení do Kubernetes chartem `nxs-universal-chart` (`make k8s-*`, skript `PWE/tools/k8s.sh`): hodnoty `values-static.yml` (image `pwe-example-static` se vzorovým webem `example.web`) a `values-generic.yml` (image `pwe-example-mariadb` s `example-db.web` + MariaDB) — vzorová nasazení berou hotové image vzorových webů, nic se nestaví; vzory `secrets-generic.example.yml` a `local.env.example`; cílový cluster jen přes povinný `KUBE_CONTEXT` ([17 — Nasazení](docs/17-nasazeni.md#kubernetes)) |
+| `PWE/docker/`, `docker-bake.hcl` | sestavení image: jeden vícestupňový `Dockerfile` závislostních image + `entrypoint.sh` (vstupní skript všech image, i image webu), cíle a tagy všech devíti image pro `docker buildx bake` (`make images`, kouřové kontroly `make images-check`); image vzorových webů staví `Dockerfile` vzorového webu |
+| `.github/` | GitHub Actions: `workflows/images.yml` (testy enginu, sestavení, kouřové kontroly a publikace image do `ghcr.io/kukam` — publikuje jen výchozí větev a větve z proměnné repozitáře `PUBLISH_BRANCHES`), `workflows/tests.yml` (jen testy pro změny compose, `kubernetes/` a `Makefile`), `dependabot.yml` (týdenní aktualizace akcí připnutých na SHA) |
 | [`AGENTS.md`](AGENTS.md) | závazná pravidla pro AI asistenty |
 
 Cesty v dokumentaci jsou relativní ke kořeni repozitáře: engine je tedy `PWE/…`, i když se
@@ -84,26 +90,42 @@ přes `pwe.require_core`. Slovo `core` v názvech konfigurace a API (`pwe.core_p
 
 ## Image a nasazení
 
-Engine se dodává jako sedm image v registru `ghcr.io/kukam`; všechny vycházejí z `pwe-base`:
+PWE se dodává jako devět image v registru `ghcr.io/kukam`. Pět **závislostních image** nese jen
+závislosti — kód enginu ani web v nich není; čtyři **image vzorových webů** jsou spustitelné ukázky:
 
-| Image | Obsah | Tagy |
-| --- | --- | --- |
-| `pwe-base` | jen běhové knihovny enginu (Perl, moduly, `sass`, ImageMagick, `tzdata`) — bez kódu enginu, bez DB ovladačů | větev |
-| `pwe` | základ + kód enginu v `/PWE/PWE` („nosič“ enginu) | větev a verze (`PWE/VERSION`) |
-| `pwe-static`, `pwe-mariadb`, `pwe-mysql`, `pwe-postgres` | základ + DB ovladač profilu (`static` žádný) | větev |
-| `pwe-debugger` | základ + všechny DB ovladače + ladicí nástroje (`Perl::LanguageServer`, `Perl::Critic`, klienti DB, …) | větev |
+| Image | Obsah |
+| --- | --- |
+| `pwe-base` | jen běhové knihovny enginu (Perl, moduly, `sass`, ImageMagick, `tzdata`) — bez DB ovladačů; základ image webu bez databáze |
+| `pwe-mariadb`, `pwe-mysql`, `pwe-postgres` | `pwe-base` + DB ovladač profilu; základ image webu s databází |
+| `pwe-debugger` | `pwe-base` + všechny DB ovladače + ladicí nástroje (`Perl::LanguageServer`, `Perl::Critic`, klienti DB, …); image nástrojů (`make test`, `check`, `cgi`, …) |
+| `pwe-example-static` | `pwe-base` + engine + vzorový web `example.web` |
+| `pwe-example-mariadb`, `pwe-example-mysql`, `pwe-example-postgres` | `pwe-<profil>` + engine + vzorový web `example-db.web` |
 
-Image staví a publikuje pipeline GitHub Actions (`.github/workflows/images.yml`) při každém `push`,
-který mění engine (`PWE/`) nebo definici image, s tagem podle větve; před publikací v čerstvém
-`pwe-base` spustí testy enginu a kouřové kontroly všech image pro `linux/amd64` i `linux/arm64`
-a publikuje jen běh nad hlavou větve, pull request jen sestaví a otestuje.
-Tagy se přepisují (tag verze `pwe:<verze>` publikuje běh z kterékoli větve) a nové balíčky jsou
+Image `pwe-example-*` jsou **ukázka a nejsou určené pro veřejný provoz**: každý návštěvník vzorového
+webu je ve skupině `admin` včetně generátoru kódu `pweCreator`.
+
+Každý image má právě dva tagy: **verzi enginu** (obsah `PWE/VERSION`, např. `2.2.1`) a **`latest`**;
+tagy podle větve gitu neexistují a nástroje berou tag z `PWE/VERSION`. Image staví pipeline GitHub
+Actions (`.github/workflows/images.yml`) při každém `push`, který mění engine (`PWE/`), vzorové weby
+nebo definici image: v čerstvém `pwe-base` spustí testy enginu a kouřové kontroly všech image.
+**Publikuje jen běh nad výchozí větví repozitáře a nad větvemi z proměnné repozitáře
+`PUBLISH_BRANCHES`** (po kontrolách `linux/amd64` i `linux/arm64`, jen nad hlavou větve); ostatní
+větve a pull requesty image jen sestaví a otestují.
+Oba tagy se přepisují (přesný kód určuje digest) a nové balíčky jsou
 v `ghcr.io` soukromé, dokud jim vlastník nenastaví viditelnost —
 [`docs/17-nasazeni.md`](docs/17-nasazeni.md#registr-a-tagy). Lokálně image sestaví `make images`
-a zkontroluje `make images-check`. Image webu vzniká z generovaného `Dockerfile`: běhové prostředí
-z `pwe-<profil>` (včetně vstupního skriptu — web vlastní `entrypoint.sh` nemá), engine zkopírovaný
-z `pwe` (lze připnout na verzi) a adresář webu. Image běží v UTC; časové pásmo pro požadavky předává
-webserver (`fastcgi_param TZ`) nebo `/etc/localtime` kontejneru — samotná proměnná `TZ` nestačí. Podrobnosti, nginx, proměnné prostředí, Kubernetes a produkční checklist:
+a zkontroluje `make images-check`. Image webu vzniká z generovaného `Dockerfile` (šablona je jen
+v `PWE/tools/new-webapp.pl`) a staví se **vždy z kořene repozitáře**: závislostní image (`pwe-<profil>`,
+web bez databáze `pwe-base`) + engine zkopírovaný z adresáře `PWE/` + adresář webu; vstupní skript dědí
+ze základu (web vlastní `entrypoint.sh` nemá). Závislosti lze připnout na verzi
+(`--build-arg PWE_IMAGE_TAG=2.2.1`), verzi enginu v image určuje pracovní kopie. Vývojový stack
+(`make run`) pouští závislostní image profilu nad namountovaným repozitářem; přímé
+`COMPOSE_PROFILES=static docker compose up` potřebuje navíc `PWE_FCGI_IMAGE=pwe-base` (`make run` to
+nastavuje sám).
+Engine na `SIGTERM` pořádaně skončí (rozpracovaný request doběhne) a poslouchá na
+`FCGI_SOCKET_PATH` — TCP (`:7779`, `127.0.0.1:7779`) nebo unix socket. Image běží v UTC; časové pásmo
+pro požadavky předává webserver (`fastcgi_param TZ`) nebo `/etc/localtime` kontejneru — samotná
+proměnná `TZ` nestačí. Podrobnosti, nginx, proměnné prostředí, Kubernetes a produkční checklist:
 [`docs/17-nasazeni.md`](docs/17-nasazeni.md); nasazení do Kubernetes (`make k8s-deploy K8S=static`,
 vždy s výslovným `KUBE_CONTEXT`): [`kubernetes/README.md`](kubernetes/README.md).
 Ladění ve VS Code: [`docs/16-nastroje.md`](docs/16-nastroje.md).

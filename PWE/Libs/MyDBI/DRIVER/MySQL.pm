@@ -8,6 +8,7 @@ Libs::MyDBI::DRIVER::MySQL - driver pro MySQL/MariaDB (DBD::mysql), oddelene spo
 
 use strict;
 use DBI;
+use Digest::MD5 ();
 
 =head2 B<[Public] new()>
 
@@ -96,6 +97,9 @@ sub connect {
         # INCLUDE DBIOBJECT
         $self->{'DBI_R'} = $dbi_r;
         $self->{'DBI_W'} = $dbi_w;
+
+        # Nove spojeni zadny zamek spojeni nedrzi (viz sessionLock).
+        delete($self->{'session_lock_reconnect'});
 
         # SET ENCODING
         $self->{'DBI_R'}->do("SET NAMES $self->{'encoding'}");
@@ -378,6 +382,104 @@ sub ping {
     # DBD::mysql ping = mysql_ping bez vysledkove sady (levnejsi nez SELECT 1)
     return 1 if ($self->{'DBI_R'}->ping and $self->{'DBI_W'}->ping);
     return 0;
+}
+
+=head2 B<[Public] sessionLock($name,$timeout)>
+
+    Ziska zamek vazany na databazove spojeni (GET_LOCK) se jmenem odvozenym od $name a nazvu
+    databaze (viz sessionLockName). Na zamek ceka nejvys $timeout sekund (cele cislo, vychozi 0 =
+    jen jeden pokus bez cekani; ceka server, ne Perl). Vraci:
+    1     - zamek ziskan,
+    0     - do $timeout sekund ho drzi jine spojeni,
+    undef - chyba (dotaz selhal nebo GET_LOCK vratil NULL); chyba je pak v getError()/error().
+
+    Zamek se bere nad zapisovym spojenim DBI_W - tim, kterym Libs::MyDBI provadi kroky migrace
+    a zapisuje tabulku dbversion: kdyz toto spojeni zanikne (pad procesu, SIGKILL, vypadek site),
+    server zamek uvolni sam a migrace zaroven nemuze pokracovat. Zamek neni soucasti transakce,
+    commit ani rollback ho neuvolni; uvolnuje ho sessionUnlock() nad stejnym spojenim, odpojeni
+    (disconnect/reconnect) nebo konec procesu. Totez spojeni muze zamek ziskat opakovane, pak ho
+    musi stejnekrat uvolnit.
+
+    Po dobu drzeni zamku je na DBI_W vypnuty tichy reconnect ovladace (mysql_auto_reconnect):
+    spojeni, ktere zaniklo, by se jinak samo obnovilo bez zamku a migrace by pokracovala
+    nechranena. Puvodni hodnotu vraci prvni sessionUnlock().
+
+    Pouziva Libs::MyDBI::checkDbversion jako zamek migrace.
+
+=cut
+
+sub sessionLock {
+    my ($self, $name, $timeout) = @_;
+
+    $timeout = ((defined($timeout) and ($timeout =~ /^\d+$/)) ? int($timeout) : 0);
+
+    my ($got) = $self->{'DBI_W'}->selectrow_array("SELECT GET_LOCK(?, $timeout)", undef, $self->sessionLockName($name));
+    $self->setError($self->{'DBI_W'});
+    return undef if ($self->error());
+
+    # NULL = zamek se nepodarilo ziskat z jineho duvodu nez vyprseni casu (napr. nedostatek pameti
+    # serveru nebo zruseny dotaz); DBI to jako chybu nehlasi, ulozime ji sami.
+    unless (defined($got)) {
+        $self->{'err'}    = -1;
+        $self->{'errstr'} = "GET_LOCK('" . $self->sessionLockName($name) . "') returned NULL";
+        $self->{'state'}  = undef;
+        return undef;
+    }
+
+    # Tichy reconnect ovladace DBD::mysql (mysql_auto_reconnect - ovladac ho sam zapina pri
+    # AutoCommit 1 a promenne GATEWAY_INTERFACE v prostredi) by zamek ztratil bez povsimnuti:
+    # nove spojeni zamek nema a migrace by pokracovala bez nej. Po dobu drzeni zamku ho vypneme,
+    # ztracene spojeni pak skonci chybou dotazu; puvodni hodnotu vraci sessionUnlock.
+    if ($got) {
+        $self->{'session_lock_reconnect'} = $self->{'DBI_W'}->{'mysql_auto_reconnect'} unless (exists($self->{'session_lock_reconnect'}));
+        $self->{'DBI_W'}->{'mysql_auto_reconnect'} = 0;
+    }
+
+    return ($got ? 1 : 0);
+}
+
+=head2 B<[Public] sessionUnlock($name)>
+
+    Uvolni zamek ziskany pres sessionLock($name) - RELEASE_LOCK nad stejnym spojenim DBI_W.
+    Vraci 1, pokud byl zamek uvolnen, jinak 0 (toto spojeni zamek nedrzi, zamek neexistuje nebo
+    dotaz selhal; chyba dotazu je v getError()/error()). Vraci take puvodni nastaveni ticheho
+    reconnectu ovladace (mysql_auto_reconnect), ktere sessionLock vypnul.
+
+=cut
+
+sub sessionUnlock {
+    my ($self, $name) = @_;
+
+    my ($released) = $self->{'DBI_W'}->selectrow_array("SELECT RELEASE_LOCK(?)", undef, $self->sessionLockName($name));
+    $self->setError($self->{'DBI_W'});
+
+    # Zamek uz nedrzime (nebo ho spojeni ztratilo): tichy reconnect ovladace se vraci do puvodniho stavu.
+    $self->{'DBI_W'}->{'mysql_auto_reconnect'} = delete($self->{'session_lock_reconnect'}) if (exists($self->{'session_lock_reconnect'}));
+
+    return ($released ? 1 : 0);
+}
+
+=head2 B<[Private] sessionLockName($name)>
+
+    Vraci jmeno zamku pro GET_LOCK/RELEASE_LOCK: "pwe.<name>.<database>". Jmena zamku jsou v MySQL
+    a MariaDB spolecna pro cely server, proto obsahuji nazev databaze - weby v ruznych databazich
+    tehoz serveru se navzajem neblokuji. MySQL povoluje nejvys 64 znaku; delsi jmeno se nahradi
+    otiskem "pwe.<md5 hex puvodniho jmena>" (36 znaku).
+
+=cut
+
+sub sessionLockName {
+    my ($self, $name) = @_;
+
+    my $lock = "pwe.$name.$self->{'database'}";
+
+    if (length($lock) > 64) {
+        my $bytes = $lock;
+        utf8::encode($bytes) if (utf8::is_utf8($bytes));
+        $lock = "pwe." . Digest::MD5::md5_hex($bytes);
+    }
+
+    return $lock;
 }
 
 =head2 B<[Public] getMetaData()>

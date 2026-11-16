@@ -1,29 +1,37 @@
-# Image enginu PWE - jeden vicestupnovy Dockerfile, kazdy stage je jeden publikovany image:
+# Zavislostni image PWE - jeden vicestupnovy Dockerfile, kazdy stage je jeden publikovany image:
 #
 #   stage      image          obsah
 #   --------   ------------   ----------------------------------------------------------------------
-#   base       pwe-base       Ubuntu + JEN behove knihovny enginu + entrypoint (bez kodu enginu,
-#                             bez DB ovladacu, bez ladicich a build nastroju)
-#   pwe        pwe            base + kod enginu v /PWE/PWE ("nosic" enginu; tag = vetev i verze)
-#   static     pwe-static     base beze zmeny (profil pro weby bez databaze)
+#   base       pwe-base       Ubuntu + JEN behove knihovny enginu + entrypoint (bez DB ovladacu, bez ladicich
+#                             a build nastroju)
 #   mariadb    pwe-mariadb    base + DBD::mysql + DBD::MariaDB
 #   mysql      pwe-mysql      base + DBD::mysql
 #   postgres   pwe-postgres   base + DBD::Pg
 #   debugger   pwe-debugger   base + vsechny tri DB ovladace + ladici a vyvojove nastroje
 #
-# Profilove image (static, mariadb, mysql, postgres) a debugger NEOBSAHUJI kod enginu:
-#   - ve vyvojovem stacku (docker-compose.yml) se koren repozitare mountuje do /PWE,
-#   - image webu si engine kopiruje z image pwe:  COPY --from=<registr>/pwe:<tag> /PWE/PWE /PWE/PWE
-#     (viz webapps/<web>/Dockerfile).
+# Zadny z techto image neobsahuje kod enginu (/PWE/PWE v nich neni) ani web: jsou to jen nosice zavislosti.
+# Engine a web dostavaji
+#   - mountem repozitare do /PWE (vyvojovy stack docker-compose.yml, nastroje make test/check/cgi...), nebo
+#   - v image webu: webapps/<web>/Dockerfile (sablona v PWE/tools/new-webapp.pl) vychazi ze zavislostniho image
+#     (web bez databaze z pwe-base, web s databazi z pwe-<profil>) a engine i web kopiruje z kontextu sestaveni
+#     (koren repozitare).
+# Vsechny maji z base ENTRYPOINT /usr/local/bin/entrypoint.sh, ENV PWE_CONF_pwe_core=/PWE/PWE a
+# CMD perl /PWE/PWE/pwe.fcgi; PWE_CONF_pwe_home a PWE_PROFILE nastavuje az image webu (nebo compose).
+#
+# Image vzorovych webu (pwe-example-static, pwe-example-mariadb, pwe-example-mysql, pwe-example-postgres)
+# se tady NESTAVI: jsou to image webu jako kazdy jiny a stavi je primo Dockerfile vzoroveho webu
+# (webapps/example.web/Dockerfile, webapps/example-db.web/Dockerfile) - viz cile example-* v docker-bake.hcl.
+#
+# Tagy: kazdy image ma prave dva - <verze> (obsah PWE/VERSION) a latest (viz docker-bake.hcl).
 #
 # Build (kontext = koren repozitare); bezne pres docker-bake.hcl, ktery zna jmena a tagy vsech image:
-#   PWE/tools/build-images.sh                    # vsech 7 image, tag podle vetve, nacte do lokalniho Dockeru
-#   PWE/tools/build-images.sh pwe debugger       # jen vybrane cile
-#   docker buildx bake -f docker-bake.hcl --load # totez bez skriptu (REGISTRIES/TAG/VERSION z prostredi)
+#   PWE/tools/build-images.sh                    # vsech 9 image (5 zavislostnich + 4 vzorove weby), nacte je do lokalniho Dockeru
+#   PWE/tools/build-images.sh base debugger      # jen vybrane cile
+#   REGISTRIES=ghcr.io/kukam VERSION="$(cat PWE/VERSION)" docker buildx bake -f docker-bake.hcl --load   # totez bez skriptu
 #   docker build --target base -t pwe-base -f PWE/docker/Dockerfile .     # jeden stage rucne
 #
-# Poradi vrstev: zavislosti (apt) jsou pred kodem, takze zmena enginu znovu stavi jen COPY vrstvy
-# stage pwe a zadny apt-get.
+# Zmena kodu enginu ani webu tyto image nemeni (z kontextu berou jen PWE/docker/entrypoint.sh): digest se
+# meni jen se zavislostmi, takze je image webu sdileji jako spolecny zaklad.
 
 ARG UBUNTU_IMAGE=ubuntu:26.04
 
@@ -105,8 +113,8 @@ RUN set -eux; \
          -MMail::RFC822::Address -MCz::Cstocs -MLWP::MediaTypes -MIO::Socket::SSL -MAuthen::SASL \
          -MImage::Magick -MCrypt::OpenSSL::RSA -MURI -MHTML::Parser -e 1
 
-# Koren enginu v kontejneru. Kod enginu tu NENI: prida ho stage pwe, mount repozitare do /PWE
-# (vyvojovy stack) nebo COPY --from=...pwe v Dockerfile webu.
+# Koren enginu v kontejneru. Kod enginu tu NENI: prida ho image webu (webapps/<web>/Dockerfile ho kopiruje
+# z kontextu sestaveni) nebo mount repozitare do /PWE (vyvojovy stack, nastroje).
 ENV PWE_CONF_pwe_core=/PWE/PWE
 
 # Entrypoint (jediny zdroj pravdy: PWE/docker/entrypoint.sh): v adresari webu pripravi
@@ -120,12 +128,13 @@ COPY --chmod=0755 PWE/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 # je PWE_SOURCE konstantni, takze se to projevi jen pri prvnim buildu forku.
 # Image Ubuntu ma vlastni popisky title=ubuntu, version=26.04 a created=<vznik image Ubuntu>, ktere by
 # se jinak zdedily a o image PWE by tvrdily nepravdu: title se prepisuje v kazdem stage, version a
-# created se tu vyprazdni (verzi enginu nese jen image pwe; cas buildu a commit doplnuje docker-bake.hcl
-# z promennych CREATED a REVISION) a puvod zakladu se zapise do base.name.
+# created se tu vyprazdni a puvod zakladu se zapise do base.name. Verzi enginu, commit a cas sestaveni
+# zavislostni image nenesou (engine neobsahuji; jejich digest se tak meni jen se zavislostmi) - tyto
+# popisky maji az image vzorovych webu (docker-bake.hcl) a image webu si je nastavuje sam.
 ARG UBUNTU_IMAGE
 ARG PWE_SOURCE=https://github.com/kukam/PWE
 LABEL org.opencontainers.image.title="pwe-base" \
-      org.opencontainers.image.description="PWE (Perl Web Engine) - zakladni image: behove knihovny enginu bez kodu enginu a bez databazovych ovladacu" \
+      org.opencontainers.image.description="PWE (Perl Web Engine) - zavislostni image: behove knihovny enginu (bez kodu enginu, bez webu a bez databazovych ovladacu); zaklad image webu bez databaze" \
       org.opencontainers.image.source="${PWE_SOURCE}" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.version="" \
@@ -138,46 +147,14 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["perl", "/PWE/PWE/pwe.fcgi"]
 
 # =============================================================================================
-# pwe - nosic kodu enginu (/PWE/PWE), z nej si image webu engine kopiruji
+# Stage mariadb, mysql a postgres = base + ovladac databaze profilu, nic dalsiho: zadny kod enginu, zadny
+# web, zadne PWE_CONF_pwe_home ani PWE_PROFILE. ENTRYPOINT, CMD, WORKDIR a PWE_CONF_pwe_core se dedi z base.
+# Z techto image vychazi image webu s databazi (FROM pwe-<profil> v webapps/<web>/Dockerfile) a bezi v nich
+# sluzba fcgi vyvojoveho stacku (engine i web z mountu repozitare).
 # =============================================================================================
-FROM base AS pwe
-
-# Engine se kopiruje po castech: PWE/t (testy) a PWE/docker (build image) do image nepatri.
-# Poradi od nejmene po nejcasteji menene, at se pri zmene kodu znovu stavi co nejmene vrstev.
-COPY LICENSE /PWE/LICENSE
-COPY PWE/assets /PWE/PWE/assets
-COPY PWE/templates /PWE/PWE/templates
-COPY PWE/tools /PWE/PWE/tools
-COPY PWE/Entities /PWE/PWE/Entities
-COPY PWE/Services /PWE/PWE/Services
-COPY PWE/Sites /PWE/PWE/Sites
-COPY PWE/Pages /PWE/PWE/Pages
-COPY PWE/Libs /PWE/PWE/Libs
-COPY PWE/pwe.fcgi PWE/debug.cgi PWE/favicon.ico PWE/README.md PWE/CHANGELOG.md PWE/VERSION /PWE/PWE/
-
-# Verze enginu = obsah PWE/VERSION; build ji predava jako PWE_VERSION (popisek a tag pwe:<verze>).
-# Kdyz se predana verze lisi od souboru v image, build spadne - tag verze nesmi ukazovat na jiny kod.
-ARG PWE_VERSION=""
-RUN set -eu; \
-    v="$(tr -d '[:space:]' < /PWE/PWE/VERSION)"; \
-    if [ -n "${PWE_VERSION}" ] && [ "${PWE_VERSION}" != "$v" ]; then \
-        echo "PWE_VERSION=${PWE_VERSION} neodpovida PWE/VERSION=$v" >&2; exit 1; \
-    fi
-
-LABEL org.opencontainers.image.title="pwe" \
-      org.opencontainers.image.description="PWE (Perl Web Engine) - engine v /PWE/PWE nad zakladnim image pwe-base (zdroj pro COPY --from v image webu)" \
-      org.opencontainers.image.version="${PWE_VERSION}"
 
 # =============================================================================================
-# static - profil pro weby bez databaze (obsahem shodny s base, lisi se jen popiskem)
-# =============================================================================================
-FROM base AS static
-
-LABEL org.opencontainers.image.title="pwe-static" \
-      org.opencontainers.image.description="PWE (Perl Web Engine) - behove prostredi pro weby bez databaze (bez kodu enginu)"
-
-# =============================================================================================
-# mariadb - base + ovladace MariaDB (engine pouziva dbi:mysql; DBD::MariaDB je k dispozici kodu webu)
+# mariadb - ovladace MariaDB (engine pouziva dbi:mysql; DBD::MariaDB je k dispozici kodu webu)
 # =============================================================================================
 FROM base AS mariadb
 
@@ -193,10 +170,10 @@ RUN set -eux; \
     perl -MDBD::mysql -MDBD::MariaDB -e 1
 
 LABEL org.opencontainers.image.title="pwe-mariadb" \
-      org.opencontainers.image.description="PWE (Perl Web Engine) - behove prostredi pro weby s MariaDB (bez kodu enginu)"
+      org.opencontainers.image.description="PWE (Perl Web Engine) - zavislostni image: behove knihovny enginu a ovladace MariaDB (bez kodu enginu a bez webu); zaklad image webu s MariaDB"
 
 # =============================================================================================
-# mysql - base + ovladac MySQL
+# mysql - ovladac MySQL
 # =============================================================================================
 FROM base AS mysql
 
@@ -211,10 +188,10 @@ RUN set -eux; \
     perl -MDBD::mysql -e 1
 
 LABEL org.opencontainers.image.title="pwe-mysql" \
-      org.opencontainers.image.description="PWE (Perl Web Engine) - behove prostredi pro weby s MySQL (bez kodu enginu)"
+      org.opencontainers.image.description="PWE (Perl Web Engine) - zavislostni image: behove knihovny enginu a ovladac MySQL (bez kodu enginu a bez webu); zaklad image webu s MySQL"
 
 # =============================================================================================
-# postgres - base + ovladac PostgreSQL
+# postgres - ovladac PostgreSQL
 # =============================================================================================
 FROM base AS postgres
 
@@ -229,10 +206,11 @@ RUN set -eux; \
     perl -MDBD::Pg -e 1
 
 LABEL org.opencontainers.image.title="pwe-postgres" \
-      org.opencontainers.image.description="PWE (Perl Web Engine) - behove prostredi pro weby s PostgreSQL (bez kodu enginu)"
+      org.opencontainers.image.description="PWE (Perl Web Engine) - zavislostni image: behove knihovny enginu a ovladac PostgreSQL (bez kodu enginu a bez webu); zaklad image webu s PostgreSQL"
 
 # =============================================================================================
-# debugger - vyvojovy image: vsechny DB ovladace + nastroje pro ladeni (do produkce nepatri)
+# debugger - vyvojovy image: vsechny DB ovladace + nastroje pro ladeni (do produkce nepatri);
+#            bez kodu enginu a bez webu - bezi vzdy nad mountem repozitare do /PWE
 # =============================================================================================
 FROM base AS debugger
 
@@ -283,7 +261,15 @@ RUN set -eux; \
 
 # cpanm z Ubuntu stahuje ve vychozim stavu distribuce nesifrovane (http://www.cpan.org) a bez overeni
 # podpisu. --from = jediny zdroj indexu i archivu pres HTTPS (totez co --mirror <url> --mirror-only).
+# Omezeni: index zrcadla zna od kazdeho modulu jen nejnovejsi verzi, takze v tomto rezimu nejde verzi
+# pripnout - "cpanm Modul@1.50" skonci chybou "Found Modul <nejnovejsi> which doesn't satisfy == 1.50"
+# (a "cpanm --info Modul@1.50" bez varovani vypise nejnovejsi verzi). Urcitou verzi nainstaluje uplna
+# adresa archivu pres HTTPS:
+#   cpanm https://cpan.metacpan.org/authors/id/A/AU/AUTOR/Dist-1.50.tar.gz
+# (cpan.metacpan.org drzi i verze uz smazane z CPAN; zkracene "cpanm AUTOR/Dist-1.50.tar.gz" funguje jen
+# pro verze, ktere na www.cpan.org jeste jsou). Jednorazove "PERL_CPANM_OPT= cpanm Modul@1.50" verzi
+# najde taky, ale hleda pres cpanmetadb a starsi verze stahuje nesifrovane z http://backpan.perl.org.
 ENV PERL_CPANM_OPT="--from https://www.cpan.org/"
 
 LABEL org.opencontainers.image.title="pwe-debugger" \
-      org.opencontainers.image.description="PWE (Perl Web Engine) - vyvojovy image: vsechny databazove ovladace, Perl::LanguageServer, perlcritic, perltidy, cpanm a ladici nastroje (bez kodu enginu)"
+      org.opencontainers.image.description="PWE (Perl Web Engine) - vyvojovy image: vsechny databazove ovladace, Perl::LanguageServer, perlcritic, perltidy, cpanm a ladici nastroje (bez kodu enginu a bez webu)"
