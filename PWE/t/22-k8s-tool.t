@@ -48,7 +48,7 @@ plan skip_all => 'chybi bash' unless ($BASH);
 my $ROOT     = PWE::TestEnv::root();    # adresar enginu PWE/ (v kontejneru /PWE/PWE)
 my $REPOROOT = abs_path("$ROOT/..");     # koren repozitare
 plan skip_all => 'chybi kubernetes/values-static.yml (repozitar bez adresare kubernetes/)'
-    unless (-f "$REPOROOT/kubernetes/values-static.yml");
+    unless (-f "$REPOROOT/kubernetes/values-example-static.yml");
 
 sub slurp { my ($f) = @_; open(my $fh, '<', $f) or return ''; local $/; my $s = <$fh>; close($fh); return defined($s) ? $s : ''; }
 
@@ -74,8 +74,12 @@ foreach my $f (qw(k8s.sh lib/images.sh)) {
     copy("$ROOT/tools/$f", "$REPO/PWE/tools/$f") or die "Nelze zkopirovat tools/$f: $!";
     chmod(0755, "$REPO/PWE/tools/$f");
 }
-foreach my $f (qw(values-static.yml values-generic.yml secrets-generic.example.yml)) {
-    copy("$REPOROOT/kubernetes/$f", "$REPO/kubernetes/$f") or die "Nelze zkopirovat kubernetes/$f: $!";
+# Vzorova nasazeni se v repozitari jmenuji podle image (example-static, example-mariadb, ...). Test je do
+# docasneho stromu kopiruje pod kratkymi nazvy static a generic - nazev nasazeni je jen nazev souboru s hodnotami.
+my %K8S_FILES = ('values-example-static.yml' => 'values-static.yml', 'values-example-mariadb.yml' => 'values-generic.yml',
+    'secrets-example-mariadb.example.yml' => 'secrets-generic.example.yml');
+foreach my $f (sort keys %K8S_FILES) {
+    copy("$REPOROOT/kubernetes/$f", "$REPO/kubernetes/$K8S_FILES{$f}") or die "Nelze zkopirovat kubernetes/$f: $!";
 }
 # Verze enginu docasneho stromu: vychozi tag image PWE (pwe_image_tag cte PWE/VERSION vedle images.sh).
 # Zamerne jina nez v repozitari - tag se nesmi brat odjinud.
@@ -242,7 +246,9 @@ sub k8s {
     my $rc = ($? & 127) ? 128 + ($? & 127) : ($? >> 8);
 
     my $want_ctx = defined($env->{'KUBE_CONTEXT'}) ? $env->{'KUBE_CONTEXT'} : $FILE_CTX;
-    my $want_ns  = defined($env->{'K8S_NAMESPACE'}) ? $env->{'K8S_NAMESPACE'} : 'pwe';
+    # vychozi namespace = nazev releasu pwe-<nazev>: kazde nasazeni ma vlastni
+    my $dep_name = (defined($args[1]) and $args[1] !~ /^-/) ? $args[1] : (defined($env->{'K8S'}) ? $env->{'K8S'} : '');
+    my $want_ns  = defined($env->{'K8S_NAMESPACE'}) ? $env->{'K8S_NAMESPACE'} : "pwe-$dep_name";
     foreach my $line (split(/\n/, slurp($LOG))) {
         my ($p, $kc, @a) = split(/\t/, $line, -1);
         next unless (defined($p) and ($p eq 'helm' or $p eq 'kubectl'));
@@ -476,7 +482,14 @@ is($rc, 0, 'deploy static: kod 0');
 my ($up) = grep { $_->[1] eq 'upgrade' } calls('helm');
 ok($up, 'deploy: helm upgrade');
 ok(has_pair($up, '--kube-context', 'ctx-test'), 'deploy: --kube-context ctx-test');
-ok(has_pair($up, '--namespace', 'pwe'),         'deploy: vychozi namespace pwe');
+ok(has_pair($up, '--namespace', 'pwe-static'),  'deploy: vychozi namespace = nazev releasu (kazde nasazeni ma vlastni namespace)');
+($rc, $out, $err) = k8s({%CTX, 'K8S_NAMESPACE' => 'spolecny'}, 'deploy', 'static');
+{
+    my ($u) = grep { $_->[1] eq 'upgrade' } calls('helm');
+    ok($u && has_pair($u, '--namespace', 'spolecny'), 'deploy: K8S_NAMESPACE vychozi namespace prepise');
+}
+($rc, $out, $err) = k8s({%CTX}, 'deploy', 'static');
+($up) = grep { $_->[1] eq 'upgrade' } calls('helm');
 ok(has_arg($up, '--install') && has_arg($up, '--wait'), 'deploy: --install --wait');
 ok(has_pair($up, '-f', "$REPO/kubernetes/values-static.yml"), 'deploy: -f values-static.yml');
 ok(has_pair($up, '--set-string', "generic.pweImageTag=v-test\@$DIGEST"), 'deploy: tag image s digestem');
@@ -849,7 +862,7 @@ is($rc, 2, 'release existuje a soubor s hesly chybi: kod 2');
 {
     my @st = grep { $_->[1] eq 'status' } calls('helm');
     ok(scalar(@st) && !grep({ !has_pair($_, '--kube-context', 'ctx-test') } @st), 'ochrana hesel: helm status s --kube-context ctx-test');
-    ok(scalar(@st) && !grep({ !has_pair($_, '--namespace', 'pwe') } @st), 'ochrana hesel: helm status s --namespace');
+    ok(scalar(@st) && !grep({ !has_pair($_, '--namespace', 'pwe-generic') } @st), 'ochrana hesel: helm status s --namespace');
 }
 like($err, qr/get values pwe-generic/, 'chybejici hesla: rada, jak soubor obnovit');
 ok(!-e $SECRETS, 'chybejici hesla u existujiciho releasu: nova se nevygeneruji');
@@ -881,7 +894,7 @@ foreach my $t (
     ['helm status selze, i kdyz svazek neni', {'FAKE_HELM_STATUS_ERR' => 'Error: query: failed to query with labels: secrets is forbidden'},
         qr/stav releasu pwe-generic v clusteru nelze zjistit \(Error: query: failed to query with labels: secrets is forbidden\)/],
     ['release neni, kubectl selze', {'FAKE_KUBECTL_RC' => 1},
-        qr/svazky releasu pwe-generic v clusteru nelze zjistit \(Unable to connect to the server: dial tcp: i\/o timeout\).*kubectl --context ctx-test -n pwe get persistentvolumeclaims -l app\.kubernetes\.io\/instance=pwe-generic/],
+        qr/svazky releasu pwe-generic v clusteru nelze zjistit \(Unable to connect to the server: dial tcp: i\/o timeout\).*kubectl --context ctx-test -n pwe-generic get persistentvolumeclaims -l app\.kubernetes\.io\/instance=pwe-generic/],
     ['release neni, kubectl neni nainstalovany', {'KUBECTL' => 'kubectl-neni-nainstalovany'},
         qr/svazky releasu pwe-generic v clusteru nelze zjistit \(program kubectl-neni-nainstalovany neni nainstalovany\)/],
 ) {
@@ -988,7 +1001,7 @@ $FILE_CTX = 'muj-cluster';
 ($rc, $out, $err) = k8s({'FAKE_DIGEST' => $DIGEST}, 'deploy', 'static');
 is($rc, 0, 'local.env.example jako local.env: vzorove nasazeni projde') or diag($err);
 ($up) = grep { $_->[1] eq 'upgrade' } calls('helm');
-ok($up && has_pair($up, '--kube-context', 'muj-cluster') && has_pair($up, '--namespace', 'pwe')
+ok($up && has_pair($up, '--kube-context', 'muj-cluster') && has_pair($up, '--namespace', 'pwe-static')
         && has_pair($up, '--set-string', 'generic.pweDomain=example.com') && has_pair($up, '--set-string', 'generic.pweIssuer=letsencrypt'),
     'local.env.example: kontext, namespace, domena a issuer ze vzoru');
 is_deeply([digest_refs()], ["ghcr.io/kukam/pwe-example-static:$VERSION"], 'local.env.example: registr ani tag nenastavuje (vychozi image vzoroveho webu)');
@@ -1218,7 +1231,7 @@ ok(scalar(calls('kubectl')) && !grep({ !has_pair($_, '--context', 'ctx-test') } 
 {
     my @st = grep { $_->[1] eq 'status' } calls('helm');
     ok(scalar(@st) && !grep({ !has_pair($_, '--kube-context', 'ctx-test') } calls('helm')), 'status: helm status (a kazdy helm) s --kube-context ctx-test');
-    ok(scalar(@st) && !grep({ !has_pair($_, '--namespace', 'pwe') } cluster_calls()), 'status: kazdy helm i kubectl s --namespace pwe');
+    ok(scalar(@st) && !grep({ !has_pair($_, '--namespace', 'pwe-generic') } cluster_calls()), 'status: kazdy helm i kubectl s --namespace pwe-generic (namespace nasazeni)');
 }
 
 ($rc, $out, $err) = k8s({%CTX}, 'logs', 'static', '-c', 'fcgi');
@@ -1247,7 +1260,7 @@ unlink($SECRETS);
 ($rc, $out, $err) = k8s({%CTX, 'FAKE_PVC' => 'data-pwe-generic-mariadb-0', 'FAKE_TLS' => 'pwe-generic-web-tls'}, 'delete', 'generic');
 is($rc, 2, 'delete bez mistniho secrets-generic.yml: kod 2 (hesla by zustala jen ve svazku)');
 like($err, qr/secrets-generic\.yml na tomto stroji chybi.*get values pwe-generic -o yaml.*K8S_DELETE_WITHOUT_SECRETS=1/s, 'delete bez souboru s hesly: rada ulozit hesla a vyslovna vyjimka');
-like($err, qr/helm --kube-context ctx-test -n pwe get values pwe-generic/, 'delete bez souboru s hesly: rada jmenuje kontext a namespace vyslovne');
+like($err, qr/helm --kube-context ctx-test -n pwe-generic get values pwe-generic/, 'delete bez souboru s hesly: rada jmenuje kontext a namespace vyslovne');
 ok(!grep({ $_->[1] eq 'uninstall' } calls('helm')), 'delete bez souboru s hesly: helm uninstall se nevola');
 is(scalar(cluster_calls()), 0, 'delete bez souboru s hesly: helm ani kubectl se nevolaji');
 ($rc, $out, $err) = k8s({%CTX, 'FAKE_PVC' => 'data-pwe-generic-mariadb-0'}, 'delete', 'generic', '--dry-run');
@@ -1323,7 +1336,9 @@ ok(grep({ $_ eq 'https://www.mujweb.test/' } map { $_->[-1] } calls('curl')), 't
 # ---------------------------------------------------------------------------------------------
 # values soubory vzorovych nasazeni (kontrakt s image vzoroveho webu a s enginem od verze 2.2.1)
 # ---------------------------------------------------------------------------------------------
-foreach my $t (['static', 'pwe-example-static', 'static', 'example.web'], ['generic', 'pwe-example-mariadb', 'mariadb', 'example-db.web']) {
+# Nasazeni se jmenuje podle image bez predpony pwe-: release i adresa webu pak jsou pwe-example-<varianta>.
+foreach my $t (['example-static', 'pwe-example-static', 'static', 'example.web'], ['example-mariadb', 'pwe-example-mariadb', 'mariadb', 'example-db.web'],
+    ['example-mysql', 'pwe-example-mysql', 'mysql', 'example-db.web'], ['example-postgres', 'pwe-example-postgres', 'postgres', 'example-db.web']) {
     my ($name, $image, $profile, $web) = @{$t};
     my $v = slurp("$REPOROOT/kubernetes/values-$name.yml");
     like($v, qr/^  pweImage: \Q$image\E\s/m,     "values-$name.yml: image vzoroveho webu $image (knihovny, engine i web)");
@@ -1347,7 +1362,23 @@ foreach my $t (['static', 'pwe-example-static', 'static', 'example.web'], ['gene
     is(scalar(() = $v =~ m{command: \["bash", "-c", "exec 3<>/dev/tcp/127\.0\.0\.1/7779"\]}g), 3, "values-$name.yml: tri sondy enginu zkouseji 127.0.0.1:7779 zevnitr kontejneru");
     like($v, qr/^networkPolicies:\n(?:.*\n)*?  web:\n(?:.*\n)*?          - port: 80\n/m, "values-$name.yml: NetworkPolicy webu (port 80) zustava");
 }
-like(slurp("$REPOROOT/kubernetes/values-generic.yml"), qr/^  mariadb:\n(?:.*\n)*?          - port: 3306\n/m, 'values-generic.yml: NetworkPolicy databaze (port 3306) zustava');
+# Databazove varianty: StatefulSet a NetworkPolicy databaze, heslo enginu z tehoz Secretu jako heslo databaze,
+# vzor hesel pro kazdou variantu a zadny pozustatek jine databaze.
+foreach my $d (['mariadb', 3306, 'MARIADB_PASSWORD', '/var/lib/mysql'], ['mysql', 3306, 'MYSQL_PASSWORD', '/var/lib/mysql'], ['postgres', 5432, 'POSTGRES_PASSWORD', '/var/lib/postgresql']) {
+    my ($db, $port, $pwkey, $datadir) = @{$d};
+    my $v   = slurp("$REPOROOT/kubernetes/values-example-$db.yml");
+    my $sec = slurp("$REPOROOT/kubernetes/secrets-example-$db.example.yml");
+    like($v, qr/^statefulSets:\n  \Q$db\E:\n/m, "values-example-$db.yml: StatefulSet databaze $db");
+    like($v, qr/^  \Q$db\E:\n(?:.*\n)*?          - port: $port\n/m, "values-example-$db.yml: NetworkPolicy databaze (port $port) zustava");
+    like($v, qr/containerPort: $port\n/, "values-example-$db.yml: port kontejneru databaze $port");
+    like($v, qr/value: "\{\{ \.Release\.Name \}\}-\Q$db\E"\n/, "values-example-$db.yml: engine se pripojuje ke sluzbe <release>-$db");
+    like($v, qr/- PWE_CONF_dbi_db1_password: $pwkey\n/, "values-example-$db.yml: heslo enginu = $pwkey ze Secretu databaze");
+    like($v, qr/mountPath: \Q$datadir\E\n/, "values-example-$db.yml: svazek databaze v $datadir");
+    like($sec, qr/^      $pwkey: "CHANGE_ME"$/m, "secrets-example-$db.example.yml: vzor hesla $pwkey");
+    my @foreign = grep { $_ ne $db } qw(mariadb mysql postgres);
+    my $other   = join('|', map { uc($_) . '_' } grep { $_ ne 'mysql' || $db ne 'mariadb' } @foreign);
+    unlike($v, qr/\b(?:$other)(?:PASSWORD|USER|DATABASE|DB|ROOT_PASSWORD)\b/, "values-example-$db.yml: zadne promenne jine databaze");
+}
 
 # ---------------------------------------------------------------------------------------------
 # hesla a mistni nastaveni nesmeji do gitu ani do image

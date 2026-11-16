@@ -35,8 +35,8 @@ Cíle sestavení a tagy všech devíti image určuje `docker-bake.hcl` v kořeni
 | `pwe-mysql` | `pwe-base` | + `DBD::mysql` | totéž pro MySQL |
 | `pwe-postgres` | `pwe-base` | + `DBD::Pg` | totéž pro PostgreSQL |
 | `pwe-debugger` | `pwe-base` | + všechny tři DB ovladače + ladicí nástroje | služba `debugger` (VS Code) a výchozí image nástrojů (`make test`, `compile`, `check`, `cgi`, …) |
-| `pwe-example-static` | `pwe-base` | + engine + vzorový web `webapps/example.web` (`PWE_PROFILE=static`) | spustitelná ukázka webu bez databáze; vzorové nasazení `static` v Kubernetes |
-| `pwe-example-mariadb` | `pwe-mariadb` | + engine + vzorový web `webapps/example-db.web` (`PWE_PROFILE=mariadb`) | spustitelná ukázka webu s MariaDB; vzorové nasazení `generic` v Kubernetes |
+| `pwe-example-static` | `pwe-base` | + engine + vzorový web `webapps/example.web` (`PWE_PROFILE=static`) | spustitelná ukázka webu bez databáze; vzorové nasazení `example-static` v Kubernetes |
+| `pwe-example-mariadb` | `pwe-mariadb` | + engine + vzorový web `webapps/example-db.web` (`PWE_PROFILE=mariadb`) | spustitelná ukázka webu s MariaDB; vzorové nasazení `example-mariadb` v Kubernetes |
 | `pwe-example-mysql` | `pwe-mysql` | + engine + `webapps/example-db.web` (`PWE_PROFILE=mysql`) | totéž pro MySQL |
 | `pwe-example-postgres` | `pwe-postgres` | + engine + `webapps/example-db.web` (`PWE_PROFILE=postgres`) | totéž pro PostgreSQL |
 
@@ -117,7 +117,7 @@ Kde se které image používají:
   `pwe-base`) a mountuje do něj kořen repozitáře do `/PWE`: běží pracovní kopie enginu i webu a který
   web běží, určuje `working_dir` a `PWE_CONF_pwe_home` služby v `docker-compose.yml`
   ([Vývojový stack](#vývojový-stack-docker-composeyml));
-- **vzorová nasazení v Kubernetes** (`static`, `generic`) nasazují přímo `pwe-example-static`
+- **vzorová nasazení v Kubernetes** (`example-static`, `example-mariadb`, `example-mysql`, `example-postgres`) nasazují přímo `pwe-example-static`
   a `pwe-example-mariadb`, bez sestavování dalšího image ([Kubernetes](#kubernetes)).
 
 Vrstvy image webu jdou v pořadí závislostní image → engine → web → pracovní adresáře. Engine i web se
@@ -1613,8 +1613,10 @@ V repozitáři jsou dvě hotová vzorová nasazení:
 
 | Název | Image | Co se nasadí |
 | --- | --- | --- |
-| `static` (`kubernetes/values-static.yml`) | `ghcr.io/kukam/pwe-example-static` (`pwe-base` + engine + `example.web`, bez databáze) | Deployment s pody nginx + engine (`fcgi`), Service, Ingress s certifikátem z cert-manageru |
-| `generic` (`kubernetes/values-generic.yml`) | `ghcr.io/kukam/pwe-example-mariadb` (`pwe-mariadb` + engine + `example-db.web`) | totéž + MariaDB (StatefulSet se svazkem) a Secret s hesly (vzor `kubernetes/secrets-generic.example.yml`) |
+| `example-static` (`kubernetes/values-example-static.yml`) | `ghcr.io/kukam/pwe-example-static` (`pwe-base` + engine + `example.web`, bez databáze) | Deployment s pody nginx + engine (`fcgi`), Service, Ingress s certifikátem z cert-manageru |
+| `example-mariadb` (`kubernetes/values-example-mariadb.yml`) | `ghcr.io/kukam/pwe-example-mariadb` (`pwe-mariadb` + engine + `example-db.web`) | totéž + MariaDB (StatefulSet se svazkem) a Secret s hesly (vzor `kubernetes/secrets-example-mariadb.example.yml`) |
+| `example-mysql` (`kubernetes/values-example-mysql.yml`) | `ghcr.io/kukam/pwe-example-mysql` (`pwe-mysql` + engine + `example-db.web`) | totéž s MySQL 8.4 |
+| `example-postgres` (`kubernetes/values-example-postgres.yml`) | `ghcr.io/kukam/pwe-example-postgres` (`pwe-postgres` + engine + `example-db.web`) | totéž s PostgreSQL 18 |
 
 Vzorová nasazení jsou **ukázka, ne veřejný provoz**: vzorový web běží ve vývojovém režimu a každý
 návštěvník je ve skupině `admin` včetně generátoru kódu `pweCreator`. Kontejner `fcgi` to při každém
@@ -1624,12 +1626,12 @@ startu připomene varováním `[entrypoint] VAROVANI: bezi vzorovy web …`
 Nasazení i kontrolu dělají cíle `make` (skript `PWE/tools/k8s.sh`):
 
 ```bash
-make k8s-deploy   K8S=static     # nasadí nebo aktualizuje release pwe-static (helm upgrade --install)
-make k8s-status   K8S=static     # stav releasu
-make k8s-test     K8S=static     # ověří web přes HTTPS
-make k8s-template K8S=static     # vypíše manifesty, které by se nasadily (ke clusteru se nepřipojuje)
-make k8s-logs     K8S=static     # logy kontejnerů releasu
-make k8s-delete   K8S=static     # odinstaluje release (svazek databáze zůstává)
+make k8s-deploy   K8S=example-static     # nasadí nebo aktualizuje release pwe-example-static (helm upgrade --install)
+make k8s-status   K8S=example-static     # stav releasu
+make k8s-test     K8S=example-static     # ověří web přes HTTPS
+make k8s-template K8S=example-static     # vypíše manifesty, které by se nasadily (ke clusteru se nepřipojuje)
+make k8s-logs     K8S=example-static     # logy kontejnerů releasu
+make k8s-delete   K8S=example-static     # odinstaluje release (svazek databáze zůstává)
 make k8s-image    K8S=mujweb     # jen vlastní web: sestaví image webu pro platformu clusteru a nahraje ho do registru
 ```
 
@@ -1642,7 +1644,7 @@ nasazovaný s `pweProfile: static`.
 
 **Kontext clusteru je povinný a vždy výslovný.** Cílový cluster určuje `KUBE_CONTEXT` (v místním
 souboru `kubernetes/local.env`, který není v gitu — vzor `kubernetes/local.env.example`, nebo jako
-proměnná `make k8s-deploy K8S=static KUBE_CONTEXT=<kontext>`). Nemá výchozí hodnotu: skript **nikdy
+proměnná `make k8s-deploy K8S=example-static KUBE_CONTEXT=<kontext>`). Nemá výchozí hodnotu: skript **nikdy
 nepoužije aktuální kontext `kubectl`** a každému příkazu `helm` i `kubectl` ho předává výslovně;
 bez něj nic nenasadí. Přepínače, které by cluster, přihlášení nebo namespace určily jinak
 (`--kube-context`, `--kubeconfig`, `--context`, `--server`, `--namespace`, … v `ARGS`), skript odmítne;

@@ -1,37 +1,45 @@
-# Nasazeni vzoroveho webu BEZ databaze (example.web) do Kubernetes.
+# Nasazeni vzoroveho webu S DATABAZI (example-db.web + PostgreSQL) do Kubernetes.
 #
 #   chart:   oci://registry.nixys.ru/nuc/nxs-universal-chart, verze 3.2.2
-#   release: pwe-static  ->  https://pwe-static.<domena>
-#   image:   ghcr.io/kukam/pwe-example-static - hotovy image vzoroveho webu: knihovny (zavislostni image
-#            pwe-base), engine (/PWE/PWE) a web (/PWE/webapps/example.web); pro toto nasazeni se zadny
-#            image nestavi
-#   postup:  kubernetes/README.md  (make k8s-deploy K8S=static)
+#   release: pwe-generic  ->  https://pwe-generic.<domena>
+#   image:   ghcr.io/kukam/pwe-example-postgres - hotovy image vzoroveho webu: knihovny a ovladac databaze
+#            (zavislostni image pwe-postgres), engine (/PWE/PWE) a web (/PWE/webapps/example-db.web); pro
+#            toto nasazeni se zadny image nestavi
+#   postup:  kubernetes/README.md  (make k8s-deploy K8S=example-postgres)
 #
-# Jeden pod = dva kontejnery: nginx (port 80) a engine (FastCGI na 127.0.0.1:7779, tedy jen uvnitr podu).
-# Statiku - static/ a assets/ webu a assets/ enginu - zkopiruje pri startu initContainer z image do
-# sdileneho svazku a nginx ji posila primo, stejne jako ve vyvojovem stacku
+# Web: jeden pod = dva kontejnery, nginx (port 80) a engine (FastCGI na 127.0.0.1:7779, tedy jen uvnitr
+# podu). Statiku - static/ a assets/ webu a assets/ enginu - zkopiruje pri startu initContainer z image
+# do sdileneho svazku a nginx ji posila primo, stejne jako ve vyvojovem stacku
 # (docker-compose/docker-compose_nginx.conf).
+# Databaze: PostgreSQL jako StatefulSet s vlastnim svazkem (PVC), dostupna jen uvnitr clusteru na
+# <release>-postgres:5432. Schema si pri prvnim startu zalozi engine sam (migrace conf/postgres.dbversion).
 #
-# Vlastni web (bez databaze): zkopiruj tento soubor jako values-<nazev>.yml, uprav generic.pweWeb
-# a generic.pweImage (a pripadne generic.pweHost), nastav K8S_REGISTRY, sestav image webu
-# (make k8s-image K8S=<nazev>; webapps/<web>/Dockerfile z korene repozitare: zavislostni image pwe-base
-# + engine z pracovni kopie + web) a nasad ho (make k8s-deploy K8S=<nazev>, release pwe-<nazev>).
-# Podrobnosti: kubernetes/README.md, Vlastni web.
+# Hesla databaze v tomto souboru NEJSOU: jsou v kubernetes/secrets-example-postgres.yml (neni v gitu). Pri prvnim
+# make k8s-deploy K8S=example-postgres ho PWE/tools/k8s.sh zalozi ze secrets-example-postgres.example.yml s nahodnymi hesly.
+#
+# Vlastni web s PostgreSQL: zkopiruj tento soubor jako values-<nazev>.yml (a secrets-example-postgres.example.yml jako
+# secrets-<nazev>.example.yml), uprav generic.pweWeb a generic.pweImage (a pripadne generic.pweHost),
+# nastav K8S_REGISTRY, sestav image webu (make k8s-image K8S=<nazev>; webapps/<web>/Dockerfile z korene
+# repozitare: zavislostni image pwe-postgres + engine z pracovni kopie + web) a nasad ho
+# (make k8s-deploy K8S=<nazev>, release pwe-<nazev>).
+# Databaze je zde natvrdo PostgreSQL (blok statefulSets); pro PostgreSQL nebo MySQL je potreba blok
+# statefulSets prepsat - viz kubernetes/README.md, Jina databaze nez PostgreSQL.
 
 generic:
   # --- nastaveni PWE: cte je i PWE/tools/k8s.sh a pouzivaji je sablony niz ({{ .Values.generic.pwe... }}) ---
-  pweWeb: example.web              # adresar webu: v image /PWE/webapps/<web>, u vlastniho webu i webapps/<web>
-  pweProfile: static               # profil webu: static = bez databaze (image webu se stavi nad pwe-base)
+  pweWeb: example-db.web           # adresar webu: v image /PWE/webapps/<web>, u vlastniho webu i webapps/<web>
+  pweProfile: postgres              # profil webu = ovladac databaze (image webu se stavi nad pwe-<profil>);
+                                   # musi odpovidat databazi niz
   # Nazev image (bez registru a tagu) urcuje druh nasazeni:
   #   pwe-example-<profil>  hotovy image vzoroveho webu - nic se nestavi (make k8s-image neni potreba):
-  #                 pwe-example-static (web example.web, profil static) nebo pwe-example-mariadb,
+  #                 pwe-example-static (web example.web, profil static) nebo pwe-example-postgres,
   #                 pwe-example-mysql, pwe-example-postgres (web example-db.web, profil podle nazvu);
   #                 pweWeb a pweProfile musi nazvu image odpovidat
   #   jiny nazev    image vlastniho webu - stavi a nahrava ho make k8s-image z webapps/<web>/Dockerfile.
-  #                 Vyhrazene nazvy (image webu se tak jmenovat nesmi): pwe-base, pwe-mariadb, pwe-mysql,
+  #                 Vyhrazene nazvy (image webu se tak jmenovat nesmi): pwe-base, pwe-postgres, pwe-mysql,
   #                 pwe-postgres, pwe-debugger (zavislostni image - jen knihovny, nasadit je nejde),
   #                 pwe-example-* a zrusene pwe a pwe-static.
-  pweImage: pwe-example-static
+  pweImage: pwe-example-postgres
   pweHost: ""                      # cela adresa webu, napr. www.mujweb.cz; prazdne = <release>.<pweDomain>
   # --- nasledujici ctyri hodnoty prepisuje make k8s-deploy (--set-string) podle kubernetes/local.env;
   #     registr a tag maji u vzoroveho nasazeni vychozi hodnotu i bez nej (registr image PWE a verze
@@ -45,7 +53,11 @@ generic:
   #     (napr. --set-string generic.pweNginxImage=harbor.example.com/dockerhub/library/nginx) ---
   pweNginxImage: nginx             # image webserveru (bez tagu)
   pweNginxImageTag: stable
-  pweTimezone: Europe/Prague       # casove pasmo kontejneru enginu (promenna TZ)
+  pweTimezone: Europe/Prague       # casove pasmo kontejneru enginu a databaze (promenna TZ)
+  pweDbImage: postgres              # image databaze (bez tagu)
+  pweDbImageTag: "18"
+  pweDbName: pwe                   # nazev databaze a uzivatel, pod kterym se engine pripojuje; PostgreSQL
+  pweDbUser: pwe                   # je zalozi jen pri prvnim startu nad prazdnym svazkem (pozdejsi zmena nic nezmeni)
   # ConfigMapy a Secrety jako bezne zdroje releasu (vychozi chovani chartu z nich dela helm hooky,
   # ktere helm uninstall nemaze).
   hookAnnotations: {}
@@ -169,6 +181,25 @@ deployments:
             value: "STDERR"
           - name: PWE_CONF_log_loglevel
             value: "2"
+          # pripojeni k databazi (prepisuje hodnoty z conf/postgres.conf webu v image)
+          - name: PWE_CONF_dbi_db1_host
+            value: "{{ .Release.Name }}-postgres"
+          - name: PWE_CONF_dbi_db1_database
+            value: "{{ .Values.generic.pweDbName }}"
+          - name: PWE_CONF_dbi_db1_login
+            value: "{{ .Values.generic.pweDbUser }}"
+          # engine zkousi pripojeni po 1 s; pri prvnim nasazeni databaze teprve startuje
+          - name: PWE_CONF_dbi_db1_trayconnect
+            value: "60"
+          # Trasovani DBI vypnute: conf webu muze mit loglevel 1 (kazde SQL vcetne vazanych hodnot -
+          # e-maily, hashe hesel - do log/<ovladac> ve vrstve kontejneru, bez rotace).
+          - name: PWE_CONF_dbi_db1_loglevel
+            value: "0"
+          - name: PWE_CONF_dbi_db1_logfile
+            value: /dev/null
+        envsFromSecret:
+          db:
+            - PWE_CONF_dbi_db1_password: POSTGRES_PASSWORD
         # Sonda zkousi spojeni zevnitr kontejneru (nezavisi na sitovych pravidlech podu).
         # Socket otevre engine az po pripojeni k databazi a migracich (checkDbversion): do te doby hlida
         # jen startupProbe (az 10 min = K8S_TIMEOUT), takze liveness engine nezabije uprostred migrace.
@@ -254,6 +285,69 @@ deployments:
       - name: uploadfile
         type: emptyDir
 
+statefulSets:
+  postgres:
+    replicas: 1
+    extraSelectorLabels:
+      app.kubernetes.io/component: postgres
+    automountServiceAccountToken: false
+    securityContext:
+      seccompProfile:
+        type: RuntimeDefault
+    containers:
+      - name: postgres
+        image: "{{ .Values.generic.pweDbImage }}"
+        imageTag: "{{ .Values.generic.pweDbImageTag }}"
+        ports:
+          - name: postgres
+            containerPort: 5432
+        env:
+          - name: TZ
+            value: "{{ .Values.generic.pweTimezone }}"
+          - name: POSTGRES_DB
+            value: "{{ .Values.generic.pweDbName }}"
+          - name: POSTGRES_USER
+            value: "{{ .Values.generic.pweDbUser }}"
+        envsFromSecret:
+          db:
+            - POSTGRES_PASSWORD
+        readinessProbe:
+          exec:
+            command: ["sh", "-c", "pg_isready -h 127.0.0.1 -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          exec:
+            command: ["sh", "-c", "pg_isready -h 127.0.0.1 -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 5
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+        volumeMounts:
+          - name: data
+            mountPath: /var/lib/postgresql
+    # Svazek databaze. Bez storageClassName se pouzije vychozi trida uloziste clusteru.
+    # helm uninstall ho NEMAZE (data databaze prezivi odinstalovani i nove nasazeni).
+    # volumeClaimTemplates nelze po prvnim nasazeni menit (API StatefulSetu zmenu odmitne a helm upgrade
+    # selze). Zvetseni svazku: kubectl --context <kontext> -n pwe patch pvc data-<release>-postgres-0
+    # (trida uloziste musi mit allowVolumeExpansion), pak kubectl ... delete sts <release>-postgres
+    # --cascade=orphan a make k8s-deploy s novou velikosti. Povyseni hlavni verze pweDbImageTag
+    # (napr. 11.8 -> 12) delej se zalohou; PostgreSQL mezi hlavnimi verzemi data sam neprevadi (pg_upgrade nebo dump a obnova).
+    volumeClaimTemplates:
+      - metadata:
+          name: data
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+
 services:
   web:
     extraSelectorLabels:
@@ -267,8 +361,9 @@ ingresses:
   web:
     ingressClassName: nginx
     annotations:
-      # Web bez databaze si stav navstevnika (jazyk, prihlaseni) uklada do souboru v podu
-      # (pwe.save_opt_to = file), proto musi navstevnik zustat u stejneho podu.
+      # Stav navstevnika je v databazi (pwe.save_opt_to = db), ale nahrane soubory (uploadfile/) jsou
+      # v tomto prikladu jen v podu, ktery je prijal - proto navstevnik zustava u stejneho podu.
+      # Se sdilenym svazkem pro uploadfile/ (ReadWriteMany) lze tyto dve anotace vypustit.
       nginx.ingress.kubernetes.io/affinity: "cookie"
       nginx.ingress.kubernetes.io/session-cookie-name: "pwe-pod"
       nginx.ingress.kubernetes.io/proxy-body-size: "100m"
@@ -281,8 +376,9 @@ ingresses:
             serviceName: web
             servicePort: http
 
-# Sitova pravidla: do podu webu smi zvenku jen port 80 (nginx; ingress controller i ostatni pody).
-# Pravidla musi podporovat sitovy plugin clusteru (Calico, Cilium ...); bez nej se tise ignoruji.
+# Sitova pravidla: do podu webu smi zvenku jen port 80 (nginx; ingress controller i ostatni pody),
+# databaze prijima spojeni jen z podu webu. Pravidla musi podporovat sitovy plugin clusteru (Calico,
+# Cilium ...); bez nej se tise ignoruji - databazi pak pred ostatnimi pody chrani jen heslo.
 # Port enginu 7779 na nich nezavisi: engine posloucha jen na 127.0.0.1 (FCGI_SOCKET_PATH vyse), takze
 # jiny pod nemuze obejit ingress a nginx a podvrhnout enginu adresu klienta nebo HTTPS.
 # Port 80 lze dal omezit jen na namespace ingress controlleru (from: namespaceSelector).
@@ -296,4 +392,20 @@ networkPolicies:
     ingress:
       - ports:
           - port: 80
+            protocol: TCP
+  # Databaze prijima spojeni jen z podu webu tehoz releasu.
+  postgres:
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/instance: "{{ .Release.Name }}"
+        app.kubernetes.io/component: postgres
+    policyTypes: ["Ingress"]
+    ingress:
+      - from:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/instance: "{{ .Release.Name }}"
+                app.kubernetes.io/component: web
+        ports:
+          - port: 5432
             protocol: TCP

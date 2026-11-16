@@ -199,6 +199,11 @@ v `docs/03-struktura-webu.md`, „Zámek migrace“, a `docs/17-nasazeni.md`, �
   brána před publikací). `make k8s-delete` odmítne název dalšího releasu v `ARGS` (obešel by
   pojistku hesel).
 
+- Kubernetes: vzorová nasazení se jmenují podle image (`example-static`, `example-mariadb`, nově i
+  `example-mysql` a `example-postgres`; soubory `kubernetes/values-example-*.yml`), takže release i adresa webu
+  jsou `pwe-example-<varianta>`. Každé nasazení má vlastní namespace pojmenovaný jako release (dřív společný
+  `pwe`); `K8S_NAMESPACE` ho přepíše.
+
 **Testy:** nové `t/23-dbversion-lock.t` (zámek migrace nad falešnou databází), `t/24-shutdown.t` (ukončování
 a socket nad skutečným FastCGI serverem) a `t/25-pipeline.t` (pravidla workflow: devět image, kdo publikuje,
 kroky s bake přehrané s falešným `docker`); pomocné moduly
@@ -391,8 +396,8 @@ názvy a tagy, `Dockerfile` webu a výchozí image nástrojů; popis je v `docs/
 **Nasazení do Kubernetes** (2026-11-15; engine beze změny):
 
 - Nové nasazení webu jako **image webu** obecným chartem `oci://registry.nixys.ru/nuc/nxs-universal-chart`
-  verze 3.2.2: `kubernetes/values-static.yml` (`webapps/example.web`, bez databáze) a
-  `kubernetes/values-generic.yml` (`webapps/example-db.web` + MariaDB), vzory `kubernetes/secrets-generic.example.yml`
+  verze 3.2.2: `kubernetes/values-example-static.yml` (`webapps/example.web`, bez databáze) a
+  `kubernetes/values-example-mariadb.yml` (`webapps/example-db.web` + MariaDB), vzory `kubernetes/secrets-example-mariadb.example.yml`
   a `kubernetes/local.env.example`, návod `kubernetes/README.md`. Pod = nginx (statika) + engine, HTTPS na ingressu
   s certifikátem z cert-manageru, nasazení podle digestu image.
 - Cíle `make k8s-image | k8s-template | k8s-deploy | k8s-status | k8s-test | k8s-logs | k8s-delete K8S=<název>`

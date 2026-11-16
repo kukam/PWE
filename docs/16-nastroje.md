@@ -393,7 +393,7 @@ z `kubernetes/local.env` (není v gitu).
 Druh nasazení určuje `generic.pweImage` ve values:
 
 - **`pwe-example-static`, `pwe-example-mariadb`, `pwe-example-mysql`, `pwe-example-postgres` = vzorové
-  nasazení** (`static` → `pwe-example-static` s `example.web`, `generic` → `pwe-example-mariadb`
+  nasazení** (`example-static` → `pwe-example-static` s `example.web`, `example-mariadb` → `pwe-example-mariadb`
   s `example-db.web` + MariaDB): nasazuje se hotový image vzorového webu z registru image PWE
   (`K8S_REGISTRY`, výchozí `PWE_IMAGE_REGISTRY` = `ghcr.io/kukam`) s tagem `K8S_IMAGE_TAG` (výchozí
   `PWE_IMAGE_TAG`, jinak verze z `PWE/VERSION`). Příkaz `image` nic nestaví — vypíše

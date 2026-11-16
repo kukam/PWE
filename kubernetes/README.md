@@ -18,8 +18,13 @@ V repozitáři jsou dvě hotová vzorová nasazení:
 
 | Název | Image | Co se nasadí | Adresa |
 | --- | --- | --- | --- |
-| `static` | `ghcr.io/kukam/pwe-example-static` (`pwe-base` + engine + `example.web`, bez databáze) | web | `https://pwe-static.<doména>` |
-| `generic` | `ghcr.io/kukam/pwe-example-mariadb` (`pwe-mariadb` + engine + `example-db.web`) | web + MariaDB | `https://pwe-generic.<doména>` |
+| `example-static` | `ghcr.io/kukam/pwe-example-static` (`pwe-base` + engine + `example.web`, bez databáze) | web | `https://pwe-example-static.<doména>` |
+| `example-mariadb` | `ghcr.io/kukam/pwe-example-mariadb` (`pwe-mariadb` + engine + `example-db.web`) | web + MariaDB | `https://pwe-example-mariadb.<doména>` |
+| `example-mysql` | `ghcr.io/kukam/pwe-example-mysql` (`pwe-mysql` + engine + `example-db.web`) | web + MySQL | `https://pwe-example-mysql.<doména>` |
+| `example-postgres` | `ghcr.io/kukam/pwe-example-postgres` (`pwe-postgres` + engine + `example-db.web`) | web + PostgreSQL | `https://pwe-example-postgres.<doména>` |
+
+Název nasazení odpovídá názvu image bez předpony `pwe-`: release, adresa webu i namespace se pak jmenují
+stejně (`pwe-example-<varianta>`). Každé nasazení má vlastní namespace.
 
 Chart, manifesty a postup byly ověřeny nasazením obou vzorových webů do clusteru s Kubernetes 1.32,
 ingress-nginx a cert-managerem (certifikát Let's Encrypt přes DNS-01), s Helm 3.22 — tehdy s image
@@ -37,9 +42,9 @@ ověřené není.
 
 | Soubor | K čemu je |
 | --- | --- |
-| `values-static.yml` | hodnoty chartu pro web bez databáze |
-| `values-generic.yml` | hodnoty chartu pro web s databází MariaDB |
-| `secrets-generic.example.yml` | vzor souboru s hesly databáze |
+| `values-example-static.yml` | hodnoty chartu pro web bez databáze |
+| `values-example-mariadb.yml` | hodnoty chartu pro web s databází MariaDB |
+| `secrets-example-mariadb.example.yml` | vzor souboru s hesly databáze |
 | `local.env.example` | vzor místního nastavení (kontext, doména, registr) |
 | `local.env` | tvoje místní nastavení — **není v gitu** (`.gitignore`) |
 | `secrets-<název>.yml` | skutečná hesla — **nejsou v gitu**, založí se při prvním nasazení |
@@ -56,10 +61,10 @@ Ingress pwe-<název>-web            HTTPS, certifikát vystaví cert-manager (Se
 NetworkPolicy pwe-<název>-web      do podů webu zvenku jen port 80
 
 jen generic:
-StatefulSet pwe-generic-mariadb    MariaDB, 1 pod, svazek 1 Gi (PVC data-pwe-generic-mariadb-0)
-Service pwe-generic-mariadb        port 3306, dostupná jen uvnitř clusteru
-NetworkPolicy pwe-generic-mariadb  databáze přijímá spojení jen od podů webu
-Secret pwe-generic-db              hesla databáze
+StatefulSet pwe-example-mariadb-mariadb    MariaDB, 1 pod, svazek 1 Gi (PVC data-pwe-example-mariadb-mariadb-0)
+Service pwe-example-mariadb-mariadb        port 3306, dostupná jen uvnitř clusteru
+NetworkPolicy pwe-example-mariadb-mariadb  databáze přijímá spojení jen od podů webu
+Secret pwe-example-mariadb-db              hesla databáze
 ```
 
 - **Jeden pod = nginx + engine.** Proces enginu obsluhuje jeden požadavek najednou; souběžnost
@@ -89,7 +94,7 @@ Secret pwe-generic-db              hesla databáze
   (order 50, `selector: all()`) tam povoluje veškerý provoz mezi pody dřív, než se pravidla
   namespace vyhodnotí. Ochrana portu enginu na nich proto nestojí (viz výše); databázi pak před
   ostatními pody chrání jen heslo. Ověření ve vlastním clusteru: z podu mimo release zkus spojení
-  na `pwe-generic-mariadb.<namespace>:3306` — nesmí se navázat.
+  na `pwe-example-mariadb-mariadb.<namespace>:3306` — nesmí se navázat.
 - Pody nemají token service accountu, kontejnery běží bez linuxových oprávnění (engine jako root
   bez capabilities, nginx jen s těmi, které potřebuje) a s profilem seccomp `RuntimeDefault`.
 
@@ -117,7 +122,7 @@ Secret pwe-generic-db              hesla databáze
 
 Který image se nasadí, určují tyto proměnné (prostředí nebo `kubernetes/local.env`):
 
-| Proměnná | Vzorové nasazení (`static`, `generic`) | Vlastní web |
+| Proměnná | Vzorové nasazení (`example-*`) | Vlastní web |
 | --- | --- | --- |
 | `K8S_REGISTRY` — registr, ve kterém image je; `make k8s-deploy` v něm zjišťuje digest | registr s image vzorových webů; výchozí `PWE_IMAGE_REGISTRY`, tedy `ghcr.io/kukam` | **povinný:** registr, do kterého `make k8s-image` nahrává image webu |
 | `K8S_PULL_REGISTRY` — registr, ze kterého image tahá cluster | výchozí `K8S_REGISTRY`; jiný jen s proxy cache, a to **zrcadlem téhož registru** (digest se zjišťuje v `K8S_REGISTRY`) | totéž |
@@ -158,7 +163,7 @@ Bez toho by `make k8s-image` nahrál image webu pod jménem image PWE a v regist
 > zjistil v jednom registru a cluster by image tahal z proxy cache jiného (pody v `ImagePullBackOff`):
 >
 > ```bash
-> make k8s-deploy K8S=static K8S_REGISTRY=ghcr.io/kukam K8S_PULL_REGISTRY=harbor.example.com/ghcr/kukam
+> make k8s-deploy K8S=example-static K8S_REGISTRY=ghcr.io/kukam K8S_PULL_REGISTRY=harbor.example.com/ghcr/kukam
 > make k8s-deploy K8S=mujweb K8S_REGISTRY=docker.io/muj-ucet K8S_PULL_REGISTRY=harbor.example.com/dockerhub/muj-ucet
 > ```
 >
@@ -188,7 +193,7 @@ V clusteru (ověření v závorce):
   (`kubectl --context <kontext> get clusterissuer`),
 - DNS záznam `pwe-<název>.<doména>` mířící na ingress (adresa je po nasazení ve sloupci `ADDRESS`
   výpisu `make k8s-status`),
-- pro `generic` výchozí `StorageClass` (`kubectl --context <kontext> get storageclass`, jedna označená
+- pro nasazení s databází výchozí `StorageClass` (`kubectl --context <kontext> get storageclass`, jedna označená
   `(default)`; jinak doplň `storageClassName` do `statefulSets.mariadb.volumeClaimTemplates`),
 - uzly s architekturou `amd64` nebo `arm64` (`kubectl --context <kontext> get nodes -L kubernetes.io/arch`)
   a přístup k registru s image: veřejný repozitář, nebo soukromý repozitář a přihlašovací Secret —
@@ -209,7 +214,7 @@ $EDITOR kubernetes/local.env
 | Proměnná | Význam |
 | --- | --- |
 | `KUBE_CONTEXT` | kontext `kubectl`, do kterého se nasazuje. **Povinný a bez výchozí hodnoty** — bez něj `deploy`, `status`, `logs` ani `delete` nic neudělají |
-| `K8S_NAMESPACE` | namespace (výchozí `pwe`; založí se při prvním nasazení). Jinak než touto proměnnou se nenastavuje — `-n` a `--namespace` v `ARGS` skript odmítne |
+| `K8S_NAMESPACE` | namespace (výchozí = název releasu `pwe-<název>`, každé nasazení má vlastní; založí se při prvním nasazení). Hodnota z `local.env` by platila pro všechna nasazení — předávej ji jen na příkazové řádce. Jinak než touto proměnnou se nenastavuje — `-n` a `--namespace` v `ARGS` skript odmítne |
 | `K8S_DOMAIN` | doména; nasazení `<název>` poběží na `https://pwe-<název>.<K8S_DOMAIN>` (jinou adresu určuje `generic.pweHost` ve values) |
 | `K8S_ISSUER` | `ClusterIssuer` cert-manageru |
 | `K8S_REGISTRY` | registr, ve kterém nasazovaný image je — viz [Image a tagy](#image-a-tagy). Pro vzorová nasazení ho nech prázdný (výchozí `ghcr.io/kukam`), pro vlastní web je povinný, např. `docker.io/muj-ucet` |
@@ -228,7 +233,7 @@ $EDITOR kubernetes/local.env
 
 V `local.env` se píše `KLÍČ=hodnota`, uvozovky kolem hodnoty a mezery se odstraní. Neprázdná
 proměnná prostředí má přednost, takže každou hodnotu lze přepsat i na příkazové řádce:
-`make k8s-deploy K8S=static KUBE_CONTEXT=jiny`.
+`make k8s-deploy K8S=example-static KUBE_CONTEXT=jiny`.
 
 Cluster se vybírá **jen** proměnnou `KUBE_CONTEXT` a namespace jen `K8S_NAMESPACE`. Proměnné,
 kterými by je `helm` nebo `kubectl` vybraly jinak — všechny `HELM_KUBE*` (`HELM_KUBEAPISERVER`,
@@ -242,22 +247,22 @@ Vzorovým nasazením stačí `KUBE_CONTEXT`, `K8S_DOMAIN` a `K8S_ISSUER`.
 ### 2. Nasazení
 
 ```bash
-make k8s-deploy K8S=static       # helm upgrade --install, čeká na připravené pody
-make k8s-status K8S=static       # pody, služba, ingress, svazky, certifikát
-make k8s-test   K8S=static       # ověří web přes HTTPS včetně platnosti certifikátu
+make k8s-deploy K8S=example-static       # helm upgrade --install, čeká na připravené pody
+make k8s-status K8S=example-static       # pody, služba, ingress, svazky, certifikát
+make k8s-test   K8S=example-static       # ověří web přes HTTPS včetně platnosti certifikátu
 ```
 
 Žádný image se nestaví: nasadí se `ghcr.io/kukam/pwe-example-static:<verze>` s verzí z `PWE/VERSION`
-(`make k8s-image K8S=static` jen oznámí, že není co stavět, a skončí kódem 0). Image s tímto tagem
+(`make k8s-image K8S=example-static` jen oznámí, že není co stavět, a skončí kódem 0). Image s tímto tagem
 musí být v registru — publikuje ho pipeline z výchozí větve (`make images` ho staví jen do místního
 Dockeru). Nejnovější publikovaný image bez ohledu na verzi v pracovní kopii nasadí
-`K8S_IMAGE_TAG=latest make k8s-deploy K8S=static`.
+`K8S_IMAGE_TAG=latest make k8s-deploy K8S=example-static`.
 
 Certifikát vystavuje cert-manager až po nasazení; s ověřením přes DNS to trvá obvykle 1–3 minuty.
 Do té doby ingress odpovídá výchozím certifikátem a `make k8s-test` hlásí chybu certifikátu.
 
-Pro web s databází je postup stejný s `K8S=generic` (image `pwe-example-mariadb`). Při prvním nasazení
-skript založí `kubernetes/secrets-generic.yml` s náhodnými hesly — **soubor si uschovej** (viz
+Pro web s databází je postup stejný s `K8S=example-mariadb` (image `pwe-example-mariadb`). Při prvním nasazení
+skript založí `kubernetes/secrets-example-mariadb.yml` s náhodnými hesly — **soubor si uschovej** (viz
 [Hesla](#hesla)).
 
 ### Přehled cílů
@@ -301,7 +306,7 @@ Krátké přepínače s hodnotou projdou, i když jejich hodnota tato písmena o
 - **Vlastní web:** `make k8s-image K8S=<název> && make k8s-deploy K8S=<název>` — po změně webu i po
   aktualizaci enginu (engine se do image bere z pracovní kopie). Pro produkci použij neměnný tag,
   např. `K8S_IMAGE_TAG=1.4.0` (u obou příkazů), ne `latest`.
-- Návrat k předchozí verzi: `helm --kube-context <kontext> -n pwe rollback pwe-<název>`.
+- Návrat k předchozí verzi: `helm --kube-context <kontext> -n pwe-<název> rollback pwe-<název>`.
 
 ## Nasazení bez make
 
@@ -309,15 +314,15 @@ Krátké přepínače s hodnotou projdou, i když jejich hodnota tato písmena o
 `docker buildx imagetools inspect ghcr.io/kukam/pwe-example-static:2.2.1 --format '{{.Manifest.Digest}}'`:
 
 ```bash
-helm upgrade --install pwe-static oci://registry.nixys.ru/nuc/nxs-universal-chart --version 3.2.2 \
+helm upgrade --install pwe-example-static oci://registry.nixys.ru/nuc/nxs-universal-chart --version 3.2.2 \
     --kube-context <kontext> --namespace pwe --create-namespace --wait --timeout 10m \
-    -f kubernetes/values-static.yml \
+    -f kubernetes/values-example-static.yml \
     --set-string generic.pweImageTag=2.2.1@sha256:<digest> \
     --set-string generic.pweDomain=example.com \
     --set-string generic.pweIssuer=letsencrypt
 ```
 
-Pro `generic` přidej `-f kubernetes/secrets-generic.yml`. Registr je ve values (`generic.pweRegistry`,
+Pro nasazení s databází přidej `-f kubernetes/secrets-example-mariadb.yml`. Registr je ve values (`generic.pweRegistry`,
 výchozí `ghcr.io/kukam`), jiný předá `--set-string generic.pweRegistry=…`.
 
 Bez `generic.pweImageTag` se nasadí výchozí hodnota z values, tedy tag `latest` bez digestu. To se
@@ -332,12 +337,12 @@ z kořene repozitáře a skládá se ze tří částí: **závislostní image** 
 kopie** (adresář `PWE/` do `/PWE/PWE`) a **web** (`/PWE/webapps/<web>`). Podrobnosti:
 [`docs/17-nasazeni.md`](../docs/17-nasazeni.md).
 
-1. Zkopíruj `values-static.yml` (web bez databáze) nebo `values-generic.yml` a
-   `secrets-generic.example.yml` (web s databází MariaDB) pod vlastním názvem:
+1. Zkopíruj `values-example-static.yml` (web bez databáze) nebo `values-example-mariadb.yml` a
+   `secrets-example-mariadb.example.yml` (web s databází MariaDB) pod vlastním názvem:
    `values-mujweb.yml`, `secrets-mujweb.example.yml`.
 2. V bloku `generic` nastav `pweWeb` (adresář webu ve `webapps/`) a `pweImage` (název image webu,
    např. `mujweb` — **ne** `pwe-example-…` ani jiný [vyhrazený název](#image-a-tagy)). `pweProfile`
-   nech podle vzoru (`static` v kopii `values-static.yml`, `mariadb` v kopii `values-generic.yml`):
+   nech podle vzoru (`static` v kopii `values-example-static.yml`, `mariadb` v kopii `values-example-mariadb.yml`):
    musí odpovídat Dockerfilu webu. Případně nastav `pweHost` — celou adresu webu, např.
    `www.mujweb.cz` (prázdné = `pwe-mujweb.<K8S_DOMAIN>`).
 3. Nastav `K8S_REGISTRY` na registr, do kterého smíš nahrávat (viz [Soukromý registr](#soukromý-registr)),
@@ -414,7 +419,7 @@ vzorová nasazení, když image vzorových webů nejsou v registru veřejné):
 
 ```bash
 kubectl --context <kontext> create namespace pwe     # pokud ještě neexistuje
-kubectl --context <kontext> -n pwe create secret docker-registry regcred \
+kubectl --context <kontext> -n pwe-<název> create secret docker-registry regcred \
     --docker-server=<registr> --docker-username=<uživatel> --docker-password=<token>
 ```
 
@@ -428,10 +433,13 @@ Tato varianta v clusteru ověřená není.
 
 ### Jiná databáze než MariaDB
 
-`values-generic.yml` nasazuje MariaDB (blok `statefulSets.mariadb`, proměnné `MARIADB_*`, port
+`values-example-mariadb.yml` nasazuje MariaDB (blok `statefulSets.mariadb`, proměnné `MARIADB_*`, port
 3306). `pweProfile` určuje ovladač databáze: u vlastního webu závislostní image `pwe-<profil>`, nad
 kterým se image webu staví, a soubor `conf/<profil>.conf`; u vzorového nasazení musí odpovídat
-názvu image. Pro PostgreSQL (`postgres`) nebo MySQL (`mysql`) je potřeba přepsat blok
+názvu image. Hotové hodnoty pro ostatní databáze jsou v `values-example-mysql.yml` (MySQL 8.4, proměnné
+`MYSQL_*`) a `values-example-postgres.yml` (PostgreSQL 18, proměnné `POSTGRES_*`, port 5432, svazek
+`/var/lib/postgresql`) — vlastní web s touto databází začni kopií příslušného souboru a jeho vzoru hesel.
+Ručně pro PostgreSQL (`postgres`) nebo MySQL (`mysql`) je potřeba přepsat blok
 `statefulSets` (image, proměnné, port, cestu svazku, sondy), `PWE_CONF_dbi_db1_host` a klíče
 v `secrets-<název>.example.yml`. Se změnou `pweProfile` změň u vzorového nasazení i `pweImage` na
 `pwe-example-<nový profil>` (např. `pwe-example-postgres`); u vlastního webu zůstává název image
@@ -455,7 +463,7 @@ lze jen klíč, který v konfiguraci webu existuje. Příklady už ve values sou
 | `PWE_CONF_pwe_development=0` | vypne vývojový režim; mimo jiné generátor kódu `pweCreator` pak odmítne zapisovat soubory (ve vzorových webech je každý návštěvník ve skupině `admin`) |
 | `PWE_CONF_http_base_url` | adresa webu pro odkazy generované mimo požadavek |
 | `PWE_CONF_log_logout=STDERR` | log enginu jde do logu kontejneru (`make k8s-logs`) |
-| `PWE_CONF_dbi_db1_*` | připojení k databázi (jen `generic`); heslo se bere ze Secretu |
+| `PWE_CONF_dbi_db1_*` | připojení k databázi (jen nasazení s databází); heslo se bere ze Secretu |
 | `PWE_CONF_dbi_db1_loglevel=0`, `PWE_CONF_dbi_db1_logfile=/dev/null` | vypne trasování DBI: s `loglevel` 1 by se každé SQL včetně vázaných hodnot (e-maily, hashe hesel) zapisovalo do souboru v kontejneru, bez rotace |
 | `TZ` | časové pásmo pro start enginu; pro požadavky ho předává nginx podu (`fastcgi_param TZ`). Obojí z `generic.pweTimezone` (image běží v UTC) |
 
@@ -466,13 +474,13 @@ základ `pwe-base`. Pracovní adresáře webu (`ramdisk/`, `sessions/`, `uploadf
 
 ## Hesla
 
-`secrets-generic.yml` obsahuje heslo správce databáze a heslo uživatele, pod kterým se připojuje
+`secrets-example-mariadb.yml` obsahuje heslo správce databáze a heslo uživatele, pod kterým se připojuje
 engine. MariaDB si obě hesla zapíše do svého svazku **při prvním startu**; pozdější změna v souboru
 je v databázi sama nezmění.
 
 - Soubor **není v gitu** — na jiný stroj (kolega, CI) ho musíš přenést sám.
 - Dokud release běží, obnovíš ho z clusteru:
-  `helm --kube-context <kontext> -n pwe get values pwe-generic -o yaml` (klíč `secrets`).
+  `helm --kube-context <kontext> -n pwe-example-mariadb get values pwe-example-mariadb -o yaml` (klíč `secrets`).
 - Když soubor chybí a release nebo jeho svazek databáze v clusteru už existuje, `make k8s-deploy`
   nová hesla **nevygeneruje** a skončí chybou s touto radou. Nová hesla vynutíš `K8S_NEW_SECRETS=1`
   — databáze ve svazku ale zůstane se starými.
@@ -487,7 +495,7 @@ je v databázi sama nezmění.
   nezakládá a použije vzor; `--dry-run=none` a `--dry-run=false` jsou skutečné nasazení se
   skutečnými hesly.
 - Po nechtěném nasazení s jinými hesly vrátí původní Secret
-  `helm --kube-context <kontext> -n pwe rollback pwe-generic`.
+  `helm --kube-context <kontext> -n pwe-example-mariadb rollback pwe-example-mariadb`.
 - `make k8s-delete` odmítne release odinstalovat, když na stroji soubor s hesly chybí — viz
   [Odinstalování](#odinstalování).
 - Když soubor ztratíš i s releasem a svazek zůstane, změň heslo přímo v databázi, nebo svazek smaž
@@ -533,17 +541,17 @@ je v databázi sama nezmění.
 ## Odinstalování
 
 ```bash
-make k8s-delete K8S=generic
+make k8s-delete K8S=example-mariadb
 ```
 
 Odstraní release (pody, služby, ingress, ConfigMap, Secret s hesly). **Zůstává** svazek databáze
-(`data-pwe-generic-mariadb-0`), svazky s anotací `keep` a Secret s certifikátem
-(`pwe-generic-web-tls`) — nové nasazení na ně naváže; skript je po odinstalování vypíše. Úplné
+(`data-pwe-example-mariadb-mariadb-0`), svazky s anotací `keep` a Secret s certifikátem
+(`pwe-example-mariadb-web-tls`) — nové nasazení na ně naváže; skript je po odinstalování vypíše. Úplné
 smazání včetně dat:
 
 ```bash
-kubectl --context <kontext> -n pwe delete pvc data-pwe-generic-mariadb-0
-kubectl --context <kontext> -n pwe delete secret pwe-generic-web-tls
+kubectl --context <kontext> -n pwe-example-mariadb delete pvc data-pwe-example-mariadb-mariadb-0
+kubectl --context <kontext> -n pwe-example-mariadb delete secret pwe-example-mariadb-web-tls
 ```
 
 **Pojistka hesel:** hesla databáze jsou jen v `secrets-<název>.yml` a v releasu. Když soubor na
@@ -553,11 +561,11 @@ vzor `secrets-<název>.example.yml`) bez místního `secrets-<název>.yml` skon�
 neodinstaluje. Hesla nejdřív ulož (výstup obsahuje hesla — nikam ho nevkládej):
 
 ```bash
-helm --kube-context <kontext> -n pwe get values pwe-generic -o yaml     # klíč secrets
+helm --kube-context <kontext> -n pwe-example-mariadb get values pwe-example-mariadb -o yaml     # klíč secrets
 ```
 
 nebo soubor zkopíruj ze stroje, odkud se nasazovalo. Když data ani hesla nepotřebuješ, odinstaluj
-release výslovně: `make k8s-delete K8S=generic K8S_DELETE_WITHOUT_SECRETS=1`. Zkouška nasucho
+release výslovně: `make k8s-delete K8S=example-mariadb K8S_DELETE_WITHOUT_SECRETS=1`. Zkouška nasucho
 (`ARGS=--dry-run`) pojistku nepotřebuje — nic neodinstaluje.
 
 `make k8s-delete` odinstaluje vždy jen release daného nasazení. V `ARGS` smí být jen přepínače helmu
@@ -589,11 +597,11 @@ release`), protože by obešel pojistku hesel — další nasazení odinstaluj s
 | `make k8s-deploy`: `secrets-<název>.yml chybi, ale release … uz existuje` | viz [Hesla](#hesla) |
 | `make k8s-deploy`: `stav releasu pwe-<název> v clusteru nelze zjistit (…)` nebo `svazky releasu pwe-<název> v clusteru nelze zjistit (…)` | soubor s hesly chybí a skript nedokázal ověřit, že release ani jeho svazek neexistují (v závorce je chyba `helm`, resp. `kubectl`): nedostupný cluster, překlep v `KUBE_CONTEXT`, vypršené přihlášení, chybějící oprávnění nebo program `kubectl`. Hesla se nezaložila a nic se nenasadilo — oprav příčinu a spusť nasazení znovu; výjimka `K8S_NEW_SECRETS=1` (viz [Hesla](#hesla)) |
 | `make k8s-delete`: `secrets-<název>.yml na tomto stroji chybi` | hesla databáze by po odinstalování zůstala jen ve svazku — nejdřív je ulož, nebo `K8S_DELETE_WITHOUT_SECRETS=1` (viz [Odinstalování](#odinstalování)) |
-| pod ve stavu `ImagePullBackOff` | cluster image nestáhne: image není v registru, registr je soukromý (viz [Soukromý registr](#soukromý-registr)), nebo `K8S_PULL_REGISTRY` míří jinam než na zrcadlo registru `K8S_REGISTRY` (skript na rozdíl registrů při nasazení upozorňuje, viz [Image a tagy](#image-a-tagy)); `kubectl --context <kontext> -n pwe describe pod <pod>` |
+| pod ve stavu `ImagePullBackOff` | cluster image nestáhne: image není v registru, registr je soukromý (viz [Soukromý registr](#soukromý-registr)), nebo `K8S_PULL_REGISTRY` míří jinam než na zrcadlo registru `K8S_REGISTRY` (skript na rozdíl registrů při nasazení upozorňuje, viz [Image a tagy](#image-a-tagy)); `kubectl --context <kontext> -n pwe-<název> describe pod <pod>` |
 | pod ve stavu `Init:CrashLoopBackOff` nebo `CrashLoopBackOff`, v logu `exec format error` | image je pro jinou platformu než uzly — u vlastního webu nastav `K8S_PLATFORM` a znovu `make k8s-image` |
 | kontejner `fcgi` se restartuje, v logu `Couldn't chmod(127.0.0.1:7779)` | image obsahuje engine starší než 2.2.1, který adresu `host:port` neumí — nasaď novější image, nebo ve values změň `FCGI_SOCKET_PATH` na `":7779"` |
 | v logu `fcgi` vzorového nasazení je `[entrypoint] VAROVANI: bezi vzorovy web … zapeceny v image … neni urcen pro verejny provoz` | není to chyba, ale upozornění: image vzorového webu je ukázka (každý návštěvník je v ní ve skupině `admin`). Do veřejného provozu nasaď vlastní web z vlastního image, viz [Vlastní web](#vlastní-web) |
-| `make k8s-test`: chyba certifikátu | certifikát se ještě vystavuje (`make k8s-status`, sloupec `READY` u certifikátu); důvod případné chyby: `kubectl --context <kontext> -n pwe describe certificate pwe-<název>-web-tls` |
+| `make k8s-test`: chyba certifikátu | certifikát se ještě vystavuje (`make k8s-status`, sloupec `READY` u certifikátu); důvod případné chyby: `kubectl --context <kontext> -n pwe-<název> describe certificate pwe-<název>-web-tls` |
 | při prvním nasazení je v logu `fcgi` několikrát `[E] … Connect to mariadb … error:2003 Can't connect` | databáze teprve startuje; engine zkouší připojení po 1 s, nejvýš 60×. Jakmile se připojí, pokračuje; když se do té doby nepřipojí, proces skončí (`Unable connect to db1`) a Kubernetes kontejner spustí znovu |
 | v logu `fcgi` druhého podu je `Dbversion: migraci databaze dbid:db1 provadi jiny proces, cekam na zamek spojeni (… s)` | není to chyba: schéma právě zakládá (migruje) první pod a druhý čeká na zámek migrace; jakmile první skončí, pokračuje sám. První hláška je úrovně info (při `log.loglevel` 2 z values vidět není), po 30 s čekání se opakuje jako `[E]`. Když čekání nekončí a žádný pod nemigruje, podívej se do logu prvního podu (`make k8s-logs K8S=<název> ARGS='-c fcgi'`) |
 | pod `fcgi` se restartuje, v logu `Connect to mariadb … connect_status:0 error:1045 Access denied` | heslo v `secrets-<název>.yml` nesouhlasí se svazkem databáze — viz [Hesla](#hesla) |

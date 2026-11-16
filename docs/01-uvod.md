@@ -169,8 +169,8 @@ PWE/                          KOŘEN REPOZITÁŘE (pracovní kopie; v kontejnere
 ├── Makefile                  jednotný vstup pro vývoj (make new/module/check/cgi/run/test/images/k8s-*)
 ├── docker-compose.yml        vývojový stack: nginx + 3× fcgi + databáze
 ├── docker-compose/           soubory stacku: docker-compose_nginx.conf (nginx) a docker-compose_*.env (proměnné služeb)
-├── kubernetes/               nasazení do Kubernetes (make k8s-*, chart nxs-universal-chart): values-static.yml,
-│                             values-generic.yml, vzory secrets-generic.example.yml a local.env.example, README.md
+├── kubernetes/               nasazení do Kubernetes (make k8s-*, chart nxs-universal-chart): values-example-static.yml,
+│                             values-example-mariadb.yml, vzory secrets-example-mariadb.example.yml a local.env.example, README.md
 ├── docker-bake.hcl           sestavení 9 image PWE (cíle a tagy pro docker buildx bake)
 ├── .github/                  GitHub Actions: workflows/images.yml (testy, sestavení, kouřové kontroly a publikace
 │                             image do ghcr.io/kukam z výchozí větve a z větví v proměnné PUBLISH_BRANCHES),

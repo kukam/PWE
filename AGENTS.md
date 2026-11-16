@@ -281,7 +281,7 @@ Detaily: [`docs/05-validace.md`](docs/05-validace.md). Při POST musí být `pag
   s `PROFILE=static`.
 - **Kubernetes** ([`kubernetes/README.md`](kubernetes/README.md)): `make k8s-image | k8s-template |
   k8s-deploy | k8s-status | k8s-test | k8s-logs | k8s-delete K8S=<název>` (vzorová nasazení berou
-  hotové image vzorových webů z registru: `static` = `pwe-example-static` s `example.web`, `generic` =
+  hotové image vzorových webů z registru: `example-static` = `pwe-example-static` s `example.web`, `example-mariadb` =
   `pwe-example-mariadb` s `example-db.web` + MariaDB — nic se nestaví; `make k8s-image` je jen pro
   vlastní web a staví jeho `Dockerfile` nad `pwe-<profil>`, bez databáze nad `pwe-base`; release
   `pwe-<název>`, skript `PWE/tools/k8s.sh`, chart

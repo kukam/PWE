@@ -13,7 +13,7 @@
 #   make images [ARGS='base debugger']   sestavi image do lokalniho Dockeru s tagy <verze> a latest: vsech 9, nebo jen vybrane cile (zavislostni image
 #                                  base mariadb mysql postgres debugger, vzorove weby example-static example-mariadb example-mysql example-postgres); ARGS='--help' vypise volby
 #   make images-check [ARGS='pwe-base pwe-example-static']   kourove kontroly image v lokalnim Dockeru (PWE/tools/smoke-images.sh; bez ARGS vsech 9 image aktualniho registru a tagu)
-#   make k8s-image|k8s-template|k8s-deploy|k8s-status|k8s-test|k8s-logs|k8s-delete K8S=static|generic [ARGS=...]
+#   make k8s-image|k8s-template|k8s-deploy|k8s-status|k8s-test|k8s-logs|k8s-delete K8S=example-static|generic [ARGS=...]
 #                                  nasazeni do Kubernetes (PWE/tools/k8s.sh, navod kubernetes/README.md); cluster
 #                                  jen pres KUBE_CONTEXT v kubernetes/local.env - aktualni kontext kubectl se nepouziva
 #

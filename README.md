@@ -74,7 +74,7 @@ Rozcestník všech kapitol: [`docs/README.md`](docs/README.md).
 | [`webapps/`](webapps/README.md) | weby postavené nad enginem (vlastní weby jsou mimo tento git: `.gitignore webapps/*`) |
 | [`docs/`](docs/README.md) | dokumentace |
 | `Makefile`, `docker-compose.yml`, `docker-compose/` | vývojový stack: nginx + 3× engine + databáze (`make run`); v adresáři `docker-compose/` je konfigurace nginx (`docker-compose_nginx.conf`) a proměnné prostředí služeb (`docker-compose_*.env`) |
-| [`kubernetes/`](kubernetes/README.md) | nasazení do Kubernetes chartem `nxs-universal-chart` (`make k8s-*`, skript `PWE/tools/k8s.sh`): hodnoty `values-static.yml` (image `pwe-example-static` se vzorovým webem `example.web`) a `values-generic.yml` (image `pwe-example-mariadb` s `example-db.web` + MariaDB) — vzorová nasazení berou hotové image vzorových webů, nic se nestaví; vzory `secrets-generic.example.yml` a `local.env.example`; cílový cluster jen přes povinný `KUBE_CONTEXT` ([17 — Nasazení](docs/17-nasazeni.md#kubernetes)) |
+| [`kubernetes/`](kubernetes/README.md) | nasazení do Kubernetes chartem `nxs-universal-chart` (`make k8s-*`, skript `PWE/tools/k8s.sh`): hodnoty `values-example-static.yml` (image `pwe-example-static` se vzorovým webem `example.web`) a `values-example-mariadb.yml` (image `pwe-example-mariadb` s `example-db.web` + MariaDB) — vzorová nasazení berou hotové image vzorových webů, nic se nestaví; vzory `secrets-example-mariadb.example.yml` a `local.env.example`; cílový cluster jen přes povinný `KUBE_CONTEXT` ([17 — Nasazení](docs/17-nasazeni.md#kubernetes)) |
 | `PWE/docker/`, `docker-bake.hcl` | sestavení image: jeden vícestupňový `Dockerfile` závislostních image + `entrypoint.sh` (vstupní skript všech image, i image webu), cíle a tagy všech devíti image pro `docker buildx bake` (`make images`, kouřové kontroly `make images-check`); image vzorových webů staví `Dockerfile` vzorového webu |
 | `.github/` | GitHub Actions: `workflows/images.yml` (testy enginu, sestavení, kouřové kontroly a publikace image do `ghcr.io/kukam` — publikuje jen výchozí větev a větve z proměnné repozitáře `PUBLISH_BRANCHES`), `workflows/tests.yml` (jen testy pro změny compose, `kubernetes/` a `Makefile`), `dependabot.yml` (týdenní aktualizace akcí připnutých na SHA) |
 | [`AGENTS.md`](AGENTS.md) | závazná pravidla pro AI asistenty |
@@ -126,7 +126,7 @@ Engine na `SIGTERM` pořádaně skončí (rozpracovaný request doběhne) a posl
 `FCGI_SOCKET_PATH` — TCP (`:7779`, `127.0.0.1:7779`) nebo unix socket. Image běží v UTC; časové pásmo
 pro požadavky předává webserver (`fastcgi_param TZ`) nebo `/etc/localtime` kontejneru — samotná
 proměnná `TZ` nestačí. Podrobnosti, nginx, proměnné prostředí, Kubernetes a produkční checklist:
-[`docs/17-nasazeni.md`](docs/17-nasazeni.md); nasazení do Kubernetes (`make k8s-deploy K8S=static`,
+[`docs/17-nasazeni.md`](docs/17-nasazeni.md); nasazení do Kubernetes (`make k8s-deploy K8S=example-static`,
 vždy s výslovným `KUBE_CONTEXT`): [`kubernetes/README.md`](kubernetes/README.md).
 Ladění ve VS Code: [`docs/16-nastroje.md`](docs/16-nastroje.md).
 

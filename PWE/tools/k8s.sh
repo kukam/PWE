@@ -52,7 +52,8 @@
 #                      KUBERNETES_MASTER), skript pred spustenim rusi - z prostredi i z local.env.
 #                      KUBECONFIG se respektuje: urcuje jen soubor s kontexty, kontext v nem vybira
 #                      vzdy KUBE_CONTEXT.
-#   K8S_NAMESPACE      namespace (vychozi pwe); jinak nez touto promennou se nenastavuje
+#   K8S_NAMESPACE      namespace (vychozi = nazev releasu pwe-<nazev>, kazde nasazeni ma vlastni); jinak nez
+#                      touto promennou se nenastavuje
 #   K8S_DOMAIN         domena; web bezi na pwe-<nazev>.<K8S_DOMAIN> (povinna, pokud values nema pweHost)
 #   K8S_ISSUER         ClusterIssuer cert-manageru pro certifikat (povinny pro deploy)
 #   K8S_REGISTRY       registr, ve kterem je nasazovany image (bez nazvu image); deploy v nem zjistuje digest.
@@ -247,7 +248,9 @@ if [ "$CMD" = logs ]; then
 fi
 
 RELEASE="pwe-$NAME"
-NAMESPACE="${K8S_NAMESPACE:-pwe}"
+# Kazde nasazeni ma vlastni namespace pojmenovany jako release (pwe-<nazev>); K8S_NAMESPACE ho prepise
+# (hodnota z kubernetes/local.env by ale platila pro VSECHNA nasazeni - davej ji jen na prikazovou radku).
+NAMESPACE="${K8S_NAMESPACE:-$RELEASE}"
 CHART="${K8S_CHART:-oci://registry.nixys.ru/nuc/nxs-universal-chart}"
 CHART_VERSION="${K8S_CHART_VERSION:-3.2.2}"
 HELM="${HELM:-helm}"
@@ -795,7 +798,7 @@ case "$CMD" in
         need_helm
         need_context
         set_dry_run "$@"
-        # helm uninstall bere kazdy argument bez pomlcky jako DALSI release: "delete static pwe-generic"
+        # helm uninstall bere kazdy argument bez pomlcky jako DALSI release: "delete static pwe-example-mariadb"
         # by odinstaloval i release, jehoz soubor s hesly pojistka nize nekontroluje. Povolene jsou jen
         # prepinace; hodnota oddelena mezerou se preskoci u prepinacu helm uninstall, ktere hodnotu maji.
         skip_value=0

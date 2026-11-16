@@ -5,7 +5,7 @@
 #   image:   ghcr.io/kukam/pwe-example-mariadb - hotovy image vzoroveho webu: knihovny a ovladac databaze
 #            (zavislostni image pwe-mariadb), engine (/PWE/PWE) a web (/PWE/webapps/example-db.web); pro
 #            toto nasazeni se zadny image nestavi
-#   postup:  kubernetes/README.md  (make k8s-deploy K8S=generic)
+#   postup:  kubernetes/README.md  (make k8s-deploy K8S=example-mariadb)
 #
 # Web: jeden pod = dva kontejnery, nginx (port 80) a engine (FastCGI na 127.0.0.1:7779, tedy jen uvnitr
 # podu). Statiku - static/ a assets/ webu a assets/ enginu - zkopiruje pri startu initContainer z image
@@ -14,10 +14,10 @@
 # Databaze: MariaDB jako StatefulSet s vlastnim svazkem (PVC), dostupna jen uvnitr clusteru na
 # <release>-mariadb:3306. Schema si pri prvnim startu zalozi engine sam (migrace conf/mariadb.dbversion).
 #
-# Hesla databaze v tomto souboru NEJSOU: jsou v kubernetes/secrets-generic.yml (neni v gitu). Pri prvnim
-# make k8s-deploy K8S=generic ho PWE/tools/k8s.sh zalozi ze secrets-generic.example.yml s nahodnymi hesly.
+# Hesla databaze v tomto souboru NEJSOU: jsou v kubernetes/secrets-example-mariadb.yml (neni v gitu). Pri prvnim
+# make k8s-deploy K8S=example-mariadb ho PWE/tools/k8s.sh zalozi ze secrets-example-mariadb.example.yml s nahodnymi hesly.
 #
-# Vlastni web s MariaDB: zkopiruj tento soubor jako values-<nazev>.yml (a secrets-generic.example.yml jako
+# Vlastni web s MariaDB: zkopiruj tento soubor jako values-<nazev>.yml (a secrets-example-mariadb.example.yml jako
 # secrets-<nazev>.example.yml), uprav generic.pweWeb a generic.pweImage (a pripadne generic.pweHost),
 # nastav K8S_REGISTRY, sestav image webu (make k8s-image K8S=<nazev>; webapps/<web>/Dockerfile z korene
 # repozitare: zavislostni image pwe-mariadb + engine z pracovni kopie + web) a nasad ho
