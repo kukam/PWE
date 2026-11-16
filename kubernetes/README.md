@@ -221,7 +221,7 @@ $EDITOR kubernetes/local.env
 | `K8S_PULL_REGISTRY` | registr, ze kterého image tahá cluster — jen když se liší (proxy cache). Musí to být zrcadlo registru `K8S_REGISTRY`; s jiným `K8S_REGISTRY` změň i tuto proměnnou (viz [Image a tagy](#image-a-tagy)) |
 | `K8S_IMAGE_TAG` | tag nasazovaného image — viz [Image a tagy](#image-a-tagy). Výchozí: vzorová nasazení verze enginu z `PWE/VERSION`, vlastní web `latest` |
 | `K8S_PLATFORM` | platforma image vlastního webu (výchozí `linux/amd64`) |
-| `K8S_HELM_ARGS` | další argumenty pro `helm`, např. `--set-string generic.pweNginxImage=…`; dělí se na mezerách, hodnoty s mezerou nejdou |
+| `K8S_HELM_ARGS` | další argumenty pro `helm`, např. `--set-string generic.pweMirror=harbor.example.com/dockerhub/library/` (předpona registru pro image třetích stran — nginx a databázi — platná pro všechna nasazení; image PWE se berou z `ghcr.io/kukam`); dělí se na mezerách, hodnoty s mezerou nejdou |
 | `K8S_TIMEOUT` | jak dlouho `make k8s-deploy` čeká na připravené pody (výchozí `10m`) |
 | `K8S_TAIL` | počet řádků logu na kontejner pro `make k8s-logs` (výchozí `100`) |
 | `K8S_MAX_LOG_REQUESTS` | z kolika kontejnerů smí `make k8s-logs` číst současně (výchozí `20`; zvyš při větším počtu podů) |

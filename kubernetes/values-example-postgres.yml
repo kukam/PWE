@@ -51,6 +51,10 @@ generic:
   pweIssuer: letsencrypt           # ClusterIssuer cert-manageru pro certifikat      (K8S_ISSUER)
   # --- dalsi hodnoty make k8s-deploy sam neprepisuje: zmen je tady, nebo je predej pres K8S_HELM_ARGS
   #     (napr. --set-string generic.pweNginxImage=harbor.example.com/dockerhub/library/nginx) ---
+  # Predpona registru pro image tretich stran (nginx, databaze), VCETNE lomitka na konci. Prazdna = primo
+  # Docker Hub. Cluster, ktery taha Docker Hub pres proxy cache, ji nastavi jednou pro vsechna nasazeni:
+  # K8S_HELM_ARGS=--set-string generic.pweMirror=harbor.example.com/dockerhub/library/
+  pweMirror: ""
   pweNginxImage: nginx             # image webserveru (bez tagu)
   pweNginxImageTag: stable
   pweTimezone: Europe/Prague       # casove pasmo kontejneru enginu a databaze (promenna TZ)
@@ -233,7 +237,7 @@ deployments:
           - name: uploadfile
             mountPath: "/PWE/webapps/{{ .Values.generic.pweWeb }}/uploadfile"
       - name: nginx
-        image: "{{ .Values.generic.pweNginxImage }}"
+        image: "{{ .Values.generic.pweMirror }}{{ .Values.generic.pweNginxImage }}"
         imageTag: "{{ .Values.generic.pweNginxImageTag }}"
         # Pred SIGTERM pocka 5 s: ingress mezitim vyradi pod z endpointu a rozpracovane pozadavky dobehnou.
         lifecycle:
@@ -296,7 +300,7 @@ statefulSets:
         type: RuntimeDefault
     containers:
       - name: postgres
-        image: "{{ .Values.generic.pweDbImage }}"
+        image: "{{ .Values.generic.pweMirror }}{{ .Values.generic.pweDbImage }}"
         imageTag: "{{ .Values.generic.pweDbImageTag }}"
         ports:
           - name: postgres

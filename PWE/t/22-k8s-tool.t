@@ -1361,6 +1361,12 @@ foreach my $t (['example-static', 'pwe-example-static', 'static', 'example.web']
     like($v, qr/fastcgi_pass 127\.0\.0\.1:7779;/, "values-$name.yml: nginx se pripojuje na 127.0.0.1:7779");
     is(scalar(() = $v =~ m{command: \["bash", "-c", "exec 3<>/dev/tcp/127\.0\.0\.1/7779"\]}g), 3, "values-$name.yml: tri sondy enginu zkouseji 127.0.0.1:7779 zevnitr kontejneru");
     like($v, qr/^networkPolicies:\n(?:.*\n)*?  web:\n(?:.*\n)*?          - port: 80\n/m, "values-$name.yml: NetworkPolicy webu (port 80) zustava");
+    # Image tretich stran (nginx, databaze) maji spolecnou predponu registru generic.pweMirror: jedno nastaveni
+    # proxy cache pak plati pro vsechna nasazeni (prepis generic.pweDbImage by vsem vnutil stejnou databazi).
+    like($v, qr/^  pweMirror: ""$/m, "values-$name.yml: vychozi pweMirror je prazdny (image tretich stran primo z Docker Hubu)");
+    like($v, qr/image: "\{\{ \.Values\.generic\.pweMirror \}\}\{\{ \.Values\.generic\.pweNginxImage \}\}"\n/, "values-$name.yml: image nginx = pweMirror + pweNginxImage");
+    unlike($v, qr/image: "\{\{ \.Values\.generic\.pwe(?:Nginx|Db)Image \}\}"/, "values-$name.yml: zadny image tretich stran bez predpony pweMirror");
+    like($v, qr/image: "\{\{ \.Values\.generic\.pweMirror \}\}\{\{ \.Values\.generic\.pweDbImage \}\}"\n/, "values-$name.yml: image databaze = pweMirror + pweDbImage") if ($profile ne 'static');
 }
 # Databazove varianty: StatefulSet a NetworkPolicy databaze, heslo enginu z tehoz Secretu jako heslo databaze,
 # vzor hesel pro kazdou variantu a zadny pozustatek jine databaze.

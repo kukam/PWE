@@ -10,6 +10,33 @@ dnešního názvu (`PWE/…`); kde záznam popisuje tehdejší stav, je to výsl
 Podle dnešního umístění jsou psané i cesty k souborům vývojového stacku (`docker-compose/`) a nasazení
 do Kubernetes (`kubernetes/`), přesunutým 15. 11. 2026 (viz 2.2.0).
 
+## 2.2.2 — 2026-11-16
+
+Úpravy sestavení image, pipeline a nasazení do Kubernetes po vydání 2.2.1. Engine (`PWE/Libs`, `pwe.fcgi`)
+se nemění; `pwe.require_core => ">=2.2"` vyhovuje dál.
+
+- Nástroje pro vývojáře (`PWE/tools`) už nejsou součástí image webu (engine je za běhu nepotřebuje) a spolu
+  s testy (`PWE/t`) přestaly být vstupem image: změna skriptu nebo testu spouští jen workflow Tests, image se
+  kvůli ní nesestavují ani nepublikují (výjimkou jsou kouřové kontroly `smoke-images.sh` a `lib/images.sh`,
+  brána před publikací). `make k8s-delete` odmítne název dalšího releasu v `ARGS` (obešel by
+  pojistku hesel).
+
+- Kubernetes: vzorová nasazení se jmenují podle image (`example-static`, `example-mariadb`, nově i
+  `example-mysql` a `example-postgres`; soubory `kubernetes/values-example-*.yml`), takže release i adresa webu
+  jsou `pwe-example-<varianta>`. Každé nasazení má vlastní namespace pojmenovaný jako release (dřív společný
+  `pwe`); `K8S_NAMESPACE` ho přepíše.
+- Kubernetes: nová hodnota `generic.pweMirror` — společná předpona registru pro image třetích stran (nginx,
+  databáze). Cluster, který tahá Docker Hub přes proxy cache, ji nastaví jednou pro všechna nasazení
+  (`K8S_HELM_ARGS=--set-string generic.pweMirror=<registr>/`); image PWE se berou z `ghcr.io/kukam`.
+- `make images` s registrem na Docker Hubu (`PWE_IMAGE_REGISTRY=docker.io/<účet>`): image vzorových webů se
+  staví nad právě sestaveným základem (dřív nad tím, co bylo v registru).
+- `make check` upozorní i na `Dockerfile` webu, který ještě kopíruje `PWE/tools`; `make k8s-logs` snese
+  slepené tvary přepínače `-c`.
+- `.dockerignore`: do image webu se nedostanou ani úložiště klíčů (`*.jks`, `*.keystore`), soukromé klíče SSH
+  (`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`) a `*.P12`, `*.PFX`.
+- Vzorový web `example-db.web`: klíče `dbversion_session_lock` a `dbversion_legacy_lock_wait` v `conf/*.conf`
+  (jdou tak přepsat proměnnou prostředí).
+
 ## 2.2.1 — 2026-11-16
 
 Opravy jádra enginu (ukončování procesu, FastCGI socket, zámek migrace schématu) a nové uspořádání image.
@@ -192,17 +219,6 @@ v `docs/03-struktura-webu.md`, „Zámek migrace“, a `docs/17-nasazeni.md`, �
     `KUBE_CONTEXT` a `K8S_NAMESPACE`, skript před spuštěním ruší a oznámí to. Neznámá hodnota `--dry-run` se
     odmítne;
   - `make k8s-image` odmítne `Dockerfile` webu ze starší šablony ještě před sestavením.
-
-- Nástroje pro vývojáře (`PWE/tools`) už nejsou součástí image webu (engine je za běhu nepotřebuje) a spolu
-  s testy (`PWE/t`) přestaly být vstupem image: změna skriptu nebo testu spouští jen workflow Tests, image se
-  kvůli ní nesestavují ani nepublikují (výjimkou jsou kouřové kontroly `smoke-images.sh` a `lib/images.sh`,
-  brána před publikací). `make k8s-delete` odmítne název dalšího releasu v `ARGS` (obešel by
-  pojistku hesel).
-
-- Kubernetes: vzorová nasazení se jmenují podle image (`example-static`, `example-mariadb`, nově i
-  `example-mysql` a `example-postgres`; soubory `kubernetes/values-example-*.yml`), takže release i adresa webu
-  jsou `pwe-example-<varianta>`. Každé nasazení má vlastní namespace pojmenovaný jako release (dřív společný
-  `pwe`); `K8S_NAMESPACE` ho přepíše.
 
 **Testy:** nové `t/23-dbversion-lock.t` (zámek migrace nad falešnou databází), `t/24-shutdown.t` (ukončování
 a socket nad skutečným FastCGI serverem) a `t/25-pipeline.t` (pravidla workflow: devět image, kdo publikuje,
