@@ -33,8 +33,18 @@ webapps/*/**/*.PEM
 webapps/*/**/*.key
 webapps/*/**/*.KEY
 webapps/*/**/*.p12
+webapps/*/**/*.P12
 webapps/*/**/*.pfx
+webapps/*/**/*.PFX
 webapps/*/**/*.env
+# Uloziste klicu Javy a soukrome klice SSH - ty byvaji bez pripony, proto presnym jmenem souboru
+# (verejne protejsky id_rsa.pub apod. zustavaji).
+webapps/*/**/*.jks
+webapps/*/**/*.keystore
+webapps/*/**/id_rsa
+webapps/*/**/id_dsa
+webapps/*/**/id_ecdsa
+webapps/*/**/id_ed25519
 # Lokalni nastaveni editoru
 webapps/*/.vscode
 **/.DS_Store

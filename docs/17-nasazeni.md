@@ -1049,7 +1049,9 @@ v registru.
   stačí sestavit image webu z pracovní kopie s úpravou.
 - **Do image se nedostanou dočasná data ani tajné údaje.** Kořenový `.dockerignore`
   z kontextu vynechává `webapps/*/conf/local.env` (tajné údaje), soukromé klíče, certifikáty a soubory
-  `*.env` kdekoli v adresáři webu (`*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.env`),
+  `*.env` kdekoli v adresáři webu (`*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.env`, úložiště klíčů `*.jks`
+  a `*.keystore` a soukromé klíče SSH `id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`; soukromý klíč
+  s jiným názvem by se do image dostal — pojmenuj ho některou z těchto přípon, nebo ho drž mimo adresář webu),
   `webapps/*/conf/database.conf` (symlink podle zapečeného profilu vytvoří `RUN` šablony při
   sestavení), dočasné adresáře webu (`ramdisk`, `log`, `sessions`, `uploadfile`, `temp`), git webu
   (`**/.git`), lokální nastavení editoru (`webapps/*/.vscode`) a testy enginu (`PWE/t`). Do image se tedy

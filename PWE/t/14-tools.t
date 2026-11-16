@@ -1264,10 +1264,12 @@ SKIP: {
         'conf/klient.p12', 'conf/csob/klient.pfx', 'conf/local.env', 'conf/database.conf', '.env', '.vscode/launch.json', '.git/config',
         'log/pwe.log', 'sessions/C0AA', 'ramdisk/templates/x.tmplc', 'uploadfile/faktura.pdf',
         'keys/private.pem', 'private.key', 'conf/csob/PRIVATE.PEM', 'conf/.env', 'conf/csob/local.env',
+        'conf/klient.P12', 'conf/csob/KLIENT.PFX', 'conf/brana.jks', 'keys/uloziste.keystore',
+        'keys/id_rsa', 'conf/ssh/id_ed25519', 'id_ecdsa', 'conf/id_dsa',
     );
     my @kept = (
         'conf/web.conf', 'conf/mariadb.conf', 'conf/mariadb.dbversion', 'conf/local.env.example', 'conf/csob/README',
-        'conf/csob/mips_platebnibrana.csob.cz.pub', 'Pages/default/default.pm', 'Pages/default/rb.tmpl', 'static/css/site.css', 'Dockerfile', 'README.md',
+        'conf/csob/mips_platebnibrana.csob.cz.pub', 'keys/id_rsa.pub', 'conf/ssh/id_ed25519.pub', 'Pages/default/default.pm', 'Pages/default/rb.tmpl', 'static/css/site.css', 'Dockerfile', 'README.md',
     );
     skip '.dockerignore neni k dispozici (engine bez korene repozitare)', scalar(@secret) + scalar(@kept) + 11 unless (length($ignore));
     my @patterns = grep { length($_) and $_ !~ /^#/ } map { my $l = $_; $l =~ s/^\s+|\s+$//g; $l } split(/\n/, $ignore);
